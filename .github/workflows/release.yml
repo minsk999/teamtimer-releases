@@ -52,7 +52,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          npm run ${{ matrix.script }} 2>&1 | tee build.log
+          npm run ${{ matrix.script }} -- --publish never 2>&1 | tee build.log
 
       - name: Push build log to repo (debug, failure only)
         if: failure()
