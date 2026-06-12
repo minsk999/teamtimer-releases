@@ -1,0 +1,88 @@
+{
+  "name": "jakeop-timer",
+  "version": "1.0.0",
+  "description": "작업 타이머 - 마감까지 남은 시간을 한눈에",
+  "main": "main.js",
+  "author": "ADEF Video Team",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "kr.co.adef.jakeop-timer",
+    "productName": "작업 타이머",
+    "afterSign": "build/afterSign.js",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "build-secrets.js",
+      "renderer/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "build/icon.icns",
+      "build/tray.ico",
+      "build/tray.png",
+      "build/tray-dot.ico",
+      "build/tray-dot.png",
+      "build/overlay-dot.png"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "artifactName": "TeamTimer-${version}-${arch}.${ext}",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "identity": "-",
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "작업 타이머",
+      "artifactName": "TeamTimer-Setup-${version}.${ext}"
+    },
+    "dmg": {
+      "artifactName": "TeamTimer-${version}-${arch}.${ext}"
+    }
+  }
+}

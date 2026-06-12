@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BatchRenameComps · 사용 설명서</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20512%20512%22%20width%3D%22512%22%20height%3D%22512%22%3E%3Crect%20x%3D%2240%22%20y%3D%2240%22%20width%3D%22432%22%20height%3D%22432%22%20rx%3D%22116%22%20fill%3D%22%230a0a0a%22/%3E%3Cpath%20d%3D%22M150%20330%20L150%20276%20L324%20102%20L378%20156%20L204%20330%20Z%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%2230%22%20stroke-linejoin%3D%22round%22/%3E%3Cpath%20d%3D%22M296%20130%20L350%20184%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%2230%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M150%20330%20L204%20330%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%2230%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M150%20392%20L380%20392%22%20fill%3D%22none%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%2226%22%20stroke-linecap%3D%22round%22%20opacity%3D%220.55%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --bg:#ffffff; --bg-soft:#f5f5f4; --surface:#ffffff; --surface-2:#fafafa;
+    --ink:#0a0a0a; --ink-2:#71717a; --ink-3:#a1a1aa; --line:#ebebe8;
+    --pill:#0a0a0a; --pill-text:#ffffff; --shadow:rgba(10,10,10,0.08);
+    --red:#dc2626; --red-bg:#fef2f2; --orange:#ea580c; --orange-bg:#fff7ed;
+    --green:#16a34a; --green-bg:#f0fdf4; --blue:#2563eb; --blue-bg:#eff6ff;
+    --radius:18px;
+  }
+  html.dark{
+    --bg:#0a0a0a; --bg-soft:#18181b; --surface:#161616; --surface-2:#1e1e1e;
+    --ink:#e4e4e7; --ink-2:#8f8f97; --ink-3:#63636b; --line:#2a2a2e;
+    --pill:#e4e4e7; --pill-text:#161616; --shadow:rgba(0,0,0,0.4);
+    --red:#f87171; --red-bg:#2a1414; --orange:#fb923c; --orange-bg:#2a1c10;
+    --green:#4ade80; --green-bg:#0f2417; --blue:#60a5fa; --blue-bg:#0f1c2e;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth; scroll-padding-top:90px;}
+  body{
+    font-family:'Inter Tight','Pretendard',sans-serif;
+    background:var(--bg); color:var(--ink);
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+    letter-spacing:-0.011em;
+    transition:background .35s ease, color .35s ease;
+  }
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:radial-gradient(110% 60% at 50% -10%, var(--bg-soft) 0%, transparent 60%);
+    opacity:.7;
+  }
+
+  /* 상단바 */
+  header{
+    position:sticky; top:0; z-index:50;
+    background:color-mix(in srgb, var(--bg) 82%, transparent);
+    backdrop-filter:blur(14px) saturate(1.2);
+    border-bottom:1px solid var(--line);
+  }
+  .bar{max-width:1080px; margin:0 auto; padding:14px 24px; display:flex; align-items:center; gap:14px;}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:-0.03em; font-size:16px;}
+  .logo{width:30px; height:30px; background:var(--pill); border-radius:9px; display:grid; place-items:center; flex-shrink:0;}
+  .logo svg{width:18px; height:18px; stroke:var(--pill-text); fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+  .ver{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-3); border:1px solid var(--line); padding:2px 7px; border-radius:20px; font-weight:600;}
+  .spacer{flex:1;}
+  .theme-btn{
+    width:38px; height:38px; border-radius:11px; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink-2); cursor:pointer; display:grid; place-items:center;
+    transition:all .15s;
+  }
+  .theme-btn:hover{color:var(--ink); border-color:var(--ink-3);}
+  .theme-btn svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:2;}
+
+  /* 레이아웃 */
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px; position:relative; z-index:1;}
+  .layout{display:grid; grid-template-columns:200px 1fr; gap:48px; align-items:start;}
+  nav.toc{position:sticky; top:90px; padding:36px 0; display:flex; flex-direction:column; gap:2px;}
+  nav.toc a{
+    font-size:13px; color:var(--ink-3); text-decoration:none; padding:7px 12px; border-radius:9px;
+    transition:all .15s; font-weight:500; border-left:2px solid transparent;
+  }
+  nav.toc a:hover{color:var(--ink); background:var(--surface-2);}
+  nav.toc a.active{color:var(--ink); background:var(--surface-2); font-weight:600;}
+  main{padding:36px 0 120px; min-width:0;}
+
+  /* 히어로 */
+  .hero{padding:46px 0 30px;}
+  .hero .eyebrow{font-size:13px; font-weight:600; color:var(--ink-3); letter-spacing:.04em; text-transform:uppercase; margin-bottom:14px;}
+  .hero h1{font-size:clamp(34px,6vw,54px); font-weight:800; letter-spacing:-0.04em; line-height:1.18;}
+  .hero p{font-size:17px; color:var(--ink-2); margin-top:18px; max-width:560px;}
+  .hero .meta{display:flex; gap:8px; margin-top:26px; flex-wrap:wrap;}
+  .chip{font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:20px; background:var(--surface-2); border:1px solid var(--line); color:var(--ink-2);}
+  .chip.dark{background:var(--pill); color:var(--pill-text); border-color:var(--pill);}
+
+  /* 섹션 */
+  section{padding:30px 0; scroll-margin-top:90px; opacity:0; transform:translateY(16px); transition:opacity .6s ease, transform .6s ease;}
+  section.in{opacity:1; transform:none;}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:6px;}
+  .sec-num{font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700; color:var(--ink-3);}
+  h2{font-size:27px; font-weight:700; letter-spacing:-0.03em;}
+  .lead{color:var(--ink-2); font-size:15.5px; margin:10px 0 22px; max-width:640px;}
+  h3{font-size:16px; font-weight:700; margin:24px 0 10px; letter-spacing:-0.02em;}
+
+  /* 카드 */
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:24px 26px; box-shadow:0 1px 2px var(--shadow);}
+  .card + .card{margin-top:14px;}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:stretch;}
+  .grid2 > .card{height:100%;}
+  .grid2 > .card + .card{margin-top:0;}
+  .grid2 + .card{margin-top:14px;}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr;}}
+
+  /* 단계 리스트 */
+  ol.steps{list-style:none; counter-reset:s; display:flex; flex-direction:column; gap:14px;}
+  ol.steps li{counter-increment:s; display:flex; gap:14px; align-items:flex-start;}
+  ol.steps li::before{
+    content:counter(s); flex-shrink:0; width:26px; height:26px; border-radius:8px;
+    background:var(--pill); color:var(--pill-text); font-size:13px; font-weight:700;
+    display:grid; place-items:center; font-family:'JetBrains Mono',monospace; margin-top:1px;
+  }
+  ol.steps li .t{font-size:14.5px; line-height:1.7;}
+  ol.steps li .t b{font-weight:700;}
+
+  ul.bul{list-style:none; display:flex; flex-direction:column; gap:14px;}
+  ul.bul li{display:flex; gap:11px; align-items:flex-start; font-size:14.5px; line-height:1.7; color:var(--ink);}
+  ul.bul li::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--ink-3); margin-top:9px; flex-shrink:0;}
+  ul.bul li b{font-weight:700;}
+
+  /* 플랫폼 탭 */
+  .tabs{display:inline-flex; gap:3px; background:var(--surface-2); border:1px solid var(--line); padding:4px; border-radius:13px; margin-bottom:18px;}
+  .tabs button{
+    font-family:inherit; font-size:13.5px; font-weight:600; padding:8px 18px; border:none; border-radius:9px;
+    background:transparent; color:var(--ink-2); cursor:pointer; transition:all .15s; display:flex; align-items:center; gap:7px;
+  }
+  .tabs button.on{background:var(--pill); color:var(--pill-text);}
+  .tabs button svg{width:15px; height:15px;}
+  .pane{display:none;}
+  .pane.on{display:block; animation:fade .35s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;}}
+
+  /* 키캡 */
+  .kbd{
+    display:inline-grid; place-items:center; min-width:30px; height:30px; padding:0 9px;
+    font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:700;
+    background:var(--surface-2); border:1.5px solid var(--line); border-bottom-width:3px; border-radius:8px; color:var(--ink);
+    vertical-align:middle;
+  }
+  .key-table{display:flex; flex-direction:column; gap:0;}
+  .key-row{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 0; border-bottom:1px solid var(--line);}
+  .key-row:last-child{border-bottom:none;}
+  .key-row .label{font-size:14px;}
+  .key-row .label small{color:var(--ink-3); font-weight:500; display:block; margin-top:2px;}
+  .key-row .keys{display:flex; gap:5px; align-items:center; flex-shrink:0;}
+
+  /* 상태/색 점 */
+  .dots{display:flex; flex-direction:column; gap:13px;}
+  .dot-row{display:flex; align-items:center; gap:12px; font-size:14.5px;}
+  .dot{width:11px; height:11px; border-radius:50%; flex-shrink:0;}
+  .dot.r{background:var(--red);} .dot.o{background:var(--orange);} .dot.g{background:var(--green);} .dot.b{background:var(--blue);}
+  .dot-row b{font-weight:700;}
+
+  /* 노트 박스 */
+  .note{display:flex; gap:12px; padding:15px 17px; border-radius:13px; background:var(--surface-2); border:1px solid var(--line); font-size:13.5px; color:var(--ink-2); margin-top:16px;}
+  .note .ic{flex-shrink:0; width:20px; height:20px; border-radius:50%; background:var(--pill); color:var(--pill-text); display:grid; place-items:center; font-weight:800; font-size:12px; margin-top:1px;}
+  .note b{color:var(--ink); font-weight:700;}
+  .note.warn{background:var(--orange-bg); border-color:transparent;}
+  .note.warn .ic{background:var(--orange); color:#fff;}
+  .note.info{background:var(--blue-bg); border-color:transparent;}
+  .note.info .ic{background:var(--blue); color:#fff;}
+  /* 다운로드 카드 */
+  .dlcard{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:18px; margin:16px 0 28px;}
+  .dlinfo .dltitle{font-weight:700; font-size:16px; color:var(--ink);}
+  .dlinfo .dlmeta{font-size:13px; color:var(--ink-2); margin-top:3px;}
+  .dlbtn{display:inline-flex; align-items:center; gap:9px; font-family:inherit; font-size:14.5px; font-weight:700; padding:13px 22px; border-radius:12px; background:var(--pill); color:var(--pill-text); border:none; text-decoration:none; cursor:pointer; transition:transform .12s ease, box-shadow .12s ease, opacity .12s ease;}
+  .dlbtn:hover{opacity:.92; transform:translateY(-1px); box-shadow:0 6px 16px var(--shadow);}
+  .dlbtn svg{width:18px; height:18px;}
+  .dlbtn .sz{font-size:11px; font-weight:700; letter-spacing:.04em; opacity:.6; padding:2px 6px; border:1px solid currentColor; border-radius:6px; line-height:1;}
+
+  code{font-family:'JetBrains Mono','Pretendard',monospace; font-size:.88em; background:var(--surface-2); border:1px solid var(--line); padding:1px 6px; border-radius:6px; color:var(--ink); word-break:break-all;}
+  .codeblock{font-family:'JetBrains Mono','Pretendard',monospace; font-size:12.5px; background:var(--surface-2); border:1px solid var(--line); padding:13px 15px; border-radius:11px; color:var(--ink); overflow-x:auto; line-height:1.7; white-space:pre;}
+
+  /* 이름 구조 분해 */
+  .namebox{background:var(--surface-2); border:1px solid var(--line); border-radius:13px; padding:18px; overflow-x:auto;}
+  .nametokens{display:flex; flex-wrap:wrap; gap:6px; font-family:'JetBrains Mono','Pretendard',monospace; font-size:13px; align-items:center;}
+  .ntok{padding:5px 9px; border-radius:7px; font-weight:700; white-space:nowrap;}
+  .nsep{color:var(--ink-3); font-weight:700;}
+  .nlegend{display:flex; flex-direction:column; gap:10px; margin-top:18px;}
+  .nleg{display:flex; gap:10px; align-items:baseline; font-size:13.5px; line-height:1.55;}
+  .nleg .sw{width:11px; height:11px; border-radius:3px; flex-shrink:0; position:relative; top:1px;}
+  .nleg b{font-family:'JetBrains Mono','Pretendard',monospace; font-weight:700; font-size:12.5px;}
+  /* token palette */
+  .t-date{background:var(--blue-bg); color:var(--blue);}
+  .t-adv{background:var(--green-bg); color:var(--green);}
+  .t-camp{background:var(--orange-bg); color:var(--orange);}
+  .t-res{background:#f3e8ff; color:#9333ea;}
+  .t-worker{background:var(--red-bg); color:var(--red);}
+  .t-job{background:#fef9c3; color:#a16207;}
+  html.dark .t-res{background:#2a1a3a; color:#c084fc;}
+  html.dark .t-job{background:#2a2410; color:#fde047;}
+  .sw.t-date{background:var(--blue);} .sw.t-adv{background:var(--green);} .sw.t-camp{background:var(--orange);}
+  .sw.t-res{background:#9333ea;} .sw.t-worker{background:var(--red);} .sw.t-job{background:#a16207;}
+
+  /* 버튼 설명 그리드 */
+  .btnrow{display:flex; gap:14px; align-items:flex-start; padding:15px 0; border-bottom:1px solid var(--line);}
+  .btnrow:last-child{border-bottom:none;}
+  .btnrow .bi{width:38px; height:38px; border-radius:10px; background:var(--surface-2); border:1px solid var(--line); display:grid; place-items:center; flex-shrink:0; color:var(--ink); font-size:18px;}
+  .btnrow .bc{flex:1; min-width:0;}
+  .btnrow .bt{font-weight:700; font-size:14.5px; margin-bottom:3px;}
+  .btnrow .bd{font-size:13.5px; color:var(--ink-2);}
+  .btnrow .bd .rc{color:var(--ink); font-weight:600;}
+
+  footer{border-top:1px solid var(--line); padding:30px 0; color:var(--ink-3); font-size:13px; text-align:center;}
+
+  @media(max-width:860px){
+    .layout{grid-template-columns:1fr; gap:0;}
+    nav.toc{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="bar">
+    <div class="brand">
+      <span class="logo">
+        <svg viewBox="0 0 24 24"><path d="M5 16.5 L5 14 L15.5 3.5 L18 6 L7.5 16.5 Z"/><path d="M14 5 L16.5 7.5"/><path d="M5 20 L19 20"/></svg>
+      </span>
+      BatchRenameComps
+    </div>
+    <span class="ver">v1.0.0</span>
+    <span class="spacer"></span>
+    <button class="theme-btn" id="theme" aria-label="테마 전환">
+      <svg id="theme-ic" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="layout">
+
+    <nav class="toc" id="toc">
+      <a href="#start">시작하기</a>
+      <a href="#setup">처음 설정</a>
+      <a href="#naming">이름 구조</a>
+      <a href="#rename">이름 변경</a>
+      <a href="#buttons">하단 버튼</a>
+      <a href="#folder">폴더트리 생성</a>
+      <a href="#import">임포트·분류</a>
+      <a href="#render">렌더</a>
+      <a href="#tree">폴더트리 편집</a>
+      <a href="#shortcuts">단축키·히든</a>
+      <a href="#backup">설정 백업</a>
+      <a href="#script">스크립트(.jsx)</a>
+      <a href="#faq">자주 묻는 질문</a>
+    </nav>
+
+    <main>
+      <div class="hero">
+        <div class="eyebrow">영상팀 작업 관리 · 사용 설명서</div>
+        <h1>컴프 이름부터<br>폴더 정리까지, 한 패널에서.</h1>
+        <p>BatchRenameComps는 After Effects · Premiere Pro의 컴포지션/시퀀스 이름을 규칙대로 일괄 변경하고, 폴더트리 생성·소스 자동 분류·프로젝트 저장·렌더까지 한 패널에서 처리하는 확장(익스텐션)이에요.</p>
+        <div class="meta">
+          <span class="chip dark">After Effects</span>
+          <span class="chip dark">Premiere Pro</span>
+          <span class="chip">Windows · macOS</span>
+          <span class="chip">CEP 익스텐션</span>
+        </div>
+      </div>
+
+      <!-- 1 설치 -->
+      <section id="start">
+        <div class="sec-head"><span class="sec-num">01</span><h2>시작하기 - 설치</h2></div>
+        <p class="lead"><b>아래에서 ZIP을 받아</b> 압축을 풀고, OS에 맞는 설치 파일을 <b>더블클릭</b>하면 돼요. <b>관리자 권한 없이</b> 확장 폴더 복사와 CEP 디버그 모드 설정까지 한 번에 처리됩니다. (ZIP 안엔 스크립트 <code>.jsx</code> 버전도 함께 들어 있어요.)</p>
+
+        <div class="card dlcard">
+          <div class="dlinfo">
+            <div class="dltitle">BatchRenameComps <span class="ver">v1.0.0</span></div>
+            <div class="dlmeta">Windows · macOS 설치 패키지 (ZIP) · 스크립트 .jsx 포함</div>
+          </div>
+          <a class="dlbtn" href="BatchRenameComps_v1.0.0.zip" download>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
+            <span>다운로드 <span class="sz">ZIP</span></span>
+          </a>
+        </div>
+
+        <div class="tabs" id="os-tabs">
+          <button data-os="win" class="on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5l8-1.1v7.2H3V5.5zm0 13l8 1.1v-7.1H3v6zm9 1.2l9 1.3V12h-9v8.7zM12 3.9v7.1h9V2.6L12 3.9z"/></svg>Windows</button>
+          <button data-os="mac"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.7 1.3c.1 1-.3 2-1 2.8-.7.8-1.7 1.4-2.7 1.3-.1-1 .4-2 1-2.7.7-.8 1.8-1.4 2.7-1.4zM19 17.3c-.5 1.1-.7 1.6-1.3 2.6-.9 1.4-2.1 3.1-3.6 3.1-1.3 0-1.7-.9-3.5-.8-1.8 0-2.2.8-3.5.8-1.5 0-2.7-1.5-3.6-2.9C1.5 16.3.5 11.6 2.4 8.4 3.3 6.9 5 5.9 6.8 5.9c1.4 0 2.3.8 3.5.8 1.1 0 1.8-.8 3.5-.8 1.3 0 2.7.7 3.6 1.9-3.2 1.7-2.6 6.2 0 7.5z"/></svg>macOS</button>
+        </div>
+
+        <div class="pane on" data-pane="win">
+          <div class="card">
+            <ol class="steps">
+              <li><span class="t">위 <b>다운로드</b> 버튼으로 <b>ZIP</b>을 받아 풀어요 (예: <code>다운로드</code> 폴더).</span></li>
+              <li><span class="t">폴더 안의 <b>install_windows.bat</b>을 <b>더블클릭</b>해요. (관리자 권한 필요 없어요)</span></li>
+              <li><span class="t">검은 창에 <b>"Installation complete!"</b>가 뜨면 <b>After Effects를 완전히 종료했다 다시 실행</b>해요. (manifest가 바뀌는 설치/업데이트는 재시작이 필요해요)</span></li>
+              <li><span class="t">메뉴 <b>창(Window) → 확장(Extensions) → BatchRenameComps</b>로 패널을 열어요.</span></li>
+            </ol>
+            <div class="note warn"><span class="ic">!</span><span>패널 목록에 안 보이면 디버그 모드 적용을 위해 <b>AE를 한 번 더 완전히 재시작</b>해보세요. 그래도 없으면 .bat이 정상 실행됐는지(검은 창의 "Installation complete!" 메시지) 확인해주세요.</span></div>
+          </div>
+        </div>
+
+        <div class="pane" data-pane="mac">
+          <div class="card">
+            <ol class="steps">
+              <li><span class="t">위 <b>다운로드</b> 버튼으로 <b>ZIP</b>을 받아 풀어요 (예: <code>다운로드</code> 폴더).</span></li>
+              <li><span class="t">폴더 안의 <b>install_mac.command</b>를 <b>우클릭 → 열기</b>로 실행해요. (다운로드한 파일이라 처음 한 번은 더블클릭이 막힐 수 있어요 - 우클릭 → 열기 → "열기")</span></li>
+              <li><span class="t">터미널 창이 잠깐 떴다가 <b>"설치 완료"</b>가 나오면 닫아요. (관리자 권한 필요 없어요)</span></li>
+              <li><span class="t"><b>After Effects를 완전히 종료했다 다시 실행</b>하고 <b>창 → 확장 → BatchRenameComps</b>를 열어요.</span></li>
+            </ol>
+            <div class="note"><span class="ic">i</span><span>확장 폴더 위치(수동 확인용): <code>~/Library/Application Support/Adobe/CEP/extensions/com.batchrenamecomps</code>. 설치가 막히면 <b>팀장(구민석)</b>에게 화면을 알려주세요 - 보통 디버그 모드나 폴더 권한 문제예요.</span></div>
+          </div>
+        </div>
+
+        <div class="note info"><span class="ic">i</span><span><b>업데이트(패치)</b>는 manifest가 안 바뀌면 AE 재시작 없이 <b>패널만 닫았다 열면</b> 적용돼요. 패치 스크립트 상단 주석에 "패널만 닫았다 열기"인지 "AE 재시작"인지 적혀 있어요.</span></div>
+      </section>
+
+      <!-- 2 처음 설정 -->
+      <section id="setup">
+        <div class="sec-head"><span class="sec-num">02</span><h2>처음 설정</h2></div>
+        <p class="lead">설정(우측 상단 톱니 또는 마우스 4·5번 버튼)에서 두 가지만 잡아두면 바로 써요.</p>
+        <div class="grid2">
+          <div class="card">
+            <h3 style="margin-top:0">① 폴더트리 생성 위치</h3>
+            <p style="font-size:14.5px; color:var(--ink-2)"><b>로컬 폴더트리 생성 위치</b>에 작업 폴더가 만들어질 상위 경로를 지정해요. 비어 있으면 폴더 버튼을 처음 누를 때 탐색기로 고르게 돼요.</p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0">② 파일 임포트 폴더</h3>
+            <p style="font-size:14.5px; color:var(--ink-2)">소스를 가져올 기본 폴더 경로예요. 임포트 버튼이 이 폴더를 프로젝트 폴더트리로 분류해 넣어요. (필요할 때만 지정)</p>
+          </div>
+        </div>
+        <div class="note"><span class="ic">i</span><span>해상도 프리셋·경로·폴더트리·단축키 등 설정은 <b>설정 백업(내보내기/가져오기)</b>으로 팀원과 공유할 수 있어요. 자세한 건 아래 <b>설정 백업</b> 항목을 보세요.</span></div>
+      </section>
+
+      <!-- 3 이름 구조 -->
+      <section id="naming">
+        <div class="sec-head"><span class="sec-num">03</span><h2>이름 구조</h2></div>
+        <p class="lead">컴프 이름은 아래 순서의 토큰을 언더스코어(<code>_</code>)로 이어 만들어요. 빈 필드는 자동으로 건너뜁니다.</p>
+        <div class="namebox">
+          <div class="nametokens">
+            <span class="ntok t-date">날짜</span><span class="nsep">_</span>
+            <span class="ntok t-adv">광고주</span><span class="nsep">_</span>
+            <span class="ntok t-camp">캠페인</span><span class="nsep">_</span>
+            <span class="ntok t-camp">페이지</span><span class="nsep">_</span>
+            <span class="ntok t-camp">작업내용</span><span class="nsep">_</span>
+            <span class="ntok t-res">해상도</span><span class="nsep">_</span>
+            <span class="ntok t-worker">작업자</span><span class="nsep">_</span>
+            <span class="ntok t-job">@작업종류</span><span class="nsep">_</span>
+            <span class="ntok t-job">작업구분</span>
+          </div>
+          <div class="nlegend">
+            <div class="nleg"><span class="sw t-date"></span><div><b>날짜</b> - 6자리(YYMMDD). 예: <code>260520</code></div></div>
+            <div class="nleg"><span class="sw t-adv"></span><div><b>광고주 / 캠페인 / 작업내용</b> - 자유 입력</div></div>
+            <div class="nleg"><span class="sw t-camp"></span><div><b>페이지</b> - <code>3p</code>처럼 숫자+p</div></div>
+            <div class="nleg"><span class="sw t-res"></span><div><b>해상도</b> - 예: <code>1080x1920</code></div></div>
+            <div class="nleg"><span class="sw t-worker"></span><div><b>작업자</b> - 이름(영문/한글)</div></div>
+            <div class="nleg"><span class="sw t-job"></span><div><b>@작업종류</b> - <code>@ED</code>(편집) 등 / <b>작업구분</b> - <code>xian</code>(시안)·<code>vari</code>(베리)·<code>sf</code>·<code>retuch1</code> 등 맨 끝 토큰</div></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="codeblock">260520_KOZ_보이넥스트도어_3p_사운드편집_1080x1920_재현_@ED_xian</div>
+        </div>
+        <div class="note"><span class="ic">i</span><span><b>@작업종류</b>는 <code>@MB</code>(모션배너)·<code>@BC</code>(배너결합)·<code>@SZ</code>(사이즈배리)·<code>@ED</code>(편집)·<code>@AV</code>(AI활용영상)·<code>@AB</code>(AI활용배너)·<code>@MV</code>(모션영상)·<code>@SH</code>(촬영)·<code>@CP</code>(용량배리) 등을 드롭다운에서 골라요.</span></div>
+      </section>
+
+      <!-- 4 이름 변경 -->
+      <section id="rename">
+        <div class="sec-head"><span class="sec-num">04</span><h2>이름 변경 - 핵심 기능</h2></div>
+        <p class="lead">각 필드를 채우고, 개별 적용(↻)하거나 한 번에 일괄 변경해요.</p>
+
+        <div class="card">
+          <ul class="bul">
+            <li><b>각 필드의 ↻ 버튼</b> - 그 필드 하나만 선택된 컴프에 개별 적용해요.</li>
+            <li><b>캠페인 / 페이지 / 작업내용의 ↻</b> - 첫 클릭은 현재 입력값으로 적용, 같은 값으로 다시 누르면 끝 숫자가 <b>+1</b> 돼요 (예: <code>캠페인1 → 캠페인2</code>, 페이지는 <code>1 → 2</code>).</li>
+            <li><b>불러오기</b> - 선택된 컴프 이름을 분석해 각 필드를 자동으로 채워요.</li>
+            <li><b>이름변경</b> - 모든 필드를 조합해 선택된 컴프 이름을 한 번에 바꿔요.</li>
+          </ul>
+        </div>
+
+        <h3>우클릭으로 더 강력하게</h3>
+        <div class="card">
+          <ul class="bul">
+            <li><b>불러오기 우클릭</b> - 컴프를 선택하지 않아도, 프로젝트의 모든 컴프 중 <b>이름순 가장 위</b> 컴프를 자동으로 불러와요.</li>
+            <li><b>이름변경 우클릭</b> - 컴프를 선택했으면 선택분만, 선택이 없으면 <b>프로젝트의 모든 컴프</b> 이름을 한 번에 변경해요. 이때 각 컴프의 기존 <b>페이지·작업구분</b>(시안/베리/리터치 등)은 그대로 유지돼요.</li>
+          </ul>
+        </div>
+        <div class="note"><span class="ic">i</span><span>Premiere Pro에서는 시퀀스 이름이 같은 방식으로 변경돼요.</span></div>
+      </section>
+
+      <!-- 5 하단 버튼 -->
+      <section id="buttons">
+        <div class="sec-head"><span class="sec-num">05</span><h2>하단 버튼 한눈에</h2></div>
+        <p class="lead">패널 아래 두 줄의 버튼이에요. 좌클릭이 기본 동작, 우클릭이 보조 동작이에요.</p>
+        <div class="card">
+          <div class="btnrow">
+            <div class="bi">↧</div>
+            <div class="bc"><div class="bt">불러오기</div><div class="bd">선택 컴프 이름을 필드로 분해. <span class="rc">우클릭</span>: 이름순 최상위 컴프 자동 불러오기.</div></div>
+          </div>
+          <div class="btnrow">
+            <div class="bi">✎</div>
+            <div class="bc"><div class="bt">이름변경</div><div class="bd">필드 조합으로 선택 컴프 이름 일괄 변경. <span class="rc">우클릭</span>: 선택분 또는 전체 컴프(페이지·작업구분 유지).</div></div>
+          </div>
+          <div class="btnrow">
+            <div class="bi">⤓</div>
+            <div class="bc"><div class="bt">저장</div><div class="bd">현재 프로젝트를 폴더트리의 <b>Ae/Pr</b> 폴더에 다른 이름으로 저장(중복 시 _1, _2 자동 증가). <span class="rc">우클릭</span>: 최근 저장 목록에서 골라 열기.</div></div>
+          </div>
+          <div class="btnrow">
+            <div class="bi">⇪</div>
+            <div class="bc"><div class="bt">임포트</div><div class="bd">설정의 임포트 폴더를 <b>02_Sc</b> 아래로 분류해 가져오기. <span class="rc">우클릭</span>: 탐색기로 폴더를 직접 골라 임포트(저장 안 됨).</div></div>
+          </div>
+          <div class="btnrow">
+            <div class="bi">▶</div>
+            <div class="bc"><div class="bt">렌더</div><div class="bd">선택 컴프를 렌더 큐에 추가. <b>선택이 없으면 '전체 N개 렌더' 확인창</b>으로 물어요. 자동 출력 ON이면 즉시 렌더 후 <b>00_Master</b>에 저장. <span class="rc">우클릭</span>: 00_Master 폴더 열기.</div></div>
+          </div>
+          <div class="btnrow">
+            <div class="bi">▤</div>
+            <div class="bc"><div class="bt">폴더</div><div class="bd"><b>프로젝트 폴더트리 → 로컬 폴더트리</b> 순으로 생성(소스 자동 분류 포함). <span class="rc">우클릭</span>: 둘 중 하나만 골라 실행 / 폴더 열기.</div></div>
+          </div>
+          <div class="btnrow">
+            <div class="bi">🗑</div>
+            <div class="bc"><div class="bt">휴지통</div><div class="bd">입력 필드 초기화(날짜·작업자는 유지).</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6 폴더트리 생성 -->
+      <section id="folder">
+        <div class="sec-head"><span class="sec-num">06</span><h2>폴더트리 생성 (폴더 버튼)</h2></div>
+        <p class="lead">폴더 버튼 좌클릭 한 번이면 프로젝트 안 정리와 디스크 폴더 생성이 한꺼번에 돼요.</p>
+        <div class="card">
+          <ol class="steps">
+            <li><span class="t"><b>프로젝트 폴더트리 먼저 생성</b> - 현재 선택된 프로젝트(ae) 트리 구조대로 AE 패널 안에 폴더를 만들고, 기존 소스(푸티지·컴프·폴더)를 확장자/타입별로 <b>자동 분류</b>해요.</span></li>
+            <li><span class="t"><b>최상위 폴더 이름</b>을 물어봐요 (기본값은 오늘 날짜).</span></li>
+            <li><span class="t"><b>로컬(디스크) 폴더트리 생성</b> - 지정한 위치에 실제 폴더를 만들고, 현재 프로젝트를 <b>Ae/Pr 폴더에 자동 저장</b>해요. 이 작업파일은 저장 기록에도 올라가요.</span></li>
+          </ol>
+          <div class="note"><span class="ic">i</span><span><b>우클릭 메뉴</b>에서는 프로젝트 트리만, 또는 로컬 트리만 따로 실행할 수도 있어요. 좌클릭은 "한 번에 다", 우클릭은 "골라서"예요.</span></div>
+        </div>
+        <h3>자동 분류 규칙</h3>
+        <div class="card">
+          <ul class="bul">
+            <li><b>이미지</b>(jpg·png·psd·ai 등) → 트리의 <b>Image</b> 계열 폴더</li>
+            <li><b>영상</b>(mp4·mov·mxf 등) → <b>Video</b> 계열 폴더</li>
+            <li><b>사운드</b>(mp3·wav 등) → <b>03_Mix</b> 계열</li>
+            <li><b>컴프</b> → <b>01_Comp/_Main</b> ( <code>[comp]</code> 태그가 가리키는 폴더 )</li>
+            <li>매핑되지 않은 나머지 → <b>Stock</b> 폴더로 모음</li>
+          </ul>
+        </div>
+        <div class="note info"><span class="ic">i</span><span><b>Overlord · TweiNa 폴더 예외</b> - 이름에 <code>Overlord</code> 또는 <code>TweiNa</code>가 들어간 폴더는 (피그마·포토샵·일러스트 연동 폴더라) 내부 구조를 그대로 유지한 채 통째로 <b>Image</b> 폴더로 들어가요. 같은 단어가 든 <b>컴프</b>는 <b>01_Comp/Etc</b>로 분류돼요. 빈 프로젝트 폴더트리 생성과 폴더 임포트 양쪽에서 동작해요.</span></div>
+      </section>
+
+      <!-- 7 임포트 -->
+      <section id="import">
+        <div class="sec-head"><span class="sec-num">07</span><h2>임포트 · 분류</h2></div>
+        <p class="lead">외부 폴더의 소스를 프로젝트 폴더트리에 맞춰 가져오면서 자동으로 정리해요. (After Effects 전용)</p>
+        <div class="card">
+          <ul class="bul">
+            <li><b>임포트 버튼(좌클릭)</b> - 설정의 임포트 폴더를 가져와 분류해요.</li>
+            <li><b>임포트 우클릭</b> - 탐색기로 폴더를 직접 골라요 (설정 경로 무시, 프로젝트 저장은 안 함).</li>
+            <li><b>폴더는 통째로, 낱개 파일은 개별로</b> - 최상위 폴더는 하위 구조까지 함께 대표 확장자 위치로, 흩어진 파일은 확장자별로 분류돼요.</li>
+            <li><b>중복 방지</b> - 같은 파일은 다시 임포트하지 않고(패널 중복 방지), 디스크에 같은 이름이 있으면 덮어써요.</li>
+            <li><b>제외</b> - 이름이 <code>_Master</code>·<code>_Ae</code>·<code>_Pr</code>로 끝나는 폴더는 분류에서 제외돼요.</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 8 렌더 -->
+      <section id="render">
+        <div class="sec-head"><span class="sec-num">08</span><h2>렌더</h2></div>
+        <p class="lead">컴프를 <b>선택하고</b> 렌더 버튼을 누르면 그 컴프만 바로 렌더돼요. <b>아무것도 선택하지 않으면</b> '프로젝트의 모든 컴프 N개를 렌더할까요?' <b>확인창</b>이 떠서 [전체 렌더] 또는 [취소]를 고를 수 있어요.</p>
+        <p class="lead">그다음, 설정의 <b>자동 출력</b> 토글에 따라 동작이 둘로 나뉘어요.</p>
+        <div class="dots card">
+          <div class="dot-row"><span class="dot g"></span><div><b>자동 출력 ON</b> - 렌더 버튼을 누르면 즉시 렌더하고, 결과물을 <b>00_Master</b> 폴더에 컴프 이름으로 저장해요. (렌더 중 AE가 잠깐 멈춰요)</div></div>
+          <div class="dot-row"><span class="dot o"></span><div><b>자동 출력 OFF</b> - 렌더 큐에 추가만 해요. 출력 위치 지정과 렌더 시작은 직접. 렌더 버튼 우클릭으로 00_Master 폴더를 열 수 있어요.</div></div>
+        </div>
+        <div class="note warn"><span class="ic">!</span><span>After Effects는 출력 경로에 <b>한글이 있으면 깨지는</b> 고질적 제약이 있어요. 그래서 자동 출력은 내부적으로 <b>영문(ASCII) 임시 폴더</b>에 렌더한 뒤 결과물만 00_Master로 옮기는 방식으로 우회해요. 만약 임시 폴더 경로에까지 한글이 끼면(드문 경우) 안내창이 떠요 - 그때는 자동 출력을 끄고 렌더 큐에서 직접 출력 위치를 지정하면 돼요.</span></div>
+      </section>
+
+      <!-- 9 폴더트리 편집 -->
+      <section id="tree">
+        <div class="sec-head"><span class="sec-num">09</span><h2>폴더트리 편집</h2></div>
+        <p class="lead">설정에서 트리 구조와 확장자 매핑을 자유롭게 바꿀 수 있어요.</p>
+        <div class="grid2">
+          <div class="card">
+            <h3 style="margin-top:0">트리 종류</h3>
+            <ul class="bul">
+              <li><b>프로젝트 폴더트리</b> - AE/Premiere 패널 안의 폴더 구조</li>
+              <li><b>로컬 폴더트리</b> - 실제 디스크에 만드는 폴더</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0">노드 편집</h3>
+            <ul class="bul">
+              <li><b>+</b> 하위 폴더 추가 · <b>✎</b> 이름 변경 · <b>🗑</b> 삭제(하위 포함)</li>
+              <li>드롭다운 또는 <b>닷(●) 인디케이터</b>로 트리 전환</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">확장자 자동 분류 (ext 버튼)</h3>
+          <p style="font-size:14.5px; color:var(--ink-2)">프로젝트 폴더트리의 각 폴더에 확장자를 지정하면, 임포트·분류 때 그 확장자 파일이 해당 폴더로 들어가요. 특수 태그 <code>[comp]</code>는 컴포지션을 의미해요. (프로젝트 폴더트리 전용)</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">드래그 계층 이동</h3>
+          <ul class="bul">
+            <li>노드 <b>위 1/4</b>: 위쪽에 삽입 · <b>아래 1/4</b>: 아래쪽에 삽입</li>
+            <li>노드 <b>가운데 1/2</b>: 자식으로 들어감 · <b>빈 영역</b>: 최상위 맨 끝</li>
+          </ul>
+        </div>
+        <div class="note"><span class="ic">i</span><span><b>기본값 복원</b>은 기본 4개 트리에만 쓸 수 있고, 확장자 매핑도 함께 복원돼요. 트리를 편집하면 폴더 버튼 우클릭 메뉴가 즉시 갱신돼요.</span></div>
+      </section>
+
+      <!-- 10 단축키/히든 -->
+      <section id="shortcuts">
+        <div class="sec-head"><span class="sec-num">10</span><h2>단축키 · 히든 커맨드</h2></div>
+        <p class="lead">자주 쓰는 동작은 키와 우클릭으로 더 빠르게.</p>
+
+        <h3>키보드</h3>
+        <div class="card key-table">
+          <div class="key-row"><div class="label">필드에서 적용 <small>↻와 동일 - 그 필드만 적용</small></div><div class="keys"><span class="kbd">Enter</span></div></div>
+          <div class="key-row"><div class="label">드롭다운에서 적용 + 다음 필드로 <small>해상도·작업종류·작업구분</small></div><div class="keys"><span class="kbd">Enter</span></div></div>
+          <div class="key-row"><div class="label">필드 간 이동 <small>설정창·메인창 탭 순서 분리</small></div><div class="keys"><span class="kbd">Tab</span><span class="kbd">⇧ Tab</span></div></div>
+          <div class="key-row"><div class="label">설정창 열기/닫기 <small>마우스 보조 버튼</small></div><div class="keys"><span class="kbd">M4</span><span class="kbd">M5</span></div></div>
+        </div>
+
+        <h3>우클릭 히든 커맨드</h3>
+        <div class="card">
+          <ul class="bul">
+            <li><b>해상도 ↻ - Shift+클릭/우클릭</b> : 드롭다운 ↔ 직접 입력창 전환</li>
+            <li><b>폴더 버튼 우클릭</b> : 프로젝트/로컬 트리 메뉴(트리 선택 · ＋생성 · ⬇임포트+분류 · 📂폴더 열기)</li>
+            <li><b>불러오기 우클릭</b> : 이름순 최상위 컴프 자동 불러오기</li>
+            <li><b>이름변경 우클릭</b> : 선택분 또는 전체 컴프(페이지·작업구분 유지)</li>
+            <li><b>저장 우클릭</b> : 최근 저장 목록에서 열기 (폴더 버튼으로 만든 작업파일도 표시 / 파일이 없으면 <b>비우기·닫기</b>)</li>
+            <li><b>임포트 우클릭</b> : 탐색기로 폴더 직접 선택</li>
+            <li><b>렌더 우클릭</b> : 00_Master 폴더 열기</li>
+            <li><b>해상도 추가 버튼 우클릭</b> : 해상도 프리셋 기본값 복원</li>
+            <li><b>찾기 버튼 우클릭</b> : 경로 입력창 비우기</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 11 설정 백업 -->
+      <section id="backup">
+        <div class="sec-head"><span class="sec-num">11</span><h2>설정 백업</h2></div>
+        <p class="lead">팀원 간 동일한 환경을 맞출 때 유용해요.</p>
+        <div class="grid2">
+          <div class="card">
+            <h3 style="margin-top:0">내보내기</h3>
+            <p style="font-size:14.5px; color:var(--ink-2)">해상도 프리셋·경로 설정·폴더트리를 <b>JSON 파일</b>로 저장해요.</p>
+          </div>
+          <div class="card">
+            <h3 style="margin-top:0">가져오기</h3>
+            <p style="font-size:14.5px; color:var(--ink-2)">저장한 JSON에서 설정을 불러와 적용해요. 한 사람이 트리를 잡아두고 팀에 배포하기 좋아요.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 12 스크립트(.jsx) 버전 -->
+      <section id="script">
+        <div class="sec-head"><span class="sec-num">12</span><h2>스크립트(.jsx) 버전</h2></div>
+        <p class="lead">설치 없이 단일 파일로 쓰는 ScriptUI 버전이에요. 같은 이름 규칙과 핵심 기능을 쓰지만, ScriptUI 한계로 일부 동작·UI가 달라요. (<b>파일 → 스크립트 → 스크립트 파일 실행</b>, 또는 ScriptUI Panels 폴더에 넣어 사용)</p>
+
+        <h3>버튼 기능</h3>
+        <div class="card">
+          <div class="btnrow"><div class="bi">↧</div><div class="bc"><div class="bt">불러오기</div><div class="bd">선택한 컴프 이름을 필드로 분해해요. (컴프를 먼저 선택해야 동작)</div></div></div>
+          <div class="btnrow"><div class="bi">✎</div><div class="bc"><div class="bt">이름변경</div><div class="bd">필드 조합으로 <b>선택한 컴프</b> 이름을 일괄 변경해요.</div></div></div>
+          <div class="btnrow"><div class="bi">⤓</div><div class="bc"><div class="bt">저장</div><div class="bd">마지막에 만든 로컬 트리(없으면 폴더 선택)의 <b>Ae/Pr</b> 폴더에 이름을 정해 저장해요(중복 시 _1, _2).</div></div></div>
+          <div class="btnrow"><div class="bi">⇪</div><div class="bc"><div class="bt">임포트</div><div class="bd">설정의 임포트 폴더(없으면 폴더 선택창)를 <b>02_Sc</b> 아래로 분류해 가져와요. <b>(After Effects 전용)</b></div></div></div>
+          <div class="btnrow"><div class="bi">▶</div><div class="bc"><div class="bt">렌더</div><div class="bd">선택 컴프(없으면 전체)를 렌더 큐에 추가해요(익스텐션과 달리 전체 렌더 확인창 없이 바로). <b>Shift+클릭 = 즉시 렌더 후 00_Master 저장</b>. <b>(After Effects 전용)</b></div></div></div>
+          <div class="btnrow"><div class="bi">▤</div><div class="bc"><div class="bt">폴더 (프로젝트 트리)</div><div class="bd">AE 패널 안에 폴더트리를 만들고 기존 소스를 자동 분류해요. <b>Shift+클릭 = 간단(quick) 트리</b>.</div></div></div>
+          <div class="btnrow"><div class="bi">▦</div><div class="bc"><div class="bt">로컬 트리</div><div class="bd">디스크에 실제 폴더트리를 만들고 프로젝트를 자동 저장해요. <b>Shift+클릭 = 간단 트리</b>. (익스텐션과 달리 별도 버튼)</div></div></div>
+          <div class="btnrow"><div class="bi">⇄</div><div class="bc"><div class="bt">텍스트 교체</div><div class="bd">이름 안의 특정 문자열을 from → to 로 바꿔요.</div></div></div>
+          <div class="btnrow"><div class="bi">⚙</div><div class="bc"><div class="bt">설정</div><div class="bd">경로(로컬 트리·임포트)와 해상도 프리셋을 지정해요.</div></div></div>
+          <div class="btnrow"><div class="bi">🗑</div><div class="bc"><div class="bt">휴지통</div><div class="bd">입력 필드를 초기화해요(날짜·작업자는 유지).</div></div></div>
+        </div>
+
+        <div class="note info"><span class="ic">i</span><span>스크립트엔 <b>우클릭이 없어요</b>(ScriptUI 한계). 보조 동작은 <b>Shift+클릭</b>으로 - 렌더는 즉시 출력, 폴더·로컬 트리는 간단(quick) 모드예요.</span></div>
+
+        <h3>익스텐션엔 있는데 스크립트엔 없는 것</h3>
+        <div class="card">
+          <ul class="bul">
+            <li><span class="t"><b>우클릭 보조 명령 전부</b> - 불러오기 최상위 자동, 이름변경 <b>전체 컴프</b>, 저장 <b>최근 목록 열기</b>, 렌더 <b>00_Master 열기</b>, 폴더 <b>골라 실행</b>. 스크립트에선 모두 불가예요(이름변경은 선택분만, 저장은 매번 이름 입력).</span></li>
+            <li><span class="t"><b>폴더트리·확장자 매핑 편집</b> - 익스텐션은 노드 추가·삭제, 확장자 매핑, 드래그로 트리를 바꿔요. 스크립트는 트리·매핑이 <b>코드에 고정</b>(quick/full 두 종류만).</span></li>
+            <li><span class="t"><b>Overlord · TweiNa 폴더 예외</b> - 연동 폴더를 통째로 Image에 넣는 특수 처리는 익스텐션에만 있어요.</span></li>
+            <li><span class="t"><b>저장 기록</b> - 최근 저장 파일 목록에서 골라 열기, 목록 비우기/닫기 UI는 익스텐션 전용이에요.</span></li>
+            <li><span class="t"><b>모던 UI</b> - 다크모드, 커스텀 폰트, 반응형 레이아웃은 ScriptUI에선 안 돼요. 입력창은 <b>OS 기본 폰트</b>로 표시돼요.</span></li>
+            <li><span class="t"><b>인앱 가이드</b> - 익스텐션 안 도움말 대신, 이 설명서를 봐요.</span></li>
+          </ul>
+        </div>
+
+        <div class="note warn"><span class="ic">!</span><span>렌더 자동 출력은 <b>00_Master가 이미 있어야</b> 동작해요(없으면 안내창). 폴더/로컬 트리로 먼저 트리를 만들고 그 안에 프로젝트를 저장한 뒤 렌더하세요.</span></div>
+      </section>
+
+      <!-- 13 FAQ -->
+      <section id="faq">
+        <div class="sec-head"><span class="sec-num">13</span><h2>자주 묻는 질문</h2></div>
+        <div class="card">
+          <h3 style="margin-top:0">패널이 안 보여요</h3>
+          <p style="font-size:14.5px; color:var(--ink-2)">설치 후 <b>AE를 완전히 종료했다 다시</b> 켜요(작업 표시줄/Dock에서 완전 종료). 그래도 없으면 CEP 디버그 모드가 켜졌는지, 확장 폴더에 파일이 들어갔는지 확인해요.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">패치(.ps1) 실행 시 실행 정책 오류가 나요</h3>
+          <p style="font-size:14.5px; color:var(--ink-2)">설치는 더블클릭(.bat/.command)이라 정책 설정이 필요 없지만, <b>패치 .ps1</b>을 직접 실행할 땐 PowerShell에서 먼저 <code>Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass</code>를 실행한 뒤 패치를 실행하면 돼요. 사내용이라 정상이에요.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">렌더 결과가 안 나오거나 "디렉토리가 없다"고 떠요</h3>
+          <p style="font-size:14.5px; color:var(--ink-2)">자동 출력은 <b>현재 프로젝트가 폴더트리 안에 저장</b>돼 있어야 00_Master를 찾을 수 있어요. 먼저 폴더 버튼이나 저장으로 프로젝트를 트리에 저장해두세요. 임시 폴더 경로에 한글이 끼었다는 안내가 뜨면 자동 출력을 끄고 큐에서 직접 출력 위치를 지정하면 돼요.</p>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0">업데이트는 어떻게 하나요</h3>
+          <p style="font-size:14.5px; color:var(--ink-2)">전달받은 패치 <code>.ps1</code>을 실행하면 돼요. manifest가 안 바뀌는 패치는 <b>패널만 닫았다 열면</b> 적용돼요. 설정(트리·경로·해상도 등)은 그대로 유지돼요.</p>
+        </div>
+        <div class="note warn"><span class="ic">!</span><span>문제가 계속되면 <b>팀장(구민석)</b>에게 화면과 증상을 알려주세요.</span></div>
+      </section>
+
+      <footer>BatchRenameComps · 영상팀 내부용 · 문의: 팀장(구민석)</footer>
+    </main>
+  </div>
+</div>
+
+<script>
+  const root = document.documentElement;
+  const tIc = document.getElementById('theme-ic');
+  const SUN = 'M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4M12 8a4 4 0 100 8 4 4 0 000-8z';
+  const MOON = 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z';
+  function setTheme(dark){
+    root.classList.toggle('dark', dark);
+    tIc.innerHTML = '<path d="'+(dark?SUN:MOON)+'"/>';
+    try{ localStorage.setItem('brcManualTheme', dark?'1':'0'); }catch(e){}
+  }
+  (function(){
+    let dark = false;
+    try{ const s = localStorage.getItem('brcManualTheme'); dark = s===null ? matchMedia('(prefers-color-scheme: dark)').matches : s==='1'; }catch(e){}
+    setTheme(dark);
+  })();
+  document.getElementById('theme').addEventListener('click', ()=> setTheme(!root.classList.contains('dark')));
+
+  const isMacUA = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  const tabs = document.getElementById('os-tabs');
+  function selectOS(os){
+    tabs.querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.os===os));
+    document.querySelectorAll('.pane[data-pane]').forEach(p=> p.classList.toggle('on', p.dataset.pane===os));
+  }
+  tabs.addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) selectOS(b.dataset.os); });
+  if(isMacUA) selectOS('mac');
+
+  const io = new IntersectionObserver((es)=>{ es.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('in'); }); }, {threshold:.10});
+  document.querySelectorAll('section').forEach(s=> io.observe(s));
+
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const map = {};
+  links.forEach(a=>{ const id=a.getAttribute('href').slice(1); const el=document.getElementById(id); if(el) map[id]=a; });
+  const spy = new IntersectionObserver((es)=>{
+    es.forEach(e=>{ if(e.isIntersecting){ links.forEach(l=>l.classList.remove('active')); const a=map[e.target.id]; if(a) a.classList.add('active'); } });
+  }, {rootMargin:'-30% 0px -60% 0px'});
+  document.querySelectorAll('section').forEach(s=> spy.observe(s));
+</script>
+</body>
+</html>
