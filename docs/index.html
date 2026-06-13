@@ -157,7 +157,7 @@
   /* 체인지로그 */
   /* 체인지로그 — 도트/세로선 중심 정렬 + 접기/펴기 */
   .changelog{position:relative; padding-left:26px;}
-  .changelog::before{content:""; position:absolute; left:5px; top:7px; bottom:7px; width:2px; background:var(--line);}
+  .changelog::before{content:""; position:absolute; left:5px; top:14.5px; height:var(--cl-line-h, 0); width:2px; background:var(--line);}
   .cl-entry{position:relative; margin-bottom:10px;}
   .cl-entry:last-child{margin-bottom:0;}
   /* 도트: 세로선 중심(x=6px)과 정렬 — 부모 padding-left 26px 기준 left:-21px → 도트 중심 -21+6=-15... 계산 대신 중심 일치를 위해 left/translate 사용 */
@@ -770,22 +770,44 @@
   }));
 
   // 체인지로그 접기/펴기 — <details> 토글을 가로채 부드러운 높이 애니메이션 적용.
-  // 열기: open 부여 → CSS가 grid-rows 0fr→1fr 트랜지션.
-  // 닫기: .cl-closing으로 1fr→0fr 트랜지션 → 끝나면 open 제거.
-  document.querySelectorAll('.changelog details.cl-entry').forEach(d=>{
+  // 세로선은 첫 도트 중심에서 시작(CSS top:14.5px)해, 마지막 도트 중심까지만 그린다.
+  const clRoot = document.querySelector('.changelog');
+  const clEntries = clRoot ? [...clRoot.querySelectorAll('details.cl-entry')] : [];
+  function dotCenterY(entry){
+    // 도트 중심 = entry 상단 + top(9) + 반지름(5.5), changelog 기준 좌표
+    return (entry.offsetTop) + 9 + 5.5;
+  }
+  function updateTimelineLine(){
+    if (!clRoot || !clEntries.length) return;
+    const firstC = dotCenterY(clEntries[0]);
+    const lastC = dotCenterY(clEntries[clEntries.length - 1]);
+    clRoot.style.setProperty('--cl-line-h', Math.max(0, lastC - firstC) + 'px');
+  }
+  updateTimelineLine();
+  window.addEventListener('resize', updateTimelineLine);
+
+  clEntries.forEach(d=>{
     const summary = d.querySelector('summary');
     const body = d.querySelector('.cl-body');
+    // 애니메이션 진행 동안 선 높이를 매 프레임 갱신 → 선이 함께 자라고 줄어듦
+    let raf = null;
+    const followLine = () => { updateTimelineLine(); raf = requestAnimationFrame(followLine); };
+    const startFollow = () => { if (!raf) followLine(); };
+    const stopFollow = () => { if (raf) { cancelAnimationFrame(raf); raf = null; } updateTimelineLine(); };
+
     summary.addEventListener('click', (e)=>{
       e.preventDefault();
       if (d.dataset.animating) return;
       if (d.open) {
         d.dataset.animating = '1';
         d.classList.add('cl-closing');           // CSS: grid-rows 0fr로 접기
+        startFollow();
         const done = () => {
           body.removeEventListener('transitionend', done);
           d.classList.remove('cl-closing');
           d.open = false;
           delete d.dataset.animating;
+          stopFollow();
         };
         body.addEventListener('transitionend', done);
       } else {
@@ -794,6 +816,9 @@
         d.classList.add('cl-opening');
         d.open = true;
         void body.offsetHeight;                  // 리플로우 강제(0fr 상태 확정)
+        startFollow();
+        const done = () => { body.removeEventListener('transitionend', done); stopFollow(); };
+        body.addEventListener('transitionend', done);
         requestAnimationFrame(() => {
           requestAnimationFrame(() => d.classList.remove('cl-opening'));
         });
