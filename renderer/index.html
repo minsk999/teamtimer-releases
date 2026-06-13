@@ -469,15 +469,20 @@
 
   .app-ver { font-size: 11.5px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; margin-left: 8px; }
   /* 업데이트 배지 (설정 버전 우측, 빨강) — flex로 텍스트 수직 중앙 */
-  .update-badge { display:inline-flex; align-items:center; justify-content:center; margin-left:8px; padding:0 10px; height:20px; border-radius:20px; background:#e5484d; color:#fff; font-size:11px; font-weight:700; line-height:1; letter-spacing:0; text-decoration:none; cursor:pointer; transition:background .15s, transform .15s; }
-  .update-badge:hover { background:#d13c41; transform:translateY(-1px); }
+  .update-badge { display:inline-flex; align-items:center; justify-content:center; margin-left:8px; padding:0 10px; height:20px; border-radius:20px; background:#ff3b30; color:#fff; font-size:11px; font-weight:700; line-height:1; letter-spacing:0; text-decoration:none; cursor:pointer; transition:background .15s, transform .15s; }
+  .update-badge:hover { background:#e63329; transform:translateY(-1px); }
   /* 업데이트 배너 (앱 최상단, 가로 전체) */
-  .update-banner { display:none; align-items:center; gap:10px; padding:9px 16px; background:#e5484d; color:#fff; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; }
-  .update-banner.show { display:flex; }
+  /* 업데이트 배너 (앱 최상단) — 블랙, 슬라이드 다운 애니메이션 */
+  .update-banner { display:none; align-items:center; gap:10px; padding:9px 16px; background:#111; color:#fff; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; overflow:hidden; }
+  .update-banner.show { display:flex; animation: bannerSlideDown .4s cubic-bezier(.22,1,.36,1) both; }
+  .update-banner.hide { display:flex; animation: bannerSlideUp .32s cubic-bezier(.4,0,1,1) both; }
+  @keyframes bannerSlideDown { from{ transform:translateY(-100%); } to{ transform:translateY(0); } }
+  @keyframes bannerSlideUp { from{ transform:translateY(0); } to{ transform:translateY(-100%); } }
   .update-banner .ub-text { flex:1; }
-  .update-banner .ub-btn { background:rgba(255,255,255,.22); padding:3px 11px; border-radius:7px; font-size:12px; font-weight:700; }
-  .update-banner .ub-close { opacity:.85; font-size:16px; line-height:1; padding:2px 4px; cursor:pointer; }
-  .update-banner .ub-close:hover { opacity:1; }
+  .update-banner .ub-btn { background:rgba(255,255,255,.18); padding:4px 12px; border-radius:7px; font-size:12px; font-weight:500; transition:background .15s; }
+  .update-banner .ub-btn:hover { background:rgba(255,255,255,.28); }
+  .update-banner .ub-later { background:transparent; border:0.5px solid rgba(255,255,255,.4); padding:4px 12px; border-radius:7px; font-size:12px; font-weight:500; transition:background .15s; }
+  .update-banner .ub-later:hover { background:rgba(255,255,255,.12); }
 
   /* 커스텀 툴팁 */
   .tooltip {
@@ -932,7 +937,7 @@
 <div class="update-banner" id="update-banner">
   <span class="ub-text" id="ub-text">새 버전이 있어요</span>
   <span class="ub-btn">받기</span>
-  <span class="ub-close" id="ub-close" title="닫기">×</span>
+  <span class="ub-later" id="ub-later">다음에</span>
 </div>
 
   <!-- 타이틀바 -->
@@ -1528,12 +1533,17 @@
     if (banner && sessionStorage.getItem("updateBannerClosed") !== r.latest) {
       const txt = document.getElementById("ub-text");
       if (txt) txt.textContent = "새 버전 v" + r.latest + "이 나왔어요";
-      banner.classList.add("show");
+      banner.classList.remove("hide");
+      banner.classList.add("show"); // 슬라이드 다운 등장
       banner.onclick = openUpdate;
-      const close = document.getElementById("ub-close");
-      if (close) close.onclick = (e) => {
+      const later = document.getElementById("ub-later");
+      if (later) later.onclick = (e) => {
         e.stopPropagation();
+        // 슬라이드 업으로 닫기 → 애니메이션 끝나면 완전히 숨김
         banner.classList.remove("show");
+        banner.classList.add("hide");
+        const done = () => { banner.classList.remove("hide"); banner.style.display = "none"; banner.removeEventListener("animationend", done); };
+        banner.addEventListener("animationend", done);
         sessionStorage.setItem("updateBannerClosed", r.latest);
       };
     }
@@ -1551,10 +1561,6 @@
     // 2) 업데이트 확인 (시작 직후 한 번)
     try {
       if (window.timerAPI.checkUpdate) applyUpdateUI(await window.timerAPI.checkUpdate());
-    } catch (e) {}
-    // 3) 트레이 '업데이트 확인'으로 새 버전을 찾으면 배너 표시
-    try {
-      if (window.timerAPI.onShowUpdateBanner) window.timerAPI.onShowUpdateBanner((r) => applyUpdateUI(r));
     } catch (e) {}
   })();
 

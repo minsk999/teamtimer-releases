@@ -35,7 +35,6 @@ contextBridge.exposeInMainWorld('timerAPI', {
   fetchHolidays: (year) => ipcRenderer.invoke('fetch-holidays', year),
   appVersion: () => ipcRenderer.invoke('app-version'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
-  onShowUpdateBanner: (cb) => ipcRenderer.on('show-update-banner', (e, r) => cb(r)),
   gmailLogin: () => ipcRenderer.invoke('gmail-login'),
   gmailLogout: () => ipcRenderer.invoke('gmail-logout'),
   gmailList: (opts) => ipcRenderer.invoke('gmail-list', opts),
