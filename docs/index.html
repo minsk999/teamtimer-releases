@@ -175,7 +175,9 @@
   .cl-body{display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s cubic-bezier(.4,0,.2,1);}
   details[open] > .cl-body{grid-template-rows:1fr;}
   details.cl-closing[open] > .cl-body{grid-template-rows:0fr;}
+  details.cl-opening[open] > .cl-body{grid-template-rows:0fr;}
   details.cl-closing[open] > .cl-head .cl-chev{transform:rotate(0deg);}
+  details.cl-opening[open] > .cl-head .cl-chev{transform:rotate(0deg);}
   .cl-body-inner{overflow:hidden;}
   .changelog ul{margin:8px 0 0; padding-left:18px; display:flex; flex-direction:column; gap:5px;}
   .changelog li{font-size:14px; color:var(--ink-2); line-height:1.65;}
@@ -787,7 +789,14 @@
         };
         body.addEventListener('transitionend', done);
       } else {
-        d.open = true;                            // CSS: grid-rows 1fr로 펼치기
+        // 열기: open을 주면 cl-body가 곧바로 1fr로 나타나 트랜지션이 생략됨.
+        // → cl-opening으로 0fr을 강제한 채 open 부여 후, 다음 프레임에 해제해 0fr→1fr 트랜지션 유발.
+        d.classList.add('cl-opening');
+        d.open = true;
+        void body.offsetHeight;                  // 리플로우 강제(0fr 상태 확정)
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => d.classList.remove('cl-opening'));
+        });
       }
     });
   });
