@@ -133,6 +133,22 @@ function createTray() {
 }
 
 // ── 앱 생명주기 ──
+// ── 중복 실행 방지 ──
+// 이미 실행 중이면 두 번째 인스턴스는 즉시 종료하고, 기존 창을 앞으로 가져와요.
+// (두 번째 인스턴스가 임시 프로필로 떠서 설정이 빈 채로 보이던 문제도 함께 해결)
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // 사용자가 앱을 또 실행했을 때 — 기존 창을 복원·표시하고 포커스
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      if (!mainWindow.isVisible()) mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+
 app.whenReady().then(() => {
   createWindow();
   createTray();
@@ -751,3 +767,5 @@ ipcMain.handle('gmail-trash', async (event, id) => {
     return { ok: false, error: String(e.message || e) };
   }
 });
+
+} // ── 중복 실행 방지 블록 끝 (requestSingleInstanceLock) ──
