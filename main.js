@@ -50,6 +50,61 @@ let isQuitting = false;
 
 const isDev = process.argv.includes('--dev');
 
+// ── 업데이트 확인 (최상위 정의 — 트레이 메뉴/IPC 어디서든 호출 가능) ──
+// GitHub 릴리스의 최신 버전을 조회. 서명 없는 맥/윈도우 모두 동일하게 작동
+// (자동 설치 X — 안내만, 다운로드는 웹에서). 트레이·IPC가 공유.
+const GITHUB_OWNER = 'minsk999';
+const GITHUB_REPO = 'teamtimer-releases';
+function cmpVer(a, b) {
+  // "1.0.2" vs "1.0.10" 정확 비교 (숫자 파트별)
+  const pa = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+async function fetchLatestRelease() {
+  const cur = app.getVersion();
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 8000);
+  const res = await fetch(
+    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+    { signal: ctrl.signal, headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'teamtimer' } }
+  );
+  clearTimeout(t);
+  if (!res.ok) return { ok: false, error: 'http-' + res.status };
+  const json = await res.json();
+  const latest = String(json.tag_name || '').replace(/^v/, '');
+  if (!latest) return { ok: false, error: 'no-tag' };
+  const hasUpdate = cmpVer(latest, cur) > 0;
+  return { ok: true, current: cur, latest, hasUpdate, url: json.html_url || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest` };
+}
+// 트레이 '업데이트 확인' — 결과를 OS 알림으로 안내. 새 버전이면 창의 배너도 표시.
+async function manualCheckUpdate() {
+  let r;
+  try { r = await fetchLatestRelease(); }
+  catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
+  const notify = (title, body, onClick) => {
+    if (!Notification.isSupported()) return;
+    const n = new Notification({ title, body, silent: true });
+    if (onClick) n.on('click', onClick);
+    n.show();
+  };
+  if (!r || !r.ok) {
+    notify('작업 타이머', '업데이트 확인에 실패했어요. 잠시 후 다시 시도해 주세요.');
+    return;
+  }
+  if (r.hasUpdate) {
+    notify('작업 타이머 업데이트', `새 버전 v${r.latest}이(가) 있어요. 눌러서 다운로드 페이지를 열어요.`, () => shell.openExternal(r.url));
+    if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('show-update-banner', r);
+  } else {
+    notify('작업 타이머', `최신 버전입니다. (v${r.current})`);
+  }
+}
+
+
 // 부팅 자동 실행으로 켜졌는지 판별 (윈도우: 로그인 항목 인자 / 맥: wasOpenedAtLogin)
 function wasOpenedAtLogin() {
   if (process.argv.includes('--autostart')) return true;
@@ -514,69 +569,12 @@ ipcMain.handle('fetch-holidays', async (event, year) => {
   }
 });
 
-// ── 앱 버전 + 업데이트 확인 ──
-// 설정 화면 버전 표기를 package.json 버전과 자동 동기화하기 위한 IPC.
+// ── 앱 버전 + 업데이트 확인 IPC (헬퍼는 파일 상단에 정의됨) ──
 ipcMain.handle('app-version', () => app.getVersion());
-
-// GitHub 릴리스의 최신 버전을 조회. 새 버전이 있으면 알려준다.
-// 서명 없는 맥/윈도우 모두 동일하게 작동(자동 설치 X — 안내만, 다운로드는 웹에서).
-const GITHUB_OWNER = 'minsk999';
-const GITHUB_REPO = 'teamtimer-releases';
-function cmpVer(a, b) {
-  // "1.0.2" vs "1.0.10" 정확 비교 (숫자 파트별)
-  const pa = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
-  const pb = String(b).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d !== 0) return d > 0 ? 1 : -1;
-  }
-  return 0;
-}
-async function fetchLatestRelease() {
-  const cur = app.getVersion();
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 8000);
-  const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-    { signal: ctrl.signal, headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'teamtimer' } }
-  );
-  clearTimeout(t);
-  if (!res.ok) return { ok: false, error: 'http-' + res.status };
-  const json = await res.json();
-  const latest = String(json.tag_name || '').replace(/^v/, '');
-  if (!latest) return { ok: false, error: 'no-tag' };
-  const hasUpdate = cmpVer(latest, cur) > 0;
-  return { ok: true, current: cur, latest, hasUpdate, url: json.html_url || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest` };
-}
-
 ipcMain.handle('check-update', async () => {
   try { return await fetchLatestRelease(); }
   catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
-
-// 트레이 '업데이트 확인' — 결과를 OS 알림으로 안내. 새 버전이면 창의 배너도 표시.
-async function manualCheckUpdate() {
-  let r;
-  try { r = await fetchLatestRelease(); }
-  catch (e) { r = { ok: false, error: String(e && e.message || e) }; }
-  const notify = (title, body, onClick) => {
-    if (!Notification.isSupported()) return;
-    const n = new Notification({ title, body, silent: true });
-    if (onClick) n.on('click', onClick);
-    n.show();
-  };
-  if (!r || !r.ok) {
-    notify('작업 타이머', '업데이트 확인에 실패했어요. 잠시 후 다시 시도해 주세요.');
-    return;
-  }
-  if (r.hasUpdate) {
-    notify('작업 타이머 업데이트', `새 버전 v${r.latest}이(가) 있어요. 눌러서 다운로드 페이지를 열어요.`, () => shell.openExternal(r.url));
-    // 열려 있는 창에도 배너를 띄우도록 알림
-    if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('show-update-banner', r);
-  } else {
-    notify('작업 타이머', `최신 버전입니다. (v${r.current})`);
-  }
-}
 
 ipcMain.handle('gmail-status', () => {
   const t = readTokens();

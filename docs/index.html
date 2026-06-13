@@ -230,7 +230,7 @@
       <span class="logo"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6"/></svg></span>
       작업 타이머
     </div>
-    <span class="ver">v1.0.3</span>
+    <span class="ver">v1.0.4</span>
     <span class="spacer"></span>
     <button class="theme-btn" id="theme" aria-label="테마 전환">
       <svg id="theme-ic" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -285,10 +285,10 @@
         <div class="pane on" data-pane="win">
           <div class="card dlcard">
             <div class="dlinfo">
-              <div class="dltitle">Windows · 작업 타이머 <span class="ver">v1.0.3</span></div>
+              <div class="dltitle">Windows · 작업 타이머 <span class="ver">v1.0.4</span></div>
               <div class="dlmeta">Windows 데스크톱 앱 설치 파일</div>
             </div>
-            <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.3/TeamTimer-Setup-1.0.3.exe" download>
+            <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.4/TeamTimer-Setup-1.0.4.exe" download>
               <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
               <span>다운로드 <span class="sz">EXE</span></span>
             </a>
@@ -306,11 +306,11 @@
         <div class="pane" data-pane="mac">
           <div class="card dlcard">
             <div class="dlinfo">
-              <div class="dltitle">macOS · 작업 타이머 <span class="ver">v1.0.3</span></div>
+              <div class="dltitle">macOS · 작업 타이머 <span class="ver">v1.0.4</span></div>
               <div class="dlmeta">Intel · Apple Silicon 공용 (universal) — 칩 구분 없이 하나로 동작</div>
             </div>
             <div class="dlbtns">
-              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.3/TeamTimer-1.0.3-universal.dmg" download>
+              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.4/TeamTimer-1.0.4-universal.dmg" download>
                 <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
                 <span>다운로드 <span class="sz">DMG</span></span>
               </a>
@@ -318,7 +318,7 @@
           </div>
           <div class="card">
             <ol class="steps">
-              <li><span class="t"><b>TeamTimer-1.0.3-universal.dmg</b>를 받아 더블클릭해서 열어요. (인텔·애플실리콘 공용이라 칩을 따질 필요 없어요)</span></li>
+              <li><span class="t"><b>TeamTimer-1.0.4-universal.dmg</b>를 받아 더블클릭해서 열어요. (인텔·애플실리콘 공용이라 칩을 따질 필요 없어요)</span></li>
               <li><span class="t">앱 아이콘을 <b>응용 프로그램(Applications) 폴더로 드래그</b>해요.</span></li>
               <li><span class="t">앱은 Apple 서명이 없어 처음엔 차단돼요. <b>터미널(Terminal)</b>을 열고 아래 한 줄을 실행해 “격리” 표시를 제거하세요.</span>
                 <div class="cmdbox"><code>xattr -cr "/Applications/작업 타이머.app"</code><button class="cmdcopy" type="button">복사</button></div>
@@ -576,7 +576,7 @@
 
         <div class="pane on" data-bpane="win">
           <div class="card">
-            <p style="font-size:13.5px; color:var(--ink-2); margin-bottom:6px"><b>준비</b> · <b>Node 22 LTS</b> 설치(<code>nodejs.org</code> → LTS, 최신 “Current”는 충돌) → 새 <b>v1.0.3 zip</b> 압축 풀기.</p>
+            <p style="font-size:13.5px; color:var(--ink-2); margin-bottom:6px"><b>준비</b> · <b>Node 22 LTS</b> 설치(<code>nodejs.org</code> → LTS, 최신 “Current”는 충돌) → 새 <b>v1.0.4 zip</b> 압축 풀기.</p>
             <ol class="steps">
               <li><span class="t">압축 푼 <b>timer-app 폴더</b>를 파일 탐색기로 열어요.</span></li>
               <li><span class="t">폴더 안 <b>빈 공간을 우클릭 → “터미널에서 열기”</b>를 눌러요. (Windows 11)<br>그 폴더 위치에서 터미널이 열려요.</span></li>
@@ -584,7 +584,7 @@
             </ol>
             <div class="cmdbox"><code>Start-Process wt -Verb RunAs -ArgumentList "-d `"$PWD`""</code><button class="cmdcopy" type="button">복사</button></div>
             <p style="font-size:12.5px; color:var(--ink-3); margin:4px 0 14px">위가 안 되면 — 시작메뉴에서 <b>“터미널”</b> 우클릭 → <b>관리자 권한으로 실행</b> → 아래로 폴더 이동(경로는 본인 위치에 맞게).</p>
-            <div class="cmdbox"><code>cd "$env:USERPROFILE\Downloads\작업타이머-electron-v1.0.3\timer-app"</code><button class="cmdcopy" type="button">복사</button></div>
+            <div class="cmdbox"><code>cd "$env:USERPROFILE\Downloads\작업타이머-electron-v1.0.4\timer-app"</code><button class="cmdcopy" type="button">복사</button></div>
 
             <p style="font-size:13.5px; color:var(--ink-2); margin:16px 0 0"><b>관리자 터미널이 timer-app 폴더에 있으면</b>, 아래를 순서대로 붙여넣어요.</p>
             <p class="cmdlabel"><span class="n">4</span>(캐시가 깨졌을 수 있으니) 코드서명 캐시를 비워요.</p>
@@ -595,7 +595,7 @@
             <div class="cmdbox"><code>npm run build:win</code><button class="cmdcopy" type="button">복사</button></div>
             <p class="cmdlabel"><span class="n">7</span>결과 폴더 열기 → 설치 파일 실행 → SmartScreen <b>“추가 정보 → 실행”</b>.</p>
             <div class="cmdbox"><code>explorer dist</code><button class="cmdcopy" type="button">복사</button></div>
-            <div class="note"><span class="ic">i</span><span><code>dist</code> 폴더에 <b>TeamTimer-Setup-1.0.3.exe</b>가 만들어져요. (파일명은 빌드 설정에 고정돼 있어 항상 같아요.)</span></div>
+            <div class="note"><span class="ic">i</span><span><code>dist</code> 폴더에 <b>TeamTimer-Setup-1.0.4.exe</b>가 만들어져요. (파일명은 빌드 설정에 고정돼 있어 항상 같아요.)</span></div>
             <div class="note warn"><span class="ic">!</span><span><b>관리자 권한</b> 터미널이 아니면 winCodeSign 심볼릭 링크 오류가 나요. 그땐 관리자로 다시 열고 캐시 삭제부터 다시 하세요. 빌드 전 트레이의 <b>작업 타이머는 우클릭 → 종료</b>로 닫아두세요.</span></div>
           </div>
         </div>
@@ -611,7 +611,7 @@
             <div class="cmdbox"><code>npm run build:mac</code><button class="cmdcopy" type="button">복사</button></div>
             <p class="cmdlabel"><span class="n">4</span>결과 폴더 열기 → <code>.dmg</code> 더블클릭 → 앱을 <b>Applications</b> 폴더로 드래그.</p>
             <div class="cmdbox"><code>open dist</code><button class="cmdcopy" type="button">복사</button></div>
-            <div class="note"><span class="ic">i</span><span><code>dist/</code>에 <b>TeamTimer-1.0.3-universal.dmg</b>와 <b>.zip</b>이 생겨요 — <b>인텔·애플실리콘 공용</b>이라 칩 구분 없이 이 하나만 배포하면 돼요.</span></div>
+            <div class="note"><span class="ic">i</span><span><code>dist/</code>에 <b>TeamTimer-1.0.4-universal.dmg</b>와 <b>.zip</b>이 생겨요 — <b>인텔·애플실리콘 공용</b>이라 칩 구분 없이 이 하나만 배포하면 돼요.</span></div>
             <div class="note warn"><span class="ic">!</span><span><b>첫 실행 (서명 안 된 앱)</b> — 받는 사람은 응용 프로그램 폴더로 옮긴 뒤 <b>터미널</b>에서 아래 한 줄을 실행하면 열려요. 인텔·애플실리콘 모두 동일해요. (한 번만 하면 이후엔 그냥 열려요)</span></div>
             <div class="cmdbox"><code>xattr -cr "/Applications/작업 타이머.app"</code><button class="cmdcopy" type="button">복사</button></div>
           </div>
@@ -647,7 +647,13 @@
         <div class="card">
           <div class="changelog">
             <div class="cl-entry current">
-              <div class="cl-head"><span class="cl-ver">v1.0.3</span><span class="cl-badge">최신</span><span class="cl-date">2026-06-13</span></div>
+              <div class="cl-head"><span class="cl-ver">v1.0.4</span><span class="cl-badge">최신</span><span class="cl-date">2026-06-13</span></div>
+              <ul>
+                <li><b>'업데이트 확인' 오류 수정</b> — 트레이 메뉴의 업데이트 확인을 누르면 오류가 나던 문제를 고쳤어요. 이제 정상 작동해요.</li>
+              </ul>
+            </div>
+            <div class="cl-entry">
+              <div class="cl-head"><span class="cl-ver">v1.0.3</span><span class="cl-date">2026-06-13</span></div>
               <ul>
                 <li><b>트레이 메뉴에 '업데이트 확인' 추가</b> — 트레이 아이콘 우클릭으로 언제든 최신 여부를 직접 확인할 수 있어요.</li>
                 <li>설치 폴더 이름을 정리했어요(team-timer).</li>
@@ -680,7 +686,7 @@
         </div>
       </section>
 
-      <footer>작업 타이머 v1.0.3 · 영상팀 내부용 · ADEF</footer>
+      <footer>작업 타이머 v1.0.4 · 영상팀 내부용 · ADEF</footer>
     </main>
   </div>
 </div>
