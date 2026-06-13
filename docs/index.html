@@ -155,17 +155,29 @@
   .note.warn{background:var(--orange-bg); border-color:transparent;}
   .note.warn .ic{background:var(--orange); color:#fff;}
   /* 체인지로그 */
-  .changelog{position:relative; padding-left:22px;}
-  .changelog::before{content:""; position:absolute; left:5px; top:6px; bottom:6px; width:2px; background:var(--line);}
-  .cl-entry{position:relative; margin-bottom:22px;}
+  /* 체인지로그 — 도트/세로선 중심 정렬 + 접기/펴기 */
+  .changelog{position:relative; padding-left:26px;}
+  .changelog::before{content:""; position:absolute; left:5px; top:7px; bottom:7px; width:2px; background:var(--line);}
+  .cl-entry{position:relative; margin-bottom:10px;}
   .cl-entry:last-child{margin-bottom:0;}
-  .cl-entry::before{content:""; position:absolute; left:-21px; top:5px; width:11px; height:11px; border-radius:50%; background:var(--pill); border:2px solid var(--bg);}
+  /* 도트: 세로선 중심(x=6px)과 정렬 — 부모 padding-left 26px 기준 left:-21px → 도트 중심 -21+6=-15... 계산 대신 중심 일치를 위해 left/translate 사용 */
+  .cl-entry::before{content:""; position:absolute; left:-25.5px; top:9px; width:11px; height:11px; border-radius:50%; background:var(--pill); border:2px solid var(--bg); box-sizing:border-box; z-index:1;}
   .cl-entry.current::before{background:var(--orange);}
-  .cl-head{display:flex; align-items:center; gap:9px; margin-bottom:8px; flex-wrap:wrap;}
+  .cl-head{display:flex; align-items:center; gap:9px; padding:3px 0; cursor:pointer; user-select:none; -webkit-user-select:none; list-style:none;}
+  .cl-head::-webkit-details-marker{display:none;}
+  .cl-chev{margin-left:auto; color:var(--ink-3); transition:transform .28s cubic-bezier(.4,0,.2,1); display:inline-flex;}
+  .cl-chev svg{width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+  details[open] > .cl-head .cl-chev{transform:rotate(180deg);}
   .cl-ver{font-family:'JetBrains Mono',monospace; font-weight:700; font-size:14px; color:var(--ink);}
   .cl-badge{font-size:11px; font-weight:700; color:var(--orange); background:var(--orange-bg); padding:2px 8px; border-radius:20px;}
   .cl-date{font-size:12.5px; color:var(--ink-3); font-family:'JetBrains Mono',monospace;}
-  .changelog ul{margin:0; padding-left:18px; display:flex; flex-direction:column; gap:5px;}
+  /* 펼침 영역: grid-rows 트랜지션으로 높이 애니메이션(내용 높이 자동) */
+  .cl-body{display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s cubic-bezier(.4,0,.2,1);}
+  details[open] > .cl-body{grid-template-rows:1fr;}
+  details.cl-closing[open] > .cl-body{grid-template-rows:0fr;}
+  details.cl-closing[open] > .cl-head .cl-chev{transform:rotate(0deg);}
+  .cl-body-inner{overflow:hidden;}
+  .changelog ul{margin:8px 0 0; padding-left:18px; display:flex; flex-direction:column; gap:5px;}
   .changelog li{font-size:14px; color:var(--ink-2); line-height:1.65;}
 
   code{font-family:'JetBrains Mono','Pretendard',monospace; font-size:.88em; background:var(--surface-2); border:1px solid var(--line); padding:1px 6px; border-radius:6px; color:var(--ink);}
@@ -646,50 +658,38 @@
         <div class="sec-head"><span class="sec-num">14</span><h2>변경 내역 (Changelog)</h2></div>
         <div class="card">
           <div class="changelog">
-            <div class="cl-entry current">
-              <div class="cl-head"><span class="cl-ver">v1.0.5</span><span class="cl-badge">최신</span><span class="cl-date">2026-06-13</span></div>
-              <ul>
-                <li><b>업데이트 안내 개선</b> — '받기' 버튼을 누르면 다운로드 페이지(설명서)로 바로 이동해요.</li>
+            <details class="cl-entry current" open>
+              <summary class="cl-head"><span class="cl-ver">v1.0.5</span><span class="cl-badge">최신</span><span class="cl-date">2026-06-13</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul><li><b>업데이트 안내 개선</b> — '받기' 버튼을 누르면 다운로드 페이지(설명서)로 바로 이동해요.</li>
                 <li><b>업데이트 배너 디자인 변경</b> — 배너 색을 검정으로 바꾸고, 부드러운 슬라이드 애니메이션을 더했어요. 'X' 대신 '다음에' 버튼으로 닫아요.</li>
-                <li>트레이 메뉴의 '업데이트 확인' 항목은 제거했어요(앱을 켜면 자동으로 알려드려요).</li>
-              </ul>
-            </div>
-            <div class="cl-entry">
-              <div class="cl-head"><span class="cl-ver">v1.0.4</span><span class="cl-date">2026-06-13</span></div>
-              <ul>
-                <li><b>'업데이트 확인' 오류 수정</b> — 트레이 메뉴의 업데이트 확인을 누르면 오류가 나던 문제를 고쳤어요.</li>
-              </ul>
-            </div>
-            <div class="cl-entry">
-              <div class="cl-head"><span class="cl-ver">v1.0.3</span><span class="cl-date">2026-06-13</span></div>
-              <ul>
-                <li><b>트레이 메뉴에 '업데이트 확인' 추가</b> — 트레이 아이콘 우클릭으로 언제든 최신 여부를 직접 확인할 수 있어요.</li>
+                <li>트레이 메뉴의 '업데이트 확인' 항목은 제거했어요(앱을 켜면 자동으로 알려드려요).</li></ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.4</span><span class="cl-date">2026-06-13</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul><li><b>'업데이트 확인' 오류 수정</b> — 트레이 메뉴의 업데이트 확인을 누르면 오류가 나던 문제를 고쳤어요.</li></ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.3</span><span class="cl-date">2026-06-13</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul><li><b>트레이 메뉴에 '업데이트 확인' 추가</b> — 트레이 아이콘 우클릭으로 언제든 최신 여부를 직접 확인할 수 있어요.</li>
                 <li>설치 폴더 이름을 정리했어요(team-timer).</li>
-                <li>설명서 좌측 목차의 현재 위치 표시를 다듬었어요.</li>
-              </ul>
-            </div>
-            <div class="cl-entry">
-              <div class="cl-head"><span class="cl-ver">v1.0.2</span><span class="cl-date">2026-06-13</span></div>
-              <ul>
-                <li><b>앱 내 업데이트 알림</b> — 새 버전이 나오면 설정 상단과 앱 상단 배너로 알려줘요. 클릭하면 다운로드 페이지로 이동해요.</li>
+                <li>설명서 좌측 목차의 현재 위치 표시를 다듬었어요.</li></ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.2</span><span class="cl-date">2026-06-13</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul><li><b>앱 내 업데이트 알림</b> — 새 버전이 나오면 설정 상단과 앱 상단 배너로 알려줘요. 클릭하면 다운로드 페이지로 이동해요.</li>
                 <li><b>중복 실행 방지 강화</b> — 두 번째 실행을 더 확실히 차단하도록 개선했어요.</li>
-                <li>설정의 버전 표기가 실제 앱 버전과 자동으로 맞춰져요.</li>
-              </ul>
-            </div>
-            <div class="cl-entry">
-              <div class="cl-head"><span class="cl-ver">v1.0.1</span><span class="cl-date">2026-06-13</span></div>
-              <ul>
-                <li><b>중복 실행 방지</b> — 앱이 이미 켜져 있을 때 다시 실행하면 새 창이 뜨지 않고 기존 창이 앞으로 나와요.</li>
-                <li><b>설정 초기화 문제 해결</b> — 중복 실행 시 이름·단축키·상태 색상 등 설정이 빈 값으로 보이던 문제를 함께 고쳤어요. (원인이 중복 실행이었어요)</li>
-              </ul>
-            </div>
-            <div class="cl-entry">
-              <div class="cl-head"><span class="cl-ver">v1.0.0</span><span class="cl-date">2026-06-13</span></div>
-              <ul>
-                <li>첫 정식 배포 — Google Sheets 업무현황 동기화, 인트라넷 메일 알림, 마감일 캘린더(공휴일 자동 반영), 작업 타이머.</li>
-                <li>Windows · macOS(유니버설) 설치 파일 제공.</li>
-              </ul>
-            </div>
+                <li>설정의 버전 표기가 실제 앱 버전과 자동으로 맞춰져요.</li></ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.1</span><span class="cl-date">2026-06-13</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul><li><b>중복 실행 방지</b> — 앱이 이미 켜져 있을 때 다시 실행하면 새 창이 뜨지 않고 기존 창이 앞으로 나와요.</li>
+                <li><b>설정 초기화 문제 해결</b> — 중복 실행 시 이름·단축키·상태 색상 등 설정이 빈 값으로 보이던 문제를 함께 고쳤어요. (원인이 중복 실행이었어요)</li></ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.0</span><span class="cl-date">2026-06-13</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul><li>첫 정식 배포 — Google Sheets 업무현황 동기화, 인트라넷 메일 알림, 마감일 캘린더(공휴일 자동 반영), 작업 타이머.</li>
+                <li>Windows · macOS(유니버설) 설치 파일 제공.</li></ul></div></div>
+            </details>
           </div>
         </div>
       </section>
@@ -766,6 +766,31 @@
   links.forEach(a=> a.addEventListener('click', ()=>{ // 클릭 즉시 반영(스크롤 애니메이션 도착 전 피드백)
     links.forEach(l=>l.classList.remove('active')); a.classList.add('active');
   }));
+
+  // 체인지로그 접기/펴기 — <details> 토글을 가로채 부드러운 높이 애니메이션 적용.
+  // 열기: open 부여 → CSS가 grid-rows 0fr→1fr 트랜지션.
+  // 닫기: .cl-closing으로 1fr→0fr 트랜지션 → 끝나면 open 제거.
+  document.querySelectorAll('.changelog details.cl-entry').forEach(d=>{
+    const summary = d.querySelector('summary');
+    const body = d.querySelector('.cl-body');
+    summary.addEventListener('click', (e)=>{
+      e.preventDefault();
+      if (d.dataset.animating) return;
+      if (d.open) {
+        d.dataset.animating = '1';
+        d.classList.add('cl-closing');           // CSS: grid-rows 0fr로 접기
+        const done = () => {
+          body.removeEventListener('transitionend', done);
+          d.classList.remove('cl-closing');
+          d.open = false;
+          delete d.dataset.animating;
+        };
+        body.addEventListener('transitionend', done);
+      } else {
+        d.open = true;                            // CSS: grid-rows 1fr로 펼치기
+      }
+    });
+  });
 
   // 명령어 복사 버튼 (아이콘)
   const COPY_ICON = '<svg viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2.5"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
