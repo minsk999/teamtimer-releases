@@ -28,7 +28,21 @@ app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 
 // GPU 디스크 캐시 권한 오류(0x5) 방지 — 캐시를 앱 전용 폴더로, 셰이더 디스크 캐시 끔
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
-app.setPath('userData', path.join(app.getPath('appData'), 'jakeop-timer'));
+
+// userData 폴더명: 'teamtimer' (예전 'jakeop-timer'에서 변경).
+// 기존 사용자의 설정이 사라지지 않도록, 새 폴더가 없고 옛 폴더가 있으면 1회 복사 이관.
+(function migrateUserData() {
+  try {
+    const appData = app.getPath('appData');
+    const oldDir = path.join(appData, 'jakeop-timer');
+    const newDir = path.join(appData, 'teamtimer');
+    if (!fs.existsSync(newDir) && fs.existsSync(oldDir)) {
+      // Node 16+ : fs.cpSync 재귀 복사 (원본은 보존 — 롤백 안전)
+      fs.cpSync(oldDir, newDir, { recursive: true });
+    }
+  } catch (e) { /* 이관 실패해도 앱은 새 폴더로 정상 시작 */ }
+})();
+app.setPath('userData', path.join(app.getPath('appData'), 'teamtimer'));
 
 let mainWindow = null;
 let tray = null;
@@ -136,9 +150,13 @@ function createTray() {
 // ── 중복 실행 방지 ──
 // 이미 실행 중이면 두 번째 인스턴스는 즉시 종료하고, 기존 창을 앞으로 가져와요.
 // (두 번째 인스턴스가 임시 프로필로 떠서 설정이 빈 채로 보이던 문제도 함께 해결)
+// 주의: requestSingleInstanceLock은 userData 경로 기준으로 판정하므로,
+//       반드시 위쪽 app.setPath('userData', ...) 이후에 호출돼야 한다(이미 그러함).
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
-  app.quit();
+  // app.quit()은 이벤트 루프를 거쳐 비동기 종료라 그 사이 창이 뜰 여지가 있음.
+  // app.exit(0)으로 즉시 프로세스를 끝내 두 번째 창을 확실히 차단.
+  app.exit(0);
 } else {
   app.on('second-instance', () => {
     // 사용자가 앱을 또 실행했을 때 — 기존 창을 복원·표시하고 포커스
@@ -489,6 +507,45 @@ ipcMain.handle('fetch-holidays', async (event, year) => {
     if (!res.ok) return { ok: false, error: 'http-' + res.status };
     const json = await res.json();
     return { ok: true, year, map: parseHolidayItems(json) };
+  } catch (e) {
+    return { ok: false, error: String(e && e.message || e) };
+  }
+});
+
+// ── 앱 버전 + 업데이트 확인 ──
+// 설정 화면 버전 표기를 package.json 버전과 자동 동기화하기 위한 IPC.
+ipcMain.handle('app-version', () => app.getVersion());
+
+// GitHub 릴리스의 최신 버전을 조회. 새 버전이 있으면 알려준다.
+// 서명 없는 맥/윈도우 모두 동일하게 작동(자동 설치 X — 안내만, 다운로드는 웹에서).
+const GITHUB_OWNER = 'minsk999';
+const GITHUB_REPO = 'teamtimer-releases';
+function cmpVer(a, b) {
+  // "1.0.2" vs "1.0.10" 정확 비교 (숫자 파트별)
+  const pa = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  const pb = String(b).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d !== 0) return d > 0 ? 1 : -1;
+  }
+  return 0;
+}
+ipcMain.handle('check-update', async () => {
+  try {
+    const cur = app.getVersion();
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+      { signal: ctrl.signal, headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'teamtimer' } }
+    );
+    clearTimeout(t);
+    if (!res.ok) return { ok: false, error: 'http-' + res.status };
+    const json = await res.json();
+    const latest = String(json.tag_name || '').replace(/^v/, '');
+    if (!latest) return { ok: false, error: 'no-tag' };
+    const hasUpdate = cmpVer(latest, cur) > 0;
+    return { ok: true, current: cur, latest, hasUpdate, url: json.html_url || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest` };
   } catch (e) {
     return { ok: false, error: String(e && e.message || e) };
   }

@@ -468,6 +468,16 @@
   .gmail-conn-btn.disconnect { background: var(--surface); color: var(--red); border: 1.5px solid var(--line); }
 
   .app-ver { font-size: 11.5px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; margin-left: 4px; vertical-align: middle; }
+  /* 업데이트 배지 (설정 버전 우측, 빨강) */
+  .update-badge { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:20px; background:#e5484d; color:#fff; font-size:11px; font-weight:700; letter-spacing:0; vertical-align:middle; text-decoration:none; cursor:pointer; transition:background .15s, transform .15s; }
+  .update-badge:hover { background:#d13c41; transform:translateY(-1px); }
+  /* 업데이트 배너 (앱 최상단, 가로 전체) */
+  .update-banner { display:none; align-items:center; gap:10px; padding:9px 16px; background:#e5484d; color:#fff; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; }
+  .update-banner.show { display:flex; }
+  .update-banner .ub-text { flex:1; }
+  .update-banner .ub-btn { background:rgba(255,255,255,.22); padding:3px 11px; border-radius:7px; font-size:12px; font-weight:700; }
+  .update-banner .ub-close { opacity:.85; font-size:16px; line-height:1; padding:2px 4px; cursor:pointer; }
+  .update-banner .ub-close:hover { opacity:1; }
 
   /* 커스텀 툴팁 */
   .tooltip {
@@ -919,6 +929,11 @@
 </head>
 <body>
 <div class="app">
+<div class="update-banner" id="update-banner">
+  <span class="ub-text" id="ub-text">새 버전이 있어요</span>
+  <span class="ub-btn">받기</span>
+  <span class="ub-close" id="ub-close" title="닫기">×</span>
+</div>
 
   <!-- 타이틀바 -->
   <div class="titlebar">
@@ -1229,7 +1244,7 @@
 <div class="overlay" id="modal-settings">
   <div class="modal">  <div class="modal-inner">
     <div class="modal-head">
-      <h2>설정 <span class="app-ver" id="app-ver">v1.0.0</span></h2>
+      <h2>설정 <span class="app-ver" id="app-ver">v1.0.0</span><a class="update-badge" id="update-badge" href="#" style="display:none">업데이트 있음</a></h2>
       <button class="close-btn" onclick="closeModal('modal-settings')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
@@ -1490,6 +1505,51 @@
   };
   HOLIDAY_API.loadCache();
   if (typeof window.timerAPI !== "undefined") setTimeout(() => HOLIDAY_API.checkAndUpdate(), 5000); // 시작 동기화 이후 여유 있게
+
+  // ── 앱 버전 표시 + 업데이트 확인 ──
+  // 설정 상단 버전을 package.json 버전과 자동 동기화하고,
+  // GitHub 릴리스에 새 버전이 있으면 배지(설정)와 배너(상단)로 안내한다.
+  (async function initVersionAndUpdate() {
+    if (typeof window.timerAPI === "undefined") return;
+    // 1) 버전 표시 (하드코딩 제거 — 이제 매 버전 자동 반영)
+    try {
+      if (window.timerAPI.appVersion) {
+        const v = await window.timerAPI.appVersion();
+        if (v) { const el = document.getElementById("app-ver"); if (el) el.textContent = "v" + v; }
+      }
+    } catch (e) {}
+    // 2) 업데이트 확인 (시작 직후 한 번)
+    try {
+      if (!window.timerAPI.checkUpdate) return;
+      const r = await window.timerAPI.checkUpdate();
+      if (!r || !r.ok || !r.hasUpdate) return;
+      const openUpdate = (e) => {
+        if (e) e.preventDefault();
+        if (window.timerAPI.openExternal) window.timerAPI.openExternal(r.url);
+      };
+      // 설정 배지
+      const badge = document.getElementById("update-badge");
+      if (badge) {
+        badge.style.display = "inline-block";
+        badge.textContent = "v" + r.latest + " 업데이트";
+        badge.addEventListener("click", openUpdate);
+      }
+      // 상단 배너 (이번 세션에서 닫았으면 다시 안 띄움)
+      const banner = document.getElementById("update-banner");
+      if (banner && sessionStorage.getItem("updateBannerClosed") !== r.latest) {
+        const txt = document.getElementById("ub-text");
+        if (txt) txt.textContent = "새 버전 v" + r.latest + "이 나왔어요";
+        banner.classList.add("show");
+        banner.addEventListener("click", openUpdate);
+        const close = document.getElementById("ub-close");
+        if (close) close.addEventListener("click", (e) => {
+          e.stopPropagation(); // 배너 클릭(받기)과 분리
+          banner.classList.remove("show");
+          sessionStorage.setItem("updateBannerClosed", r.latest);
+        });
+      }
+    } catch (e) {}
+  })();
 
   const DEFAULT_PRESETS = [
     { name: "오전", time: "11:50" },

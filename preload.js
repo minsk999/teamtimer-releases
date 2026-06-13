@@ -33,6 +33,8 @@ contextBridge.exposeInMainWorld('timerAPI', {
   // Gmail 연동
   gmailStatus: () => ipcRenderer.invoke('gmail-status'),
   fetchHolidays: (year) => ipcRenderer.invoke('fetch-holidays', year),
+  appVersion: () => ipcRenderer.invoke('app-version'),
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
   gmailLogin: () => ipcRenderer.invoke('gmail-login'),
   gmailLogout: () => ipcRenderer.invoke('gmail-logout'),
   gmailList: (opts) => ipcRenderer.invoke('gmail-list', opts),
