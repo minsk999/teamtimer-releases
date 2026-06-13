@@ -393,7 +393,7 @@
   .modal-inner::-webkit-scrollbar { width: 0; height: 0; display: none; }
   @keyframes up { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
   .modal-head { padding: 26px 28px 0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .modal-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.035em; }
+  .modal-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.035em; display: flex; align-items: center; gap: 0; }
   .modal-body { padding: 22px 28px 28px; }
 
   .field { margin-bottom: 22px; }
@@ -467,9 +467,9 @@
   .gmail-conn-btn:hover { opacity: 0.8; }
   .gmail-conn-btn.disconnect { background: var(--surface); color: var(--red); border: 1.5px solid var(--line); }
 
-  .app-ver { font-size: 11.5px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; margin-left: 4px; vertical-align: middle; }
-  /* 업데이트 배지 (설정 버전 우측, 빨강) */
-  .update-badge { display:inline-block; margin-left:8px; padding:2px 9px; border-radius:20px; background:#e5484d; color:#fff; font-size:11px; font-weight:700; letter-spacing:0; vertical-align:middle; text-decoration:none; cursor:pointer; transition:background .15s, transform .15s; }
+  .app-ver { font-size: 11.5px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; margin-left: 8px; }
+  /* 업데이트 배지 (설정 버전 우측, 빨강) — flex로 텍스트 수직 중앙 */
+  .update-badge { display:inline-flex; align-items:center; justify-content:center; margin-left:8px; padding:0 10px; height:20px; border-radius:20px; background:#e5484d; color:#fff; font-size:11px; font-weight:700; line-height:1; letter-spacing:0; text-decoration:none; cursor:pointer; transition:background .15s, transform .15s; }
   .update-badge:hover { background:#d13c41; transform:translateY(-1px); }
   /* 업데이트 배너 (앱 최상단, 가로 전체) */
   .update-banner { display:none; align-items:center; gap:10px; padding:9px 16px; background:#e5484d; color:#fff; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; }
@@ -1244,7 +1244,7 @@
 <div class="overlay" id="modal-settings">
   <div class="modal">  <div class="modal-inner">
     <div class="modal-head">
-      <h2>설정 <span class="app-ver" id="app-ver">v1.0.0</span><a class="update-badge" id="update-badge" href="#" style="display:none">업데이트 있음</a></h2>
+      <h2><span>설정</span><span class="app-ver" id="app-ver">v1.0.0</span><a class="update-badge" id="update-badge" href="#" style="display:none">업데이트 있음</a></h2>
       <button class="close-btn" onclick="closeModal('modal-settings')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
@@ -1509,6 +1509,36 @@
   // ── 앱 버전 표시 + 업데이트 확인 ──
   // 설정 상단 버전을 package.json 버전과 자동 동기화하고,
   // GitHub 릴리스에 새 버전이 있으면 배지(설정)와 배너(상단)로 안내한다.
+  // 업데이트 UI 표시(배지+배너) — 시작 확인과 트레이 '업데이트 확인'이 공유.
+  function applyUpdateUI(r) {
+    if (!r || !r.ok || !r.hasUpdate) return;
+    const openUpdate = (e) => {
+      if (e) e.preventDefault();
+      if (window.timerAPI && window.timerAPI.openExternal) window.timerAPI.openExternal(r.url);
+    };
+    // 설정 배지
+    const badge = document.getElementById("update-badge");
+    if (badge) {
+      badge.style.display = "inline-flex";
+      badge.textContent = "v" + r.latest + " 업데이트";
+      badge.onclick = openUpdate; // 중복 등록 방지(onclick 덮어쓰기)
+    }
+    // 상단 배너 (이번 세션에서 닫았으면 다시 안 띄움)
+    const banner = document.getElementById("update-banner");
+    if (banner && sessionStorage.getItem("updateBannerClosed") !== r.latest) {
+      const txt = document.getElementById("ub-text");
+      if (txt) txt.textContent = "새 버전 v" + r.latest + "이 나왔어요";
+      banner.classList.add("show");
+      banner.onclick = openUpdate;
+      const close = document.getElementById("ub-close");
+      if (close) close.onclick = (e) => {
+        e.stopPropagation();
+        banner.classList.remove("show");
+        sessionStorage.setItem("updateBannerClosed", r.latest);
+      };
+    }
+  }
+
   (async function initVersionAndUpdate() {
     if (typeof window.timerAPI === "undefined") return;
     // 1) 버전 표시 (하드코딩 제거 — 이제 매 버전 자동 반영)
@@ -1520,34 +1550,11 @@
     } catch (e) {}
     // 2) 업데이트 확인 (시작 직후 한 번)
     try {
-      if (!window.timerAPI.checkUpdate) return;
-      const r = await window.timerAPI.checkUpdate();
-      if (!r || !r.ok || !r.hasUpdate) return;
-      const openUpdate = (e) => {
-        if (e) e.preventDefault();
-        if (window.timerAPI.openExternal) window.timerAPI.openExternal(r.url);
-      };
-      // 설정 배지
-      const badge = document.getElementById("update-badge");
-      if (badge) {
-        badge.style.display = "inline-block";
-        badge.textContent = "v" + r.latest + " 업데이트";
-        badge.addEventListener("click", openUpdate);
-      }
-      // 상단 배너 (이번 세션에서 닫았으면 다시 안 띄움)
-      const banner = document.getElementById("update-banner");
-      if (banner && sessionStorage.getItem("updateBannerClosed") !== r.latest) {
-        const txt = document.getElementById("ub-text");
-        if (txt) txt.textContent = "새 버전 v" + r.latest + "이 나왔어요";
-        banner.classList.add("show");
-        banner.addEventListener("click", openUpdate);
-        const close = document.getElementById("ub-close");
-        if (close) close.addEventListener("click", (e) => {
-          e.stopPropagation(); // 배너 클릭(받기)과 분리
-          banner.classList.remove("show");
-          sessionStorage.setItem("updateBannerClosed", r.latest);
-        });
-      }
+      if (window.timerAPI.checkUpdate) applyUpdateUI(await window.timerAPI.checkUpdate());
+    } catch (e) {}
+    // 3) 트레이 '업데이트 확인'으로 새 버전을 찾으면 배너 표시
+    try {
+      if (window.timerAPI.onShowUpdateBanner) window.timerAPI.onShowUpdateBanner((r) => applyUpdateUI(r));
     } catch (e) {}
   })();
 
