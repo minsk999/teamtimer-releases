@@ -1,6 +1,6 @@
 {
   "name": "team-timer",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "작업 타이머 - 마감까지 남은 시간을 한눈에",
   "main": "main.js",
   "author": "ADEF Video Team",
@@ -45,12 +45,16 @@
         {
           "target": "dmg",
           "arch": [
+            "x64",
+            "arm64",
             "universal"
           ]
         },
         {
           "target": "zip",
           "arch": [
+            "x64",
+            "arm64",
             "universal"
           ]
         }
