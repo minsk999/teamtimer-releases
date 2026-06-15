@@ -21,10 +21,10 @@ const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
 // 구글 시트 연동 — Apps Script 웹앱 URL (기존 배포 유지)
 const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzpYvgADNXn3POEe-XDsOVR9Q1AvH_xJ_d38vymNNkjdKCtjtEIiSJJVrpX61FA_6wGbg/exec';
 
-// ── 고용량 RAM(예: 128GB) 맥에서 V8 시작 크래시 방지 ──
-// RAM이 매우 큰 기기에서 V8이 메모리 한계를 자동 계산하다 구동 직후 SIGTRAP로 죽는 문제 우회.
-// 힙 상한을 고정값(4GB)으로 강제. (반드시 하이픈 2개 '--', em대시 '—' 아님)
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
+// 참고: 과거 '고용량 RAM 맥 V8 크래시 방지'용으로 넣었던
+// app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096') 는 제거함.
+// 이 옵션이 오히려 인텔 맥(128GB RAM)+Electron 31에서 V8 컴파일러 초기화 중
+// SIGTRAP 크래시를 유발했음. V8 기본 힙 설정에 맡기는 편이 안전. (다시 추가하지 말 것)
 
 // GPU 디스크 캐시 권한 오류(0x5) 방지 — 캐시를 앱 전용 폴더로, 셰이더 디스크 캐시 끔
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
