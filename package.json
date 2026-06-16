@@ -1,6 +1,6 @@
 {
   "name": "team-timer",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "작업 타이머 - 마감까지 남은 시간을 한눈에",
   "main": "main.js",
   "author": "ADEF Video Team",
@@ -20,7 +20,6 @@
   "build": {
     "appId": "kr.co.adef.jakeop-timer",
     "productName": "작업 타이머",
-    "afterSign": "build/afterSign.js",
     "directories": {
       "output": "dist",
       "buildResources": "build"
