@@ -1,0 +1,17 @@
+{
+  "name": "mintest",
+  "version": "1.0.0",
+  "main": "main.js",
+  "devDependencies": {
+    "electron": "31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "kr.co.adef.mintest",
+    "productName": "MinTest",
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64"] }],
+      "identity": "-"
+    }
+  }
+}
