@@ -1,0 +1,3932 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>작업 타이머</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+
+  :root {
+    /* 라이트 (기본) */
+    --hairline: 1px; /* JS가 devicePixelRatio 기준 1 디바이스 픽셀로 설정 (배율 화면 또렷) */
+    --bg: #ffffff;
+    --bg-soft: #f5f5f4;
+    --surface: #ffffff;
+    --surface-2: #fafafa;
+    --ink: #0a0a0a;
+    --ink-2: #71717a;
+    --ink-3: #a1a1aa;
+    --line: #ebebe8;
+    --pill: #0a0a0a;
+    --pill-text: #ffffff;
+    --shadow: rgba(10,10,10,0.08);
+    --red: #FF3333;
+    --red-bg: #fff0f0;
+    --orange: #FFAC24;
+    --orange-bg: #fff8ec;
+    --green: #04C766;
+    --green-bg: #eafaf1;
+    --st-urgent: var(--red);
+    --st-today: var(--orange);
+    --st-soon: var(--green);
+  }
+  .dark {
+    --bg: #0a0a0a;
+    --bg-soft: #18181b;
+    --surface: #161616;
+    --surface-2: #1e1e1e;
+    --ink: #d8d8dc;
+    --ink-2: #8f8f97;
+    --ink-3: #63636b;
+    --line: #2a2a2e;
+    --pill: #d8d8dc;
+    --pill-text: #161616;
+    --shadow: rgba(0,0,0,0.4);
+    --red: #FF5C5C;
+    --red-bg: #2a1515;
+    --orange: #FFB84D;
+    --orange-bg: #2a1c10;
+    --green: #2DD68A;
+    --green-bg: #14241a;
+    --st-urgent: var(--red);
+    --st-today: var(--orange);
+    --st-soon: var(--green);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* 전역 네이티브 스크롤바 완전 제거 — 오버레이 스크롤바만 사용 (v15) */
+  *::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+  * { scrollbar-width: none !important; }
+
+  html, body {
+    width: 100%; height: 100%;
+    margin: 0; padding: 0;
+  }
+  body {
+    font-family: 'Inter Tight', 'Pretendard', sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    transition: background 0.4s ease, color 0.4s ease;
+    overflow: hidden;
+  }
+
+  .app {
+    width: 100%; height: 100vh;
+    display: flex; flex-direction: column;
+    margin: 0 auto;
+    overflow-x: hidden;
+  }
+  /* 본문(상단바·리스트)은 중앙 정렬된 콘텐츠 폭. 타이틀바/구분선은 전체 폭 */
+  .content-wrap {
+    flex: 1; display: flex; flex-direction: column; min-height: 0;
+    width: 100%; max-width: 1080px; margin: 0 auto;
+  }
+
+  /* ── 타이틀바 ── (전체 폭, 구분선이 좌우 끝까지) */
+  .titlebar {
+    height: 38px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 8px 0 14px; flex-shrink: 0; -webkit-app-region: drag;
+    border-bottom: var(--hairline) solid var(--line); user-select: none;
+  }
+  .tb-brand { font-size: 12px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink-2); display: flex; align-items: center; gap: 7px; line-height: 1; padding-top: 1px; }
+  .tb-brand .bd {
+    width: 15px; height: 15px; background: var(--pill); border-radius: 4px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .tb-brand .bd svg { width: 9px; height: 9px; stroke: var(--pill-text); fill: none; stroke-width: 2; display: block; }
+  .win-controls { display: flex; gap: 2px; -webkit-app-region: no-drag; }
+  .win-btn {
+    width: 28px; height: 24px; border: none; background: none; cursor: pointer;
+    border-radius: 6px; display: flex; align-items: center; justify-content: center;
+    color: var(--ink-3); transition: all 0.13s;
+  }
+  .win-btn svg { width: 10px; height: 10px; stroke: currentColor; stroke-width: 1.6; fill: none; stroke-linecap: round; }
+  .win-btn:hover { background: var(--bg-soft); color: var(--ink); }
+  .win-btn.close:hover { background: var(--red); color: #fff; }
+
+  /* ── 상단 pill 바 ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 28px 16px; flex-shrink: 0; gap: 12px;
+    min-width: 0; max-width: 100%; overflow: hidden;
+  }
+
+  .top-controls { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
+
+  /* 통계 (상단바 좌측) */
+  .stat-line { display: flex; gap: 12px; align-items: center; flex-shrink: 1; min-width: 0; flex-wrap: nowrap; overflow: hidden; transition: gap 0.3s ease; padding-left: 8px; }
+  .stat-item { display: flex; align-items: baseline; gap: 8px; flex-shrink: 0; white-space: nowrap; transition: gap 0.3s ease; }
+  .stat-item .sdot { display: none; width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+  .stat-item.red .sdot { background: var(--st-urgent); }
+  .stat-item.orange .sdot { background: var(--st-today); }
+  .stat-item.green .sdot { background: var(--st-soon); }
+  .stat-item .n {
+    font-family: 'JetBrains Mono', monospace; font-size: 26px; font-weight: 700;
+    letter-spacing: -0.04em; line-height: 1; transition: font-size 0.3s ease;
+  }
+  .stat-item.red .n { color: var(--st-urgent); }
+  .stat-item.orange .n { color: var(--st-today); }
+  .stat-item.green .n { color: var(--st-soon); }
+  .stat-item .l { font-size: 12.5px; color: var(--ink-3); font-weight: 500; letter-spacing: -0.01em; }
+
+  /* pill 컨트롤 그룹 */
+  .pill-group {
+    display: flex; align-items: center; gap: 2px; background: var(--pill);
+    border-radius: 100px; padding: 4px;
+  }
+  .pill-btn {
+    border: none; background: none; cursor: pointer; border-radius: 100px;
+    padding: 8px 14px; font-family: inherit; font-size: 13px; font-weight: 600;
+    color: var(--pill-text); display: flex; align-items: center; gap: 7px;
+    transition: opacity 0.13s, padding 0.3s ease, font-size 0.3s ease; letter-spacing: -0.01em; white-space: nowrap; line-height: 1;
+  }
+  .pill-btn span, .pill-btn { line-height: 1; }
+  .pill-btn span {
+    overflow: hidden; max-width: 80px; opacity: 1;
+    transition: max-width 0.3s ease, opacity 0.25s ease, margin 0.3s ease;
+  }
+  .pill-btn:hover { opacity: 0.7; }
+
+  /* 작업자 롤링 네비 (심플 — 이름만) */
+  .board-nav { display: flex; align-items: center; justify-content: center; overflow: hidden;
+    max-height: 80px; opacity: 1; padding: 14px 0 16px;
+    transition: max-height 0.42s cubic-bezier(0.4,0,0.2,1), opacity 0.32s ease, padding 0.42s cubic-bezier(0.4,0,0.2,1); }
+  .board-nav.collapsed { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; pointer-events: none; }
+  .bn-center { display: flex; flex-direction: column; align-items: center; }
+  .bn-name-row { display: flex; align-items: center; gap: 8px; }
+  .bn-name { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .bn-ro { display: none; align-items: center; font-size: 10.5px; font-weight: 600; color: var(--ink-3); background: var(--surface-2); border-radius: 100px; padding: 2px 8px; }
+
+  /* 읽기 전용(다른 팀원 보드) — 쓰기 동작 비활성 */
+  body.readonly .check,
+  body.readonly .act,
+  body.readonly .mact,
+  body.readonly .clear-done,
+  body.readonly #btn-add,
+  body.readonly .add-mgmt,
+  body.readonly .meta-deadline { pointer-events: none; opacity: 0.4; }
+  body.readonly .meta-deadline { opacity: 0.75; cursor: default; }
+  .pill-btn:focus:not(:focus-visible),
+  .win-btn:focus:not(:focus-visible),
+  .sync-pill:focus:not(:focus-visible),
+  .clear-done:focus:not(:focus-visible),
+  .act:focus:not(:focus-visible),
+  .mact:focus:not(:focus-visible),
+  .close-btn:focus:not(:focus-visible),
+  .preset-pill:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+  .pill-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: block; flex-shrink: 0; }
+  #theme-icon { transition: transform 0.36s cubic-bezier(0.45, 0, 0.15, 1); transform-origin: 50% 50%; will-change: transform; }
+  @media (prefers-reduced-motion: reduce) { #theme-icon { transition: none; } }
+  #mail-icon { transition: transform 0.36s cubic-bezier(0.45, 0, 0.15, 1); transform-origin: 50% 50%; will-change: transform; }
+  @media (prefers-reduced-motion: reduce) { #mail-icon { transition: none; } }
+  .pill-btn.icon-only { padding: 8px; }
+  .pill-divider { width: 1px; height: 18px; background: var(--pill-text); opacity: 0.2; margin: 0 2px; }
+
+  .sync-pill {
+    display: flex; align-items: center; gap: 7px; padding: 8px 14px;
+    border: 1.5px solid var(--line); border-radius: 100px; font-size: 12.5px;
+    font-weight: 600; color: var(--ink-2); letter-spacing: -0.01em;
+    cursor: pointer; transition: border-color 0.13s, background 0.13s, padding 0.3s ease, gap 0.3s ease, width 0.3s ease, height 0.3s ease, border-radius 0.3s ease; flex-shrink: 0;
+  }
+  .sync-pill:hover { border-color: var(--ink-3); }
+  .sync-pill.syncing { pointer-events: none; }
+  .sync-pill .sync-text { overflow: hidden; max-width: 60px; opacity: 1; transition: max-width 0.3s ease, opacity 0.25s ease; white-space: nowrap; }
+  .sync-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
+  .sync-pill.syncing .dot { animation: spin-pulse 0.8s linear infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  @keyframes spin-pulse { 0%{opacity:0.3;} 50%{opacity:1;} 100%{opacity:0.3;} }
+
+  /* ── 리스트 ── */
+  .list-wrap { flex: 1; overflow-y: auto; padding: 4px 28px 28px; position: relative; scrollbar-width: none; }
+  .list-wrap::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+  /* 커스텀 오버레이 스크롤바 — absolute로 떠서 레이아웃 안 밀고, 스크롤 시에만 표시 */
+  .ovsb {
+    position: absolute; right: 3px; width: 6px; border-radius: 10px;
+    background: var(--ink-3); opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease; z-index: 50;
+  }
+  .ovsb.show { opacity: 0.45; }
+  .ovsb.hoverable { pointer-events: auto; }
+  .ovsb.hoverable:hover, .ovsb.dragging { opacity: 0.7; }
+
+  .sec-label {
+    font-size: 11px; font-weight: 700; color: var(--ink-3); letter-spacing: 0.08em;
+    text-transform: uppercase; margin: 18px 4px 12px; display: flex; align-items: center; gap: 9px;
+  }
+  .sec-label .ln { flex: 1; height: var(--hairline); background: var(--line); }
+
+  /* 공통 접이식 섹션 (진행 중 / 완료 / 관리 항목) */
+  .sec-group { margin: 18px 0 0; }
+  /* 리스트 맨 위 섹션만 작은 여백. 관리 항목이 있으면 그 다음(진행 중)은 일반 간격(18px). */
+  #mgmt-host .sec-group:first-child { margin-top: 4px; }
+  #mgmt-host:empty + #task-host .sec-group:first-child { margin-top: 4px; }
+  .sec-head {
+    display: flex; align-items: center; gap: 9px; cursor: pointer;
+    margin: 0 4px 12px; font-size: 11px; font-weight: 700; color: var(--ink-3);
+    letter-spacing: 0.08em; text-transform: uppercase; user-select: none;
+  }
+  .sec-head:hover { color: var(--ink-2); }
+  .sec-head .chev {
+    width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round; transition: transform 0.2s; flex-shrink: 0;
+  }
+  .sec-group.collapsed .sec-head .chev { transform: rotate(-90deg); }
+  .sec-head .sh-label { flex-shrink: 0; }
+  .sec-head .ln { flex: 1; height: var(--hairline); background: var(--line); }
+  .sec-body { display: flex; flex-direction: column; gap: 12px; }
+  .sec-group.collapsed .sec-body { display: none; }
+  .sec-body .task { margin-bottom: 0; }
+
+  /* 관리 항목 — 콤팩트 행 (B·C 각각 별개) */
+  #sec-mgmt .sec-body { gap: 6px; }
+  .mgmt-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface-2); border: var(--hairline) solid var(--line); border-radius: 11px;
+    padding: 8px 13px;
+  }
+  .mgmt-item.done { opacity: 0.5; }
+  .mgmt-item .pin { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
+  .mgmt-text { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); font-weight: 500; letter-spacing: -0.01em; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mdlink { color: var(--accent, #2E96FF); text-decoration: none; border-bottom: 1px solid transparent; cursor: pointer; transition: border-color 0.13s; }
+  .mdlink:hover { border-bottom-color: currentColor; }
+  .mgmt-item.done .mdlink { color: inherit; opacity: 0.8; text-decoration: underline; }
+
+  /* 등장 모션: 앱 시작·동기화 반영·보드 전환 시 항목들이 스태거로 떠오름 (맥OS풍)
+     끝 상태를 지정하지 않아 각 요소의 원래 불투명도(완료=0.45 등)로 자연스럽게 도착. 스케일 없음(텍스트 흔들림 방지).
+     요소별 .enter 클래스 방식: 연속 전환·중간 재렌더에도 항상 깨끗하게 재생됨. */
+  @keyframes itemIn { from { opacity: 0; transform: translateY(9px); } }
+  .task.enter, .mgmt-item.enter { animation: itemIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; animation-delay: calc(var(--ei, 0) * 36ms); }
+  @media (prefers-reduced-motion: reduce) { .task.enter, .mgmt-item.enter { animation: none; } }
+  .mgmt-acts { display: flex; gap: 1px; margin-left: auto; flex-shrink: 0; opacity: 0; max-width: 0; overflow: hidden; transition: max-width 0.26s ease, opacity 0.22s ease; }
+  .mgmt-item:hover .mgmt-acts, .mgmt-item.editing .mgmt-acts { opacity: 1; max-width: 60px; }
+  .mgmt-item.pending .mgmt-acts, .mgmt-item.adding .mgmt-acts { opacity: 1; max-width: 90px; }
+  .mact {
+    width: 26px; height: 26px; border: none; background: none; border-radius: 7px; cursor: pointer;
+    color: var(--ink-3); display: flex; align-items: center; justify-content: center; transition: background 0.13s, color 0.13s;
+  }
+  .mact svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .mact:hover { background: var(--bg-soft); color: var(--ink); }
+  .mact.del:hover { color: var(--red); }
+  .mgmt-item.pending { opacity: 0.6; }
+  .mgmt-pending { font-size: 10.5px; color: var(--ink-3); font-weight: 600; letter-spacing: -0.01em; padding: 0 6px; white-space: nowrap; }
+  .mgmt-edit { flex: 1; min-width: 0; }
+  .mgmt-edit input {
+    width: 100%; padding: 6px 10px; border: 1.5px solid var(--ink); border-radius: 8px;
+    font-family: inherit; font-size: 13px; color: var(--ink); background: var(--surface); outline: none;
+  }
+  .add-mgmt {
+    border: none; background: none; cursor: pointer; display: flex; align-items: center; gap: 4px;
+    color: var(--ink-3); font-family: inherit; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.02em; text-transform: none; padding: 4px 10px; border-radius: 100px; transition: all 0.13s;
+  }
+  .add-mgmt svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .add-mgmt:hover { background: var(--bg-soft); color: var(--ink); }
+  .clear-done {
+    border: none; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;
+    color: var(--ink-3); font-family: inherit; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.02em; text-transform: none; padding: 4px 10px; border-radius: 100px;
+    transition: all 0.13s;
+  }
+  .clear-done svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .clear-done:hover { background: var(--red-bg); color: var(--red); }
+
+  /* ── 작업 카드 ── */
+  .task {
+    background: var(--surface); border: var(--hairline) solid var(--line); border-radius: 20px;
+    border-left: 4px solid var(--line);
+    padding: 18px 19px; margin-bottom: 12px; display: flex; align-items: center; gap: 18px;
+    transition: border-color 0.13s, box-shadow 0.13s, transform 0.13s, padding 0.3s ease, gap 0.3s ease;
+  }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } } /* 끝 상태 미지정 → 완료 카드도 자기 불투명도로 도착 */
+  .task.card-new { animation: cardIn 0.4s cubic-bezier(0.16,1,0.3,1) backwards; } /* 새로 추가된 카드만 등장 모션 (재렌더 전체 깜빡임 제거) */
+  .task:hover { box-shadow: 0 12px 32px -16px var(--shadow); transform: translateY(-1px); border-top-color: var(--ink-3); border-right-color: var(--ink-3); border-bottom-color: var(--ink-3); }
+  .task.done { opacity: 0.45; }
+
+  .check {
+    width: 26px; height: 26px; border: 2px solid var(--line); border-radius: 9px;
+    cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: all 0.13s; background: var(--surface);
+  }
+  .check:hover { border-color: var(--green); }
+  .check svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .check.on { background: var(--green); border-color: var(--green); }
+  .check.on svg { opacity: 1; }
+
+  .task-main { flex: 1; min-width: 0; }
+  .task-title { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: font-size 0.3s ease; }
+  .task-sub { display: flex; align-items: center; gap: 9px; margin-top: 5px; flex-wrap: nowrap; min-width: 0; transition: gap 0.3s ease, margin-top 0.3s ease; }
+  .task-sub .meta-deadline { flex-shrink: 0; }
+  .chip-tag {
+    font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px;
+    border: var(--hairline) solid var(--line); color: var(--ink-2); letter-spacing: -0.01em;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .chip-tag.req { border-color: transparent; background: var(--pill); color: var(--pill-text); }
+  .meta-text { font-size: 12.5px; color: var(--ink-3); font-family: 'Inter Tight', 'Pretendard', sans-serif; font-weight: 500; display: flex; align-items: center; gap: 5px; letter-spacing: -0.01em; white-space: nowrap; flex-shrink: 0; transition: font-size 0.3s ease; }
+  .meta-text svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+  .link-group { display: inline-flex; gap: 2px; align-items: center; flex-shrink: 0; }
+  .link-mini {
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+    border-radius: 7px; color: var(--ink-3); text-decoration: none; transition: all 0.13s; cursor: pointer;
+  }
+  .link-mini svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .link-mini:hover { background: var(--bg-soft); color: var(--ink); }
+
+  .count {
+    text-align: right; flex-shrink: 0; min-width: 130px;
+    font-family: 'JetBrains Mono', monospace; display: flex; align-items: center; justify-content: flex-end;
+    transition: min-width 0.3s ease;
+  }
+  .count .t { font-size: 21px; font-weight: 700; letter-spacing: -0.03em; line-height: 1; transition: color 0.4s ease, font-size 0.3s ease; }
+  .count.red .t { color: var(--st-urgent); }
+  .count.orange .t { color: var(--st-today); }
+  .count.green .t { color: var(--st-soon); }
+  .count .l { font-size: 9.5px; color: var(--ink-3); font-weight: 600; letter-spacing: 0.12em; margin-top: 3px; }
+
+  .actions { display: flex; gap: 3px; flex-shrink: 0; transition: gap 0.3s ease; }
+  .act {
+    width: 34px; height: 34px; border: none; background: none; border-radius: 10px;
+    cursor: pointer; color: var(--ink-3); display: flex; align-items: center; justify-content: center;
+    transition: background 0.13s, color 0.13s, width 0.3s ease, height 0.3s ease; text-decoration: none; flex-shrink: 0;
+  }
+  .act svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; transition: width 0.3s ease, height 0.3s ease; }
+  .act:hover { background: var(--bg-soft); color: var(--ink); }
+  .act.del:hover { background: var(--red-bg); color: var(--red); }
+
+  /* 긴급도 좌측 바 — border-left로 처리해 카드 라운드를 완벽히 따라감 */
+  .task { position: relative; overflow: hidden; }
+  .task.red { border-left-color: var(--st-urgent); }
+  .task.orange { border-left-color: var(--st-today); }
+  .task.green { border-left-color: var(--st-soon); }
+
+  /* ── 빈 상태 ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--ink-3); }
+  .empty svg { width: 44px; height: 44px; stroke: var(--ink-3); fill: none; stroke-width: 1.3; opacity: 0.5; margin-bottom: 12px; }
+  .empty .msg { font-size: 14px; letter-spacing: -0.01em; }
+
+  /* ── 모달 ── */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(10,10,10,0.45); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center; z-index: 100; animation: fade 0.2s;
+  }
+  .overlay.show { display: flex; }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+  .modal {
+    background: var(--surface); border-radius: 26px; width: 500px;
+    max-width: calc(100vw - 36px); max-height: calc(100vh - 56px);
+    box-shadow: 0 40px 100px -24px rgba(0,0,0,0.5); animation: up 0.3s cubic-bezier(0.16,1,0.3,1);
+    border: var(--hairline) solid var(--line);
+    overflow: hidden;          /* border-radius가 스크롤바를 덮음 */
+    display: flex; flex-direction: column;
+  }
+  /* 실제 스크롤은 modal-inner가 담당 — 스크롤바가 라운드 안에만 표시됨 */
+  .modal-inner {
+    overflow-y: auto; overflow-x: hidden; flex: 1; position: relative;
+    scrollbar-width: none;
+  }
+  .modal-inner::-webkit-scrollbar { width: 0; height: 0; display: none; }
+  @keyframes up { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal-head { padding: 26px 28px 0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .modal-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.035em; display: flex; align-items: center; gap: 0; }
+  .modal-body { padding: 22px 28px 28px; }
+
+  .field { margin-bottom: 22px; }
+  .field > label {
+    display: block; font-size: 11px; font-weight: 700; color: var(--ink-3);
+    letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 9px;
+  }
+  .field input[type="text"] {
+    width: 100%; padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px;
+    font-family: inherit; font-size: 15px; color: var(--ink); outline: none;
+    background: var(--surface-2); transition: border-color 0.13s; font-weight: 500;
+  }
+  .field input[type="text"]:focus { border-color: var(--ink); }
+  .field .opt { font-weight: 500; color: var(--ink-3); text-transform: none; letter-spacing: 0; }
+  .field .setting-desc { margin-top: -4px; }
+
+  /* 인트라넷 링크 불러오기 */
+  .link-fetch-row { display: flex; gap: 8px; }
+  .link-fetch-row input { flex: 1; min-width: 0; }
+  .fetch-btn {
+    flex-shrink: 0; padding: 0 18px; border: none; border-radius: 14px;
+    background: var(--pill); color: var(--pill-text); font-family: inherit;
+    font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: -0.01em;
+    transition: opacity 0.13s;
+  }
+  .fetch-btn:hover { opacity: 0.85; }
+
+  /* 마감 칩 */
+  .dl-box { background: var(--surface-2); border-radius: 18px; padding: 16px; }
+  .chip-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .dchip {
+    border: 1.5px solid var(--line); background: var(--surface); border-radius: 14px;
+    padding: 12px 8px; cursor: pointer; text-align: center; transition: all 0.13s; font-family: inherit;
+  }
+  .dchip:hover { border-color: var(--ink-3); transform: translateY(-1px); }
+  .dchip.on { border-color: var(--pill); background: var(--pill); }
+  .dchip.on .d, .dchip.on .t { color: var(--pill-text); }
+  .dchip .d { font-size: 13px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+  .dchip .t { font-size: 11px; color: var(--ink-3); margin-top: 2px; font-family: 'JetBrains Mono', monospace; }
+
+  .custom-toggle { margin-top: 11px; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--ink-2); cursor: pointer; padding: 6px; letter-spacing: -0.01em; }
+  .custom-toggle:hover { color: var(--ink); }
+
+  .custom-row { display: none; gap: 9px; margin-top: 13px; padding-top: 13px; border-top: var(--hairline) solid var(--line); }
+  .custom-row.show { display: flex; }
+  .cal-trigger {
+    flex: 1.3; display: flex; align-items: center; gap: 9px; padding: 12px 14px;
+    border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface);
+    cursor: pointer; font-family: inherit; font-size: 14px; color: var(--ink);
+    transition: border-color 0.13s; font-weight: 500;
+  }
+  .cal-trigger:hover { border-color: var(--ink-3); }
+  .cal-trigger.has { border-color: var(--ink); font-weight: 600; }
+  .cal-trigger svg { width: 16px; height: 16px; stroke: var(--ink-3); fill: none; stroke-width: 1.5; }
+  .time-input {
+    flex: 1; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; outline: none;
+    background: var(--surface); color: var(--ink); text-align: center; font-weight: 500;
+  }
+  .time-input:focus { border-color: var(--ink); }
+
+  /* 메일 연동 행 */
+  .gmail-conn { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--surface-2); border: var(--hairline) solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .gmail-conn-info { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .gmail-conn-info span:last-child { font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gmail-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-4, #c9c9c9); flex-shrink: 0; }
+  .gmail-dot.on { background: var(--green); }
+  .gmail-conn-btn { flex-shrink: 0; border: none; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 8px 16px; border-radius: 100px; background: var(--pill); color: var(--pill-text); transition: opacity 0.13s; }
+  .gmail-conn-btn:hover { opacity: 0.8; }
+  .gmail-conn-btn.disconnect { background: var(--surface); color: var(--red); border: 1.5px solid var(--line); }
+
+  .app-ver { font-size: 11.5px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; margin-left: 8px; }
+  /* 업데이트 배지 (설정 버전 우측, 빨강) — flex로 텍스트 수직 중앙 */
+  .update-badge { display:inline-flex; align-items:center; justify-content:center; margin-left:8px; padding:0 10px; height:20px; border-radius:20px; background:#ff3b30; color:#fff; font-size:11px; font-weight:700; line-height:1; letter-spacing:0; text-decoration:none; cursor:pointer; transition:background .15s, transform .15s; }
+  .update-badge:hover { background:#e63329; transform:translateY(-1px); }
+  /* 업데이트 배너 (앱 최상단, 가로 전체) */
+  /* 업데이트 배너 (앱 최상단) — 블랙, 슬라이드 다운 애니메이션 */
+  .update-banner { display:none; align-items:center; gap:10px; padding:9px 16px; background:#111; color:#fff; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; overflow:hidden; }
+  .update-banner.show { display:flex; animation: bannerSlideDown .4s cubic-bezier(.22,1,.36,1) both; }
+  .update-banner.hide { display:flex; animation: bannerSlideUp .32s cubic-bezier(.4,0,1,1) both; }
+  @keyframes bannerSlideDown { from{ transform:translateY(-100%); } to{ transform:translateY(0); } }
+  @keyframes bannerSlideUp { from{ transform:translateY(0); } to{ transform:translateY(-100%); } }
+  .update-banner .ub-text { flex:1; }
+  .update-banner .ub-btn { background:rgba(255,255,255,.18); padding:4px 12px; border-radius:7px; font-size:12px; font-weight:500; transition:background .15s; }
+  .update-banner .ub-btn:hover { background:rgba(255,255,255,.28); }
+  .update-banner .ub-later { background:transparent; border:0.5px solid rgba(255,255,255,.4); padding:4px 12px; border-radius:7px; font-size:12px; font-weight:500; transition:background .15s; }
+  .update-banner .ub-later:hover { background:rgba(255,255,255,.12); }
+
+  /* 커스텀 툴팁 */
+  .tooltip {
+    position: fixed; z-index: 2000; left: 0; top: 0;
+    background: var(--pill); color: var(--pill-text);
+    font-size: 11.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3;
+    padding: 6px 9px; border-radius: 8px; white-space: nowrap; max-width: 240px;
+    pointer-events: none; opacity: 0; transform: translateX(-50%) translateY(-3px);
+    transition: opacity 0.13s ease, transform 0.13s ease;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  }
+  .tooltip.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .prof-select { flex-shrink: 0; max-width: 150px; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 9px; padding: 8px 10px; cursor: pointer; }
+  .prof-select:hover { border-color: var(--ink-3); }
+
+  /* 상태 색상 설정 */
+  .color-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; }
+  .color-name { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 600; width: 84px; flex-shrink: 0; }
+  .color-name .cdot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+  .swatches { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; align-items: center; }
+  .swatch { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: none; transition: transform 0.13s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.13s ease; }
+  .swatch:hover { transform: scale(1.15); }
+  .swatch.on { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); animation: swpop 0.22s cubic-bezier(0.34,1.56,0.64,1); }
+  @keyframes swpop { 0%{transform:scale(0.8);} 60%{transform:scale(1.18);} 100%{transform:scale(1);} }
+  .color-pick { width: 26px; height: 26px; padding: 0; border: 1.5px solid var(--line); border-radius: 50%; cursor: pointer; flex-shrink: 0; transition: transform 0.13s; }
+  .color-pick:hover { transform: scale(1.12); }
+
+  /* 커스텀 컬러 피커 팝오버 */
+  .cpick-pop { position: fixed; z-index: 200; width: 196px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px; box-shadow: 0 12px 32px var(--shadow); }
+  .cpick-sv { position: relative; width: 172px; height: 116px; border-radius: 9px; overflow: hidden; cursor: crosshair; }
+  .cpick-sv-light { position: absolute; inset: 0; background: linear-gradient(to right, #fff, rgba(255,255,255,0)); }
+  .cpick-sv-dark { position: absolute; inset: 0; background: linear-gradient(to top, #000, rgba(0,0,0,0)); }
+  .cpick-sv-cursor { position: absolute; width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); transform: translate(-50%,-50%); pointer-events: none; }
+  .cpick-hue { position: relative; width: 172px; height: 14px; border-radius: 7px; margin-top: 11px; cursor: pointer; background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%); }
+  .cpick-hue-cursor { position: absolute; top: 50%; width: 16px; height: 16px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,0.3); transform: translate(-50%,-50%); pointer-events: none; }
+  .cpick-foot { display: flex; align-items: center; gap: 6px; margin-top: 11px; }
+  .cpick-preview { width: 24px; height: 24px; border-radius: 7px; border: var(--hairline) solid var(--line); flex-shrink: 0; }
+  .cpick-hash { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink-3); font-weight: 700; }
+  .cpick-hex { flex: 1; min-width: 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600; text-transform: uppercase; color: var(--ink); background: var(--surface-2); border: 1.5px solid var(--line); border-radius: 8px; padding: 7px 9px; outline: none; }
+  .cpick-hex:focus { border-color: var(--ink-3); }
+
+  .stat-line { transition: gap 0.3s ease, opacity 0.13s ease; }
+  .stat-line:hover { opacity: 0.7; }
+
+  /* 일반 옵션 행 (토글) */
+  .opt-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; padding: 4px 0; }
+  .opt-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .opt-title { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .opt-desc { font-size: 12px; color: var(--ink-3); line-height: 1.45; }
+  .opt-row .mh-toggle { pointer-events: none; flex-shrink: 0; } /* 클릭은 행 전체에서 처리 */
+
+  /* 단축키 편집 */
+  .key-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: var(--hairline) solid var(--line); }
+  .key-row:last-child { border-bottom: none; }
+  .key-label { font-size: 13.5px; color: var(--ink); font-weight: 500; }
+  .key-cap { min-width: 64px; height: 33px; padding: 0 13px; border: 1.5px solid var(--line); border-radius: 9px; background: var(--surface-2); color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-transform: uppercase; transition: border-color 0.13s, background 0.13s, color 0.13s; }
+  .key-cap:hover { border-color: var(--ink-3); }
+  .key-cap.capturing { border-color: var(--ink); background: var(--surface); color: var(--ink-3); text-transform: none; font-weight: 600; animation: pulse 0.9s ease-in-out infinite; }
+  .key-cap.fixed { text-transform: none; color: var(--ink-3); cursor: default; min-width: 64px; }
+  .key-cap.fixed:hover { border-color: var(--line); }
+  #modal-keys { z-index: 120; } /* 설정 모달 위에 표시 */
+  .mail-slider-row { margin-top: 14px; }
+  .mail-slider-row:first-child { margin-top: 12px; }
+  .mail-slider-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
+  .mail-slider-head .msl-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .mail-slider-head .msl-val { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+  input[type=range].mail-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; border-radius: 100px; background: var(--line); outline: none; cursor: pointer; margin: 6px 0; }
+  input[type=range].mail-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--ink); border: 3px solid var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.13s; }
+  input[type=range].mail-slider::-webkit-slider-thumb:active { transform: scale(1.15); }
+  .msl-ticks { display: flex; justify-content: space-between; margin-top: 4px; }
+  .msl-ticks span { font-size: 10px; color: var(--ink-3); }
+
+  /* ── 메일 화면 ── */
+  /* 상단 통계 ↔ 업무요청 메일: 좌우 슬라이드 + 크로스페이드 */
+  .stat-swap { position: relative; display: grid; align-items: center; flex-shrink: 1; min-width: 0; }
+  .stat-swap > * { grid-area: 1 / 1; }
+  .stat-line { opacity: 1; transform: translateX(0);
+    transition: gap 0.3s ease, opacity 0.26s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  body.mail-mode .stat-line { opacity: 0; transform: translateX(-22px); pointer-events: none; }
+  .mail-stat { display: flex; flex-direction: row; align-items: center; gap: 10px; min-width: 0; padding: 0 6px 0 4px; cursor: pointer; border-radius: 10px;
+    opacity: 0; transform: translateX(22px); pointer-events: none;
+    transition: opacity 0.26s ease, transform 0.34s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  body.mail-mode .mail-stat { opacity: 1; transform: translateX(0); pointer-events: auto; }
+  body.mail-mode .mail-stat:hover { opacity: 0.66; }
+  body.mail-mode .mail-stat:active { opacity: 0.45; }
+  @media (prefers-reduced-motion: reduce) {
+    .stat-line, .mail-stat { transition: opacity 0.2s ease; transform: none !important; }
+  }
+  /* 메일 아이콘 박스 (블랙톤) — 새로고침 시 Slate 테마전환식: 180° 회전 + 중간점에서 글리프 교체 */
+  .ms-ic { position: relative; width: 32px; height: 32px; border-radius: 9px; background: var(--pill); color: var(--pill-text); flex-shrink: 0; display: grid; place-items: center; }
+  #ms-ic-svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.42s cubic-bezier(0.45, 0, 0.15, 1); transform-origin: 50% 50%; will-change: transform; }
+  .ms-spin-arc { transform-origin: 12px 12px; animation: ms-spin 0.72s linear infinite; }
+  @keyframes ms-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { #ms-ic-svg { transition: none; } .ms-spin-arc { animation: none; } }
+  .ms-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .mail-stat .ms-title { font-size: 16px; font-weight: 800; letter-spacing: -0.015em; color: var(--ink); line-height: 1.15; white-space: nowrap; }
+  .mail-stat .mh-count { font-size: 12px; font-weight: 600; color: var(--ink-3); line-height: 1.1; white-space: nowrap; }
+  /* 카운트 ↔ '불러오는 중' B 슬라이드(위로 롤): 두 줄을 세로 트랙에 쌓고 트랙을 한 줄 위로 굴림 */
+  .mh-count { display: inline-block; overflow: hidden; height: 1.15em; vertical-align: bottom; }
+  .mhc-track { display: flex; flex-direction: column; transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1); }
+  .mhc-line { display: block; height: 1.15em; line-height: 1.15em; white-space: nowrap; }
+  .mh-count.is-loading .mhc-track { transform: translateY(-1.15em); }
+  @media (prefers-reduced-motion: reduce) { .mhc-track { transition: none; } }
+
+  /* ── 타이머 ↔ 메일 가로 슬라이드 트랙 ── */
+  /* 두 화면을 가로로 나란히 두고, 트랙을 translateX로 밀어 좌우 전환 */
+  .pane-viewport { flex: 1; min-height: 0; overflow: hidden; position: relative; }
+  .pane-track { display: flex; width: 200%; height: 100%; transform: translateX(0);
+    transition: transform 0.36s cubic-bezier(0.22, 0.61, 0.36, 1); will-change: transform; }
+  body.mail-mode .pane-track { transform: translateX(-50%); }
+  .pane { flex: 0 0 50%; width: 50%; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  @media (prefers-reduced-motion: reduce) { .pane-track { transition: none; } }
+
+  /* 메일 화면: 트랙 안에서 항상 렌더(보이고 안 보이고는 트랙 위치로 제어) */
+  .mail-view { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; position: relative; padding: 4px 14px 8px; }
+  .mail-view::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+  .mail-head { display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 2px 2px 14px; }
+  .mail-head-title { display: flex; align-items: baseline; gap: 9px; }
+  .mail-head-title h2 { font-size: 17px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); }
+  .mail-head-title .mh-count { font-size: 13px; font-weight: 600; color: var(--ink-3); }
+  .mail-head-ctrl { display: flex; align-items: center; gap: 12px; }
+  .mh-refresh { width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; border-radius: 9px; color: var(--ink-3); transition: background 0.13s, color 0.13s; }
+  .mh-refresh:hover { background: var(--surface-2); color: var(--ink); }
+  .mh-refresh svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .mh-refresh.spin svg { animation: mhspin 0.7s linear infinite; }
+  @keyframes mhspin { to { transform: rotate(360deg); } }
+  .mh-toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
+  .mh-toggle span { font-size: 11.5px; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
+  .mh-switch { position: relative; width: 36px; height: 21px; border-radius: 100px; background: var(--line); transition: background 0.2s; flex-shrink: 0; }
+  .mh-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.2s; }
+  .mh-toggle.on .mh-switch { background: var(--ink); }
+  .mh-toggle.on .mh-switch::after { transform: translateX(15px); }
+  .mail-list { display: flex; flex-direction: column; gap: 3px; }
+  .mail-item { display: flex; align-items: flex-start; gap: 11px; padding: 12px 13px; border-radius: 14px; cursor: pointer; transition: background 0.13s; border: 1px solid transparent; }
+  .mail-item:hover { background: var(--surface-2); }
+  .mail-item.unread { background: var(--surface-2); border-color: var(--line); }
+  .mail-dot-col { width: 8px; flex-shrink: 0; display: flex; justify-content: center; padding-top: 6px; }
+  .mail-udot { width: 7px; height: 7px; border-radius: 50%; background: #ff3b30; opacity: 0; }
+  .mail-item.unread .mail-udot { opacity: 1; }
+  .mail-main { flex: 1; min-width: 0; }
+  .mail-subject { font-size: 14px; line-height: 1.4; color: var(--ink-3); font-weight: 500; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mail-item.unread .mail-subject { color: var(--ink); font-weight: 700; }
+  .mail-meta { font-size: 12px; color: var(--ink-3); margin-top: 3px; display: flex; align-items: center; gap: 6px; overflow: hidden; }
+  .mail-requester { font-weight: 600; color: var(--ink-3); white-space: nowrap; }
+  .mail-item.unread .mail-requester { color: var(--ink); }
+  .mail-time { flex-shrink: 0; font-size: 11.5px; color: var(--ink-3); min-width: 50px; text-align: right; padding-top: 2px; font-variant-numeric: tabular-nums; }
+  .mail-right { flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .mail-trash { width: 26px; height: 26px; border: none; background: none; border-radius: 7px; cursor: pointer; color: var(--ink-3); display: grid; place-items: center; opacity: 0; max-width: 0; overflow: hidden; transition: max-width 0.26s ease, opacity 0.22s ease, background 0.13s, color 0.13s; }
+  .mail-trash svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .mail-item:hover .mail-trash { opacity: 1; max-width: 26px; }
+  .mail-trash:hover { background: var(--red-bg); color: var(--red); }
+  .mail-empty { text-align: center; color: var(--ink-3); font-size: 14px; padding: 60px 20px; line-height: 1.7; }
+  .mail-empty .me-sub { font-size: 12.5px; opacity: 0.7; margin-top: 6px; }
+  .name-trigger {
+    width: 100%; display: flex; align-items: center; justify-content: center;
+    padding: 13px 16px; border: 1.5px solid var(--line); border-radius: 14px;
+    background: var(--surface-2); color: var(--ink); font-family: inherit;
+    font-size: 15px; font-weight: 600; cursor: pointer; position: relative;
+    transition: border-color 0.13s;
+  }
+  .name-trigger:hover { border-color: var(--ink-3); }
+  .name-trigger.open { border-color: var(--ink); }
+  .name-chevron {
+    width: 16px; height: 16px; stroke: var(--ink-3); fill: none; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round;
+    position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+    transition: transform 0.18s;
+  }
+  .name-trigger.open .name-chevron { transform: translateY(-50%) rotate(180deg); }
+  .name-pop {
+    display: none; margin-top: 8px; background: var(--surface);
+    border: 1.5px solid var(--line); border-radius: 14px; padding: 6px;
+    animation: calIn 0.18s ease;
+  }
+  .name-pop.show { display: block; }
+  .name-opt {
+    width: 100%; padding: 11px; border: none; background: none; cursor: pointer;
+    border-radius: 10px; font-family: inherit; font-size: 14.5px; font-weight: 500;
+    color: var(--ink); text-align: center; transition: background 0.13s, color 0.13s;
+  }
+  .name-opt:hover { background: var(--bg-soft); }
+  .name-opt.sel { background: var(--pill); color: var(--pill-text); font-weight: 700; }
+
+  /* 캘린더 */
+  .cal-pop { display: none; margin-top: 11px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; animation: calIn 0.18s ease; }
+  .cal-pop.show { display: block; }
+  @keyframes calIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .cal-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .cal-h .tt { font-size: 14px; font-weight: 700; letter-spacing: -0.02em; }
+  .cal-nav { display: flex; gap: 2px; }
+  .cal-nav button { width: 28px; height: 28px; border: none; background: none; cursor: pointer; border-radius: 8px; color: var(--ink-2); display: flex; align-items: center; justify-content: center; transition: background 0.13s; }
+  .cal-nav button:hover { background: var(--bg-soft); color: var(--ink); }
+  .cal-nav button svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-dow { height: 26px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: var(--ink-3); font-family: 'JetBrains Mono', monospace; }
+  .cal-dow.sun { color: var(--red); }
+  .cal-dow.sat { color: #6d9eeb; }
+  .cal-d {
+    height: 32px; border: none; background: none; cursor: pointer; border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: var(--ink);
+    display: flex; align-items: center; justify-content: center; transition: background 0.13s, color 0.13s; position: relative; padding: 0;
+  }
+  .cal-d:hover:not(.empty) { background: var(--bg-soft); }
+  .cal-d.empty { cursor: default; pointer-events: none; }
+  .cal-d.today { font-weight: 700; color: var(--green); }
+  .cal-d.today::after { content: ""; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--green); }
+  .cal-d.today:has(.hdot)::after { display: none; }
+  .cal-d.sel { background: var(--pill); color: var(--pill-text); font-weight: 700; }
+  .cal-d.sel:hover { background: var(--bg-soft); color: var(--ink); }
+  .cal-d.sel.today { color: var(--pill-text); }
+  .cal-d.sel.today:hover { color: var(--ink); }
+  .cal-d.sel.today::after { background: var(--pill-text); }
+  .cal-d.past { color: var(--ink-3); opacity: 0.4; }
+  .cal-d.holiday { color: var(--red); }
+  .cal-d.sat { color: #6d9eeb; }
+  .cal-d.sel.holiday, .cal-d.sel.sat { color: var(--pill-text); }
+  .cal-d .hdot { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 3px; height: 3px; border-radius: 50%; background: var(--red); }
+  .cal-d.today .hdot { background: var(--green); }
+  .cal-d.sel .hdot { background: var(--pill-text); }
+
+  /* 미리보기 */
+  .dl-preview { margin-top: 13px; padding: 13px 16px; background: var(--pill); border-radius: 14px; display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--pill-text); font-weight: 600; letter-spacing: -0.01em; }
+  .dl-preview svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+
+  /* 알람 칩 */
+  .alarm-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .achip {
+    border: 1.5px solid var(--line); background: var(--surface); border-radius: 100px;
+    padding: 8px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+    color: var(--ink-2); transition: all 0.13s; letter-spacing: -0.01em;
+  }
+  .achip:hover { border-color: var(--ink-3); }
+  .achip.on { background: var(--pill); border-color: var(--pill); color: var(--pill-text); }
+
+  .modal-foot { display: flex; gap: 10px; padding-top: 4px; }
+  .modal-foot button { flex: 1; padding: 14px; border: none; border-radius: 14px; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; letter-spacing: -0.01em; transition: all 0.13s; }
+  .modal-foot .cancel { background: var(--bg-soft); color: var(--ink); }
+  .modal-foot .cancel:hover { background: var(--line); }
+  .modal-foot .save { background: var(--pill); color: var(--pill-text); }
+  .modal-foot .save:hover { opacity: 0.85; }
+
+  /* 완료/되돌림 팝업 */
+  .done-sub {
+    font-size: 13px; color: var(--ink-3); font-weight: 500; margin-top: 7px;
+    max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .done-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .preset-pill {
+    padding: 10px 16px; border: 1.5px solid var(--line); border-radius: 100px;
+    background: var(--surface-2); color: var(--ink); font-family: inherit;
+    font-size: 13.5px; font-weight: 600; cursor: pointer; transition: all 0.13s;
+    letter-spacing: -0.01em;
+  }
+  .preset-pill:hover { border-color: var(--ink); background: var(--bg-soft); }
+  /* 되돌리기 팝업 전용 — 완료 상태를 유지한 채 '전달 완료'로 보내는 검은 버튼 */
+  .preset-pill-dark { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .preset-pill-dark:hover { background: var(--ink); color: var(--surface); border-color: var(--ink); opacity: 0.86; }
+
+  /* 메일 버튼 배지 (좌상단, 1자리=원 / 여러자리=알약) */
+  .mail-btn { position: relative; overflow: visible; }
+  .mail-badge {
+    position: absolute; top: -7px; right: -4px;
+    min-width: 17px; height: 17px; padding: 0 5px; box-sizing: border-box;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #ff3b30; color: #fff; font-size: 10px; font-weight: 800;
+    line-height: 1; letter-spacing: -0.02em; border-radius: 100px;
+    font-variant-numeric: tabular-nums;
+    pointer-events: none; animation: badgePop 0.18s ease-out;
+  }
+  .mail-btn:hover .mail-badge { opacity: 1; }
+  .pill-btn.mail-btn:hover { opacity: 1; }  /* 버튼이 흐려지면 배지도 흐려지므로 메일버튼은 hover 페이드 제외 */
+  /* 배지는 버튼 라벨(span)이 아니므로 글자 숨김 규칙에서 제외 — 항상 표시 */
+  .pill-btn span.mail-badge,
+  body.stats-compact .pill-btn span.mail-badge { opacity: 1 !important; max-width: none !important; overflow: visible !important; }
+  .mail-badge[hidden] { display: none; }
+  @keyframes badgePop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* 가져오기 미리보기 */
+  .imp-card { background: var(--surface-2); border-radius: 16px; padding: 16px 18px; margin-bottom: 22px; border: var(--hairline) solid var(--line); }
+  .imp-card .it { font-size: 15px; font-weight: 700; margin-bottom: 10px; letter-spacing: -0.02em; }
+  .imp-card .ir { display: flex; gap: 10px; font-size: 13px; color: var(--ink-2); margin-bottom: 5px; }
+  .imp-card .ir .k { color: var(--ink-3); min-width: 58px; font-weight: 500; }
+
+  /* 설정 — 프리셋 */
+  .setting-desc { font-size: 12.5px; color: var(--ink-3); margin: -2px 0 12px; line-height: 1.5; letter-spacing: -0.01em; text-transform: none; font-weight: 400; }
+  .preset-head { display: grid; grid-template-columns: 1fr 84px 40px; gap: 8px; margin-bottom: 7px; padding: 0 2px; }
+  .preset-head .ph-name, .preset-head .ph-time { font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.04em; }
+  .preset-head .ph-time { text-align: center; }
+  .preset-row { display: grid; grid-template-columns: 1fr 84px 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .preset-name {
+    width: 100%; min-width: 0; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 12px;
+    font-family: inherit; font-size: 14px; color: var(--ink); outline: none;
+    background: var(--surface-2); font-weight: 600; transition: border-color 0.13s;
+  }
+  .preset-time {
+    width: 100%; min-width: 0; padding: 11px 8px; border: 1.5px solid var(--line); border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--ink); outline: none;
+    background: var(--surface-2); text-align: center; transition: border-color 0.13s;
+  }
+  .preset-name:focus, .preset-time:focus { border-color: var(--ink); }
+  .preset-del {
+    width: 40px; height: 40px; border: none; background: none; border-radius: 11px;
+    cursor: pointer; color: var(--ink-3); display: flex; align-items: center; justify-content: center;
+    transition: all 0.13s;
+  }
+  .preset-del svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .preset-del:hover { background: var(--red-bg); color: var(--red); }
+  .add-preset {
+    width: 100%; margin-top: 6px; padding: 11px; border: 1.5px dashed var(--line);
+    background: none; border-radius: 12px; cursor: pointer; color: var(--ink-2);
+    font-family: inherit; font-size: 13px; font-weight: 600; display: flex;
+    align-items: center; justify-content: center; gap: 6px; transition: all 0.13s; letter-spacing: -0.01em;
+  }
+  .add-preset svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; }
+  .add-preset:hover { border-color: var(--ink-3); color: var(--ink); }
+
+  /* 설정 — 구분선 & 세그먼트 */
+  .settings-divider { height: var(--hairline); background: var(--line); margin: 22px 0; }
+  .seg { display: flex; gap: 6px; flex-wrap: wrap; }
+  .seg-btn {
+    border: 1.5px solid var(--line); background: var(--surface); border-radius: 100px;
+    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    color: var(--ink-2); transition: all 0.13s; letter-spacing: -0.01em;
+  }
+  .seg-btn:hover { border-color: var(--ink-3); }
+  .seg-btn.on { background: var(--pill); border-color: var(--pill); color: var(--pill-text); }
+  .seg-btn.seg-custom { border-style: dashed; }
+  .custom-sound-name {
+    display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 9px 14px;
+    background: var(--surface-2); border: var(--hairline) solid var(--line); border-radius: 10px;
+    font-size: 12.5px; color: var(--ink-2); font-weight: 500;
+  }
+  .custom-sound-name svg { width: 14px; height: 14px; stroke: var(--ink-3); fill: none; stroke-width: 1.5; flex-shrink: 0; }
+  .custom-sound-name .csn-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .custom-sound-name .csn-text:hover { color: var(--ink); text-decoration: underline; }
+  .csn-remove { flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: none; background: none; border-radius: 6px; cursor: pointer; color: var(--ink-3); display: inline-flex; align-items: center; justify-content: center; transition: all 0.13s; }
+  .csn-remove svg { width: 13px; height: 13px; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+  .csn-remove:hover { background: var(--bg-soft); color: var(--ink); }
+  .field.disabled { opacity: 0.4; pointer-events: none; }
+
+  .close-btn { width: 36px; height: 36px; border: none; background: none; border-radius: 11px; cursor: pointer; color: var(--ink-3); display: flex; align-items: center; justify-content: center; transition: all 0.13s; }
+  .close-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; }
+  .close-btn:hover { background: var(--bg-soft); color: var(--ink); }
+
+  /* 토스트 */
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--pill); color: var(--pill-text); padding: 14px 24px; border-radius: 100px;
+    font-size: 13.5px; font-weight: 600; box-shadow: 0 16px 44px -12px rgba(0,0,0,0.4);
+    opacity: 0; transition: all 0.3s cubic-bezier(0.16,1,0.3,1); z-index: 200;
+    display: flex; align-items: center; gap: 9px; letter-spacing: -0.01em;
+  }
+  .toast svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* ── 반응형: 중간 (720px 이하) ── */
+  @media (max-width: 720px) {
+    .topbar { padding: 16px 18px 14px; }
+    .list-wrap { padding: 4px 18px 24px; }
+    .pill-btn { padding: 8px 12px; font-size: 12.5px; }
+    .count { min-width: 104px; }
+    .count .t { font-size: 18px; }
+    .task { padding: 16px 18px; gap: 14px; }
+  }
+
+  /* 상단 축약 — JS가 겹침 감지 시 body.stats-compact 부여.
+     통계 라벨·버튼 텍스트·동기화 텍스트가 모두 같은 순간 함께 접힘 */
+  body.stats-compact .stat-item .l { display: none; }
+  body.stats-compact .stat-item .sdot { display: block; }
+  body.stats-compact .stat-line { gap: 14px; }
+  body.stats-compact .stat-item { gap: 5px; }
+  body.stats-compact .pill-btn span { max-width: 0; opacity: 0; }
+  body.stats-compact .pill-btn { padding: 8px; }
+  body.stats-compact .sync-pill {
+    padding: 0; gap: 0; width: 32px; height: 32px;
+    justify-content: center; border-radius: 50%;
+  }
+  body.stats-compact .sync-pill .sync-text { max-width: 0; opacity: 0; }
+  /* 하단 카드 태그(인트라넷/직접추가)도 상단과 같은 타이밍에 사라짐 */
+  body.stats-compact .task-sub .sub-extra { display: none; }
+
+  /* ── 반응형: 좁음 (560px 이하) — 카드만 ── */
+  @media (max-width: 560px) {
+    .topbar { padding: 14px 14px 12px; gap: 10px; }
+    .list-wrap { padding: 4px 14px 20px; }
+    .stat-item .n { font-size: 21px; }
+
+    /* 카드 */
+    .task { padding: 14px 16px; gap: 12px; align-items: center; }
+    .task-title { font-size: 14px; }
+    .task-sub { gap: 7px; flex-wrap: nowrap; }
+    .count { min-width: 78px; }
+    .count .t { font-size: 15px; }
+    .count .l { font-size: 8.5px; }
+    .actions { gap: 0; }
+    .act { width: 30px; height: 30px; }
+    .act svg { width: 15px; height: 15px; }
+  }
+
+  /* ── 반응형: 매우 좁음 (400px 이하) ── */
+  @media (max-width: 400px) {
+    .task { padding: 12px 14px; gap: 10px; }
+    .task-title { font-size: 13px; }
+    .task-sub { gap: 8px; margin-top: 3px; }
+    .task-sub .meta-text { font-size: 12px; }
+    /* 매우 좁을 땐 태그·알람만 숨기고, 마감시각과 링크는 유지 */
+    .task-sub .sub-extra { display: none; }
+    .meta-deadline { font-family: 'JetBrains Mono', monospace !important; }
+    .count { min-width: 52px; }
+    .count .t { font-size: 14px; }
+    .stat-line { gap: 11px; }
+  }
+
+  /* ── 반응형: 극도로 좁음 (355px 이하) — 최후의 방어선 ──
+     356px에서 작아지기 직전 크기가 유지되도록 355px로 설정 */
+  @media (max-width: 355px) {
+    .topbar { padding: 12px 12px 10px; gap: 8px; }
+    .list-wrap { padding: 4px 12px 18px; }
+    .task { padding: 11px 12px; gap: 8px; }
+    .check { width: 22px; height: 22px; }
+    .task-title { font-size: 12.5px; }
+    .task-sub { gap: 6px; }
+    .task-sub .meta-text { font-size: 11px; }
+    .count { min-width: 48px; }
+    .count .t { font-size: 13px; }
+    .act { width: 28px; height: 28px; }
+    .act svg { width: 14px; height: 14px; }
+    .link-mini { width: 22px; height: 22px; }
+    .link-mini svg { width: 14px; height: 14px; }
+    /* 상단 컨트롤 축소 — 넘침 방지 */
+    .top-controls { gap: 5px; }
+    body.stats-compact .pill-btn { padding: 6px; }
+    .pill-btn svg { width: 15px; height: 15px; }
+    body.stats-compact .sync-pill { width: 28px; height: 28px; }
+    .pill-group { padding: 3px; gap: 0; }
+    .stat-line { gap: 9px; padding-left: 6px; }
+    .stat-item { gap: 4px; }
+    .stat-item .n { font-size: 19px; }
+    /* 메일 제목 블록 — 좁은 화면 축소 + transform으로 아래로 (버튼 높이 영향 없음) */
+    .mail-stat { gap: 8px; padding: 0 6px 0 4px; }
+    .mail-stat .ms-ic { width: 28px; height: 28px; border-radius: 8px; }
+    .mail-stat .ms-ic svg { width: 15px; height: 15px; }
+    .mail-stat .ms-title { font-size: 14px; }
+    .mail-stat .mh-count { font-size: 11px; }
+    /* 관리항목도 카드처럼 살짝 축소 */
+    .mgmt-item { padding: 7px 12px; gap: 8px; }
+    .mgmt-text { font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+<div class="update-banner" id="update-banner">
+  <span class="ub-text" id="ub-text">새 버전이 있어요</span>
+  <span class="ub-btn">받기</span>
+  <span class="ub-later" id="ub-later">다음에</span>
+</div>
+
+  <!-- 타이틀바 -->
+  <div class="titlebar">
+    <div class="tb-brand"><span class="bd"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6" stroke-linecap="round" stroke-linejoin="round"/></svg></span> 작업 타이머</div>
+    <div class="win-controls">
+      <button class="win-btn" title="최소화" id="win-min"><svg viewBox="0 0 12 12"><line x1="2.5" y1="6" x2="9.5" y2="6"/></svg></button>
+      <button class="win-btn" title="최대화" id="win-max"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5"/></svg></button>
+      <button class="win-btn close" title="닫기" id="win-close"><svg viewBox="0 0 12 12"><line x1="3" y1="3" x2="9" y2="9"/><line x1="9" y1="3" x2="3" y2="9"/></svg></button>
+    </div>
+  </div>
+
+  <!-- 본문 (중앙 정렬 폭) -->
+  <div class="content-wrap">
+  <!-- 상단바 -->
+  <div class="topbar">
+    <div class="stat-swap">
+      <div class="stat-line" onclick="openSheet()" title="클릭하면 구글 시트 열기" style="cursor:pointer">
+        <div class="stat-item red"><span class="sdot"></span><span class="n" id="s-red">0</span><span class="l">마감임박</span></div>
+        <div class="stat-item orange"><span class="sdot"></span><span class="n" id="s-orange">0</span><span class="l">오늘마감</span></div>
+        <div class="stat-item green"><span class="sdot"></span><span class="n" id="s-green">0</span><span class="l">여유있음</span></div>
+      </div>
+      <div class="mail-stat" id="mail-stat" onclick="loadMail()" title="클릭하면 새로고침">
+        <div class="ms-ic" id="ms-ic">
+          <svg id="ms-ic-svg" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.6 7l8.4 6 8.4-6"/></svg>
+        </div>
+        <div class="ms-text">
+          <div class="ms-title">업무요청 메일</div>
+          <span class="mh-count" id="mh-count"><span class="mhc-track"><span class="mhc-line mhc-count" id="mhc-count"></span><span class="mhc-line mhc-loading">불러오는 중</span></span></span>
+        </div>
+      </div>
+    </div>
+    <div class="top-controls">
+      <div class="sync-pill" id="sync-pill" onclick="doSync()" title="지금 동기화"><span class="dot"></span><span class="sync-text">동기화</span></div>
+      <div class="pill-group">
+        <button class="pill-btn icon-only" onclick="toggleTheme()" title="테마 전환" id="theme-btn">
+          <svg viewBox="0 0 24 24" id="theme-icon"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
+        </button>
+        <button class="pill-btn icon-only" onclick="openSettings()" title="설정">
+          <svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+        <div class="pill-divider"></div>
+        <button class="pill-btn" id="btn-add" onclick="openAdd()" title="새 작업 추가">
+          <svg viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></svg>
+          <span>작업추가</span>
+        </button>
+        <button class="pill-btn mail-btn" onclick="openMail()" title="메일">
+          <svg viewBox="0 0 24 24" id="mail-icon"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.6 7l8.4 6 8.4-6"/></svg>
+          <span id="mail-label">메일</span>
+          <span class="mail-badge" id="mail-badge" hidden></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 타이머 ↔ 메일 가로 슬라이드 트랙 -->
+  <div class="pane-viewport">
+    <div class="pane-track" id="pane-track">
+
+      <!-- 타이머 화면 (왼쪽 탭) -->
+      <div class="pane pane-timer">
+        <!-- 작업자 롤링 네비 -->
+        <div class="board-nav" id="board-nav">
+          <div class="bn-center">
+            <div class="bn-name-row">
+              <span class="bn-name" id="bn-name"></span>
+              <span class="bn-ro" id="bn-ro">읽기 전용</span>
+            </div>
+          </div>
+        </div>
+        <!-- 리스트 -->
+        <div class="list-wrap" id="list"></div>
+      </div>
+
+      <!-- 메일 화면 (오른쪽 탭) -->
+      <div class="pane pane-mail">
+        <div class="mail-view" id="mail-view">
+          <div class="mail-head">
+            <div class="mail-head-ctrl">
+              <div class="mh-toggle on" id="mh-toggle" onclick="toggleMailSort()" title="정렬 방식">
+                <span>최신순</span>
+                <div class="mh-switch"></div>
+              </div>
+            </div>
+          </div>
+          <div class="mail-list" id="mail-list"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- 작업 추가/편집 모달 -->
+<div class="overlay" id="modal-task">
+  <div class="modal">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <h2 id="modal-title">작업추가</h2>
+      <button class="close-btn" onclick="closeModal('modal-task')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>인트라넷 요청글 링크 <span class="opt">(필수)</span></label>
+        <input type="text" id="f-reqlink" placeholder="intranet.adef.co.kr/creative/view?idx=...">
+      </div>
+      <div class="field">
+        <label>기획안 링크 <span class="opt">(선택)</span></label>
+        <input type="text" id="f-planlink" placeholder="docs.google.com/presentation/...">
+      </div>
+      <div class="field">
+        <label>작업 제목</label>
+        <input type="text" id="f-title" placeholder="예: [네플스] 영상 소재 제작 요청">
+      </div>
+      <div class="field">
+        <label>마감 시간</label>
+        <div class="dl-box">
+          <div class="chip-grid" id="chip-grid"></div>
+          <div class="custom-toggle" onclick="toggleCustom('main')">+ 직접 입력</div>
+          <div class="custom-row" id="custom-row-main">
+            <button class="cal-trigger" id="cal-trig-main" onclick="toggleCal('main')">
+              <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8h13M7 3v3M13 3v3"/></svg>
+              <span id="cal-trig-text-main">날짜 선택</span>
+            </button>
+            <input type="text" class="time-input" id="time-main" placeholder="14:00" onblur="this.value=normalizeTime(this.value)||this.value">
+          </div>
+          <div class="cal-pop" id="cal-pop-main"></div>
+          <div class="dl-preview" id="dl-prev-main" style="display:none;">
+            <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/></svg>
+            <span id="dl-prev-text-main"></span>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label>알람</label>
+        <div class="alarm-opts" id="alarm-opts"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="cancel" onclick="closeModal('modal-task')">취소</button>
+        <button class="save" onclick="saveTask()">저장</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- 가져오기 모달 -->
+<div class="overlay" id="modal-import">
+  <div class="modal">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <h2>가져오기</h2>
+      <button class="close-btn" onclick="closeModal('modal-import')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p class="setting-desc">인트라넷에서 불러온 요청글이에요. 마감 시간만 정해서 내 작업에 추가하세요.</p>
+      <div class="imp-card">
+        <div class="it">[더한섬닷컴] 5월 3주차 라이프 스타일 기획전 모션배너</div>
+        <div class="ir"><span class="k">희망완료</span> <span>2026-06-05</span></div>
+        <div class="ir"><span class="k">처리자</span> <span>구민석</span></div>
+        <div class="ir"><span class="k">기획안</span> <span>docs.google.com/presentation/...</span></div>
+      </div>
+      <div class="field">
+        <label>마감 시간 설정</label>
+        <div class="dl-box">
+          <div class="chip-grid" id="chip-grid-import"></div>
+          <div class="custom-toggle" onclick="toggleCustom('import')">+ 직접 입력</div>
+          <div class="custom-row" id="custom-row-import">
+            <button class="cal-trigger" id="cal-trig-import" onclick="toggleCal('import')">
+              <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8h13M7 3v3M13 3v3"/></svg>
+              <span id="cal-trig-text-import">날짜 선택</span>
+            </button>
+            <input type="text" class="time-input" id="time-import" placeholder="14:00">
+          </div>
+          <div class="cal-pop" id="cal-pop-import"></div>
+          <div class="dl-preview" id="dl-prev-import" style="display:none;">
+            <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/></svg>
+            <span id="dl-prev-text-import"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="cancel" onclick="closeModal('modal-import')">취소</button>
+        <button class="save" onclick="confirmImport()">내 작업에 추가</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- 완료/되돌림 팝업 -->
+<div class="overlay" id="modal-done" onclick="if(event.target===this) closeModal('modal-done')">
+  <div class="modal">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div>
+        <h2 id="done-title">완료 처리</h2>
+        <div class="done-sub" id="done-sub"></div>
+      </div>
+      <button class="close-btn" onclick="closeModal('modal-done')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="done-presets" id="done-presets"></div>
+      <div class="field" style="margin-bottom:0">
+        <label id="done-input-label">상태 메모</label>
+        <input type="text" id="done-input" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmDoneFromInput()}">
+      </div>
+      <div class="modal-foot" style="margin-top:22px">
+        <button class="cancel" onclick="closeModal('modal-done')">취소</button>
+        <button class="save" onclick="confirmDoneFromInput()">확인</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- 확인 모달 (삭제 등) -->
+<div class="overlay" id="modal-confirm" onclick="if(event.target===this) closeModal('modal-confirm')">
+  <div class="modal">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <h2 id="confirm-title">확인</h2>
+      <button class="close-btn" onclick="closeModal('modal-confirm')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p class="setting-desc" id="confirm-msg" style="margin-bottom:22px; line-height:1.6;"></p>
+      <div class="modal-foot">
+        <button class="cancel" onclick="closeModal('modal-confirm')">취소</button>
+        <button class="save" id="confirm-ok" onclick="doConfirm()">삭제</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- 커스텀 컬러 피커 팝오버 -->
+<div class="cpick-pop" id="cpick" style="display:none;">
+  <div class="cpick-sv" id="cpick-sv"><div class="cpick-sv-light"></div><div class="cpick-sv-dark"></div><div class="cpick-sv-cursor" id="cpick-sv-cursor"></div></div>
+  <div class="cpick-hue" id="cpick-hue"><div class="cpick-hue-cursor" id="cpick-hue-cursor"></div></div>
+  <div class="cpick-foot">
+    <span class="cpick-preview" id="cpick-preview"></span>
+    <span class="cpick-hash">#</span>
+    <input type="text" class="cpick-hex" id="cpick-hex" maxlength="6" spellcheck="false">
+  </div>
+</div>
+
+<!-- 단축키 커스터마이징 팝업 -->
+<div class="overlay" id="modal-keys" onclick="if(event.target===this) closeModal('modal-keys')">
+  <div class="modal">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <h2>단축키</h2>
+      <button class="close-btn" onclick="closeModal('modal-keys')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <p class="setting-desc" style="margin-bottom:14px; line-height:1.6;">바꿀 단축키를 누르고 원하는 키를 입력하세요.</p>
+      <div id="keys-list"></div>
+      <div class="modal-foot" style="margin-top:18px;">
+        <button class="cancel" onclick="resetKeymap()">초기화</button>
+        <button class="save" onclick="closeModal('modal-keys')">완료</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- 마감 편집 팝업 (날짜 + 시간) -->
+<div class="overlay" id="modal-time" onclick="if(event.target===this) closeModal('modal-time')">
+  <div class="modal">
+  <div class="modal-inner">
+    <div class="modal-head">
+      <div>
+        <h2>마감 편집</h2>
+        <div class="done-sub" id="time-sub"></div>
+      </div>
+      <button class="close-btn" onclick="closeModal('modal-time')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>마감 시간</label>
+        <div class="dl-box">
+          <div class="chip-grid" id="chip-grid-edit"></div>
+          <div class="custom-toggle" onclick="toggleCustom('edit')">+ 직접 입력</div>
+          <div class="custom-row" id="custom-row-edit">
+            <button class="cal-trigger" id="cal-trig-edit" onclick="toggleCal('edit')">
+              <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8h13M7 3v3M13 3v3"/></svg>
+              <span id="cal-trig-text-edit">날짜 선택</span>
+            </button>
+            <input type="text" class="time-input" id="time-edit" placeholder="14:00" onblur="this.value=normalizeTime(this.value)||this.value">
+          </div>
+          <div class="cal-pop" id="cal-pop-edit"></div>
+          <div class="dl-preview" id="dl-prev-edit" style="display:none;">
+            <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/></svg>
+            <span id="dl-prev-text-edit"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot" style="margin-top:22px">
+        <button class="cancel" onclick="closeModal('modal-time')">취소</button>
+        <button class="save" onclick="saveDueEdit()">저장</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<!-- 설정 모달 -->
+<div class="overlay" id="modal-settings">
+  <div class="modal">  <div class="modal-inner">
+    <div class="modal-head">
+      <h2><span>설정</span><span class="app-ver" id="app-ver">v1.0.0</span><a class="update-badge" id="update-badge" href="#" style="display:none">업데이트 있음</a></h2>
+      <button class="close-btn" onclick="closeModal('modal-settings')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="field">
+        <label>작업자</label>
+        <p class="setting-desc">시트에서 내 작업만 불러오기 위해 사용해요. 팀원 중 본인을 선택하세요.</p>
+        <div class="name-select">
+          <button class="name-trigger" id="name-trigger" onclick="toggleNamePop()">
+            <span id="name-trigger-text">— 선택 —</span>
+            <svg class="name-chevron" viewBox="0 0 20 20"><path d="M5 8l5 5 5-5"/></svg>
+          </button>
+          <div class="name-pop" id="name-pop"></div>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="field">
+        <label>메일 연동</label>
+        <p class="setting-desc">받은 업무요청 메일을 앱에서 확인해요. 본인 회사 Google 계정으로 연결하세요.</p>
+        <div class="gmail-conn" id="gmail-conn">
+          <div class="gmail-conn-info">
+            <span class="gmail-dot" id="gmail-dot"></span>
+            <span id="gmail-conn-text">연결 안 됨</span>
+          </div>
+          <button class="gmail-conn-btn" id="gmail-conn-btn" onclick="toggleGmailConn()">연결</button>
+        </div>
+
+        <div class="mail-slider-row">
+          <div class="mail-slider-head">
+            <span class="msl-label">메일을 누르면</span>
+          </div>
+          <div class="seg" id="seg-mail-open">
+            <button class="seg-btn" data-val="gmail">Gmail</button>
+            <button class="seg-btn" data-val="intranet">요청글</button>
+            <button class="seg-btn" data-val="both">둘 다</button>
+          </div>
+          <p class="setting-desc" style="margin-top:7px;">메일 카드를 누를 때 Gmail, 메일에 담긴 인트라넷 요청글, 또는 둘 다 열어요.</p>
+        </div>
+
+        <div class="mail-slider-row">
+          <div class="mail-slider-head">
+            <span class="msl-label">메일 새로고침 주기</span>
+            <span class="msl-val" id="msl-poll-val">30초</span>
+          </div>
+          <input type="range" class="mail-slider" id="msl-poll" min="10" max="60" step="10" value="30" oninput="onPollSlide(this.value)">
+          <div class="msl-ticks"><span>10초</span><span>60초</span></div>
+        </div>
+
+        <div class="mail-slider-row">
+          <div class="mail-slider-head">
+            <span class="msl-label">불러올 메일 수</span>
+            <span class="msl-val" id="msl-count-val">100개</span>
+          </div>
+          <input type="range" class="mail-slider" id="msl-count" min="50" max="300" step="50" value="100" oninput="onCountSlide(this.value)">
+          <div class="msl-ticks"><span>50개</span><span>300개</span></div>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="field">
+        <label>일반</label>
+        <div class="opt-row" onclick="toggleAutostart()">
+          <div class="opt-text">
+            <span class="opt-title">시작 시 자동 실행</span>
+            <span class="opt-desc">컴퓨터를 켜면 작업 타이머가 자동으로 실행돼요.</span>
+          </div>
+          <div class="mh-toggle" id="autostart-toggle"><div class="mh-switch"></div></div>
+        </div>
+        <div class="opt-row" id="autostart-min-row" onclick="toggleAutostartMin()">
+          <div class="opt-text">
+            <span class="opt-title">자동 실행 시 트레이로 시작</span>
+            <span class="opt-desc">부팅 자동 실행 때 창을 띄우지 않고 트레이(메뉴바)에만 떠 있어요.</span>
+          </div>
+          <div class="mh-toggle" id="autostart-min-toggle"><div class="mh-switch"></div></div>
+        </div>
+        <div class="opt-row" onclick="openKeysModal()">
+          <div class="opt-text">
+            <span class="opt-title">단축키</span>
+            <span class="opt-desc">키보드 단축키를 원하는 키로 바꿔요.</span>
+          </div>
+          <button class="gmail-conn-btn" onclick="event.stopPropagation(); openKeysModal()">편집</button>
+        </div>
+        <div class="opt-row" style="cursor:default">
+          <div class="opt-text">
+            <span class="opt-title">링크 열기</span>
+            <span class="opt-desc">링크를 열 계정을 선택해요.</span>
+          </div>
+          <select class="prof-select" id="link-profile" onchange="onLinkProfileChange(this.value)">
+            <option value="">기본 브라우저</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="field">
+        <label>마감 시간 프리셋</label>
+        <p class="setting-desc">빠른 마감 설정에 쓰이는 시간 프리셋이에요. 이름과 시간을 자유롭게 바꿀 수 있어요.</p>
+        <div id="preset-list"></div>
+        <button class="add-preset" onclick="addPreset()">
+          <svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg>
+          <span>프리셋 추가</span>
+        </button>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <div class="field">
+        <label>알람 방식</label>
+        <p class="setting-desc">알림과 소리를 함께 켤 수 있어요. 끄기를 누르면 모두 해제돼요.</p>
+        <div class="seg" id="seg-mode">
+          <button class="seg-btn toggle" data-val="notify">알림</button>
+          <button class="seg-btn toggle" data-val="sound">소리</button>
+          <button class="seg-btn off-btn" data-val="off">끄기</button>
+        </div>
+      </div>
+
+      <div class="field" id="field-sound">
+        <label>알람 소리</label>
+        <p class="setting-desc">버튼을 누르면 미리 들어볼 수 있어요. 직접 추가로 내 음원도 쓸 수 있어요.</p>
+        <div class="seg" id="seg-sound">
+          <button class="seg-btn" data-val="ding">딩</button>
+          <button class="seg-btn" data-val="bell">벨</button>
+          <button class="seg-btn" data-val="chime">차임</button>
+          <button class="seg-btn seg-custom" data-val="custom" id="btn-custom-sound" title="mp3·wav·ogg / 5MB 이하 / 10초 이하">+ 직접 추가</button>
+        </div>
+        <input type="file" id="custom-sound-input" accept="audio/*" style="display:none;">
+        <div id="custom-sound-name" class="custom-sound-name" style="display:none;"></div>
+        <div class="mail-slider-row" style="margin-top:14px;">
+          <div class="mail-slider-head">
+            <span class="msl-label">음량</span>
+            <span class="msl-val" id="vol-val">80%</span>
+          </div>
+          <input type="range" class="mail-slider" id="vol-slider" min="0" max="200" step="10" value="80" oninput="onVolSlide(this.value)" onchange="playPreview(draftAlarm.soundType==='custom'?'custom':(draftAlarm.soundType||'ding'), draftAlarm.volume)">
+          <div class="msl-ticks"><span>0%</span><span>200%</span></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>기본 알람 시점</label>
+        <p class="setting-desc">새 작업을 추가할 때 기본으로 설정될 알람 시점이에요.</p>
+        <div class="seg" id="seg-default-alarm">
+          <button class="seg-btn" data-val="">없음</button>
+          <button class="seg-btn" data-val="10">10분</button>
+          <button class="seg-btn" data-val="30">30분</button>
+          <button class="seg-btn" data-val="60">1시간</button>
+          <button class="seg-btn" data-val="180">3시간</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>상태 색상</label>
+        <p class="setting-desc">마감 임박·오늘 마감·여유 있음의 색이에요. 칩에서 고르거나 직접 선택할 수 있어요.</p>
+        <div class="color-row" id="color-urgent"></div>
+        <div class="color-row" id="color-today"></div>
+        <div class="color-row" id="color-soon"></div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="cancel" onclick="resetSettings()">초기화</button>
+        <button class="save" onclick="saveSettings()">저장</button>
+      </div>
+    </div>
+  </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  // 아이콘
+  const IC = {
+    edit: '<svg viewBox="0 0 20 20"><path d="M13.5 4.5l2 2L7 15l-2.5.5L5 13l8.5-8.5z"/></svg>',
+    trash: '<svg viewBox="0 0 20 20"><path d="M4.5 6h11M8 6V4.5h4V6M6 6l.5 9h7l.5-9"/></svg>',
+    check: '<svg viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>',
+    bell: '<svg viewBox="0 0 20 20" style="width:12px;height:12px;"><path d="M10 3a4.5 4.5 0 00-4.5 4.5c0 4-1.5 5-1.5 5h12s-1.5-1-1.5-5A4.5 4.5 0 0010 3zM8.5 15.5a1.5 1.5 0 003 0"/></svg>',
+    inbox: '<svg viewBox="0 0 24 24"><path d="M4 13l2-7h12l2 7M4 13v5h16v-5M4 13h4l1.5 2.5h5L16 13h4"/></svg>',
+    chevL: '<svg viewBox="0 0 20 20"><path d="M12 5l-5 5 5 5"/></svg>',
+    chevR: '<svg viewBox="0 0 20 20"><path d="M8 5l5 5-5 5"/></svg>',
+    link: '<svg viewBox="0 0 20 20"><path d="M8 11a3 3 0 004.5.5l2-2a3 3 0 00-4-4l-1 1M12 9a3 3 0 00-4.5-.5l-2 2a3 3 0 004 4l1-1"/></svg>',
+    deck: '<svg viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="10" rx="1.5"/><path d="M7 17h6M10 14v3"/></svg>',
+    settings: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.5"/><path d="M10 1.5v2M10 16.5v2M3.5 3.5l1.4 1.4M15.1 15.1l1.4 1.4M1.5 10h2M16.5 10h2M3.5 16.5l1.4-1.4M15.1 4.9l1.4-1.4"/></svg>',
+  };
+
+  // ── 한국 공휴일 (대체공휴일 포함) ──
+  // 양력 고정 + 연도별 음력/대체공휴일 데이터
+  const HOLIDAYS = {
+    // 매년 고정 (월-일)
+    fixed: {
+      "1-1": "신정", "3-1": "삼일절", "5-5": "어린이날",
+      "6-6": "현충일", "7-17": "제헌절", "8-15": "광복절",
+      "10-3": "개천절", "10-9": "한글날", "12-25": "성탄절",
+    },
+    // 연도별 (음력 환산 + 대체공휴일 + 임시공휴일)
+    byYear: {
+      2026: {
+        "2-16":"설날","2-17":"설날","2-18":"설날",
+        "3-2":"대체공휴일","5-5":"어린이날","5-24":"부처님오신날","5-25":"대체공휴일",
+        "6-3":"지방선거","8-17":"대체공휴일",
+        "9-24":"추석","9-25":"추석","9-26":"추석","10-5":"대체공휴일",
+      },
+      2027: {
+        "2-6":"설날","2-7":"설날","2-8":"설날","2-9":"대체공휴일",
+        "5-13":"부처님오신날","9-14":"추석","9-15":"추석","9-16":"추석",
+      },
+    },
+  };
+  function getHoliday(y, mo, d) {
+    const key = `${mo+1}-${d}`;
+    if (HOLIDAYS.byYear[y] && HOLIDAYS.byYear[y][key]) return HOLIDAYS.byYear[y][key];
+    if (HOLIDAYS.fixed[key]) return HOLIDAYS.fixed[key];
+    return null;
+  }
+
+  // ── 공휴일 자동 업데이트 ──
+  // 한국천문연구원 특일정보 API(공공데이터포털)를 메인 프로세스에서 받아와
+  // 내장 데이터에 머지 + 로컬 캐시. 마지막 성공 후 7일 지나면 재갱신.
+  // 키가 없거나 실패하면 조용히 건너뛰고 내장 데이터(2026·2027)로 폴백.
+  const HOLIDAY_API = {
+    updateIntervalDays: 7, // 주 1회 (월 1회로 바꾸려면 30)
+    async fetchYear(year) {
+      if (typeof window.timerAPI === "undefined" || !window.timerAPI.fetchHolidays) return null;
+      try {
+        const res = await window.timerAPI.fetchHolidays(year);
+        if (res && res.ok && res.map && Object.keys(res.map).length) return res.map;
+      } catch (e) {}
+      return null;
+    },
+    async checkAndUpdate() {
+      const last = Number(localStorage.getItem("holidayUpdatedAt") || 0);
+      const now = Date.now();
+      if (now - last < this.updateIntervalDays * 86400000) return;
+      const year = new Date().getFullYear();
+      let anyOk = false;
+      for (const y of [year, year + 1]) {
+        const map = await this.fetchYear(y);
+        if (map) {
+          anyOk = true;
+          HOLIDAYS.byYear[y] = { ...(HOLIDAYS.byYear[y] || {}), ...map };
+          localStorage.setItem(`holiday_${y}`, JSON.stringify(HOLIDAYS.byYear[y]));
+        }
+      }
+      // 성공했을 때만 갱신 시각 기록 → 키 미설정/일시 실패 시 다음 기회에 재시도
+      if (anyOk) localStorage.setItem("holidayUpdatedAt", String(now));
+    },
+    loadCache() {
+      // 앱 시작 시 캐시된 공휴일을 메모리에 복원
+      const year = new Date().getFullYear();
+      for (const y of [year, year + 1]) {
+        const cached = localStorage.getItem(`holiday_${y}`);
+        if (cached) { try { HOLIDAYS.byYear[y] = { ...(HOLIDAYS.byYear[y] || {}), ...JSON.parse(cached) }; } catch (e) {} }
+      }
+    },
+  };
+  HOLIDAY_API.loadCache();
+  if (typeof window.timerAPI !== "undefined") setTimeout(() => HOLIDAY_API.checkAndUpdate(), 5000); // 시작 동기화 이후 여유 있게
+
+  // ── 앱 버전 표시 + 업데이트 확인 ──
+  // 설정 상단 버전을 package.json 버전과 자동 동기화하고,
+  // GitHub 릴리스에 새 버전이 있으면 배지(설정)와 배너(상단)로 안내한다.
+  // 업데이트 UI 표시(배지+배너) — 시작 확인과 트레이 '업데이트 확인'이 공유.
+  function applyUpdateUI(r) {
+    if (!r || !r.ok || !r.hasUpdate) return;
+    const openUpdate = (e) => {
+      if (e) e.preventDefault();
+      if (window.timerAPI && window.timerAPI.openExternal) window.timerAPI.openExternal(r.url);
+    };
+    // 설정 배지
+    const badge = document.getElementById("update-badge");
+    if (badge) {
+      badge.style.display = "inline-flex";
+      badge.textContent = "v" + r.latest + " 업데이트";
+      badge.onclick = openUpdate; // 중복 등록 방지(onclick 덮어쓰기)
+    }
+    // 상단 배너 (이번 세션에서 닫았으면 다시 안 띄움)
+    const banner = document.getElementById("update-banner");
+    if (banner && sessionStorage.getItem("updateBannerClosed") !== r.latest) {
+      const txt = document.getElementById("ub-text");
+      if (txt) txt.textContent = "새 버전 v" + r.latest + "이 나왔어요";
+      banner.classList.remove("hide");
+      banner.classList.add("show"); // 슬라이드 다운 등장
+      banner.onclick = openUpdate;
+      const later = document.getElementById("ub-later");
+      if (later) later.onclick = (e) => {
+        e.stopPropagation();
+        // 슬라이드 업으로 닫기 → 애니메이션 끝나면 완전히 숨김
+        banner.classList.remove("show");
+        banner.classList.add("hide");
+        const done = () => { banner.classList.remove("hide"); banner.style.display = "none"; banner.removeEventListener("animationend", done); };
+        banner.addEventListener("animationend", done);
+        sessionStorage.setItem("updateBannerClosed", r.latest);
+      };
+    }
+  }
+
+  (async function initVersionAndUpdate() {
+    if (typeof window.timerAPI === "undefined") return;
+    // 1) 버전 표시 (하드코딩 제거 — 이제 매 버전 자동 반영)
+    try {
+      if (window.timerAPI.appVersion) {
+        const v = await window.timerAPI.appVersion();
+        if (v) { const el = document.getElementById("app-ver"); if (el) el.textContent = "v" + v; }
+      }
+    } catch (e) {}
+    // 2) 업데이트 확인 (시작 직후 한 번)
+    try {
+      if (window.timerAPI.checkUpdate) applyUpdateUI(await window.timerAPI.checkUpdate());
+    } catch (e) {}
+  })();
+
+  const DEFAULT_PRESETS = [
+    { name: "오전", time: "11:50" },
+    { name: "오후", time: "15:00" },
+    { name: "EOD",  time: "18:00" },
+  ];
+  let PRESETS = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+  try { const _p = JSON.parse(localStorage.getItem("presets") || "null"); if (Array.isArray(_p) && _p.length) PRESETS = _p; } catch(e){}
+  const DAYS = ["오늘", "내일"];
+
+  const ALARM_OPTS = [
+    { label: "없음", min: null }, { label: "10분 전", min: 10 }, { label: "30분 전", min: 30 },
+    { label: "1시간 전", min: 60 }, { label: "3시간 전", min: 180 },
+  ];
+
+  function presetTime(name) {
+    const p = PRESETS.find(x => x.name === name);
+    return p ? p.time : "18:00";
+  }
+  function dlChip(dayLabel, presetName) {
+    const d = new Date();
+    if (dayLabel === "내일") d.setDate(d.getDate()+1);
+    if (dayLabel === "모레") d.setDate(d.getDate()+2);
+    const [h,m] = presetTime(presetName).split(":").map(Number);
+    d.setHours(h,m,0,0); return d.getTime();
+  }
+  function dlDays(days, time) {
+    const d = new Date(); d.setDate(d.getDate()+days);
+    const [h,m] = time.split(":").map(Number); d.setHours(h,m,0,0); return d.getTime();
+  }
+
+  // ── 시트 연동: 팀원 목록 + 내 이름 ──
+  const MEMBERS = ["구민석","한영채","주지현","박나진","김본희","구정현","박지수"];
+  function getMyName(){ return localStorage.getItem("myName") || ""; }
+  function setMyName(v){ localStorage.setItem("myName", v || ""); }
+
+  // 작업별 개인 마감 "시간"(HH:MM) 저장 — 시트는 날짜만 저장하므로 시간은 앱 로컬에.
+  // 키는 요청글 링크(없으면 제목) — 삭제 compaction으로 행이 바뀌어도 안 어긋남.
+  let taskTimes = {};
+  try { taskTimes = JSON.parse(localStorage.getItem("taskTimes") || "{}"); } catch(e){ taskTimes = {}; }
+  function saveTaskTimes(){ localStorage.setItem("taskTimes", JSON.stringify(taskTimes)); }
+  function timeKey(reqLink, title){ return (reqLink || "") || ("t:" + (title || "")); }
+
+  // 작업별 알람 시점(분) 저장 — 시트에는 없으므로 로컬에 보관(동기화 후에도 유지)
+  let taskAlarms = {};
+  try { taskAlarms = JSON.parse(localStorage.getItem("taskAlarms") || "{}"); } catch(e){ taskAlarms = {}; }
+  function saveTaskAlarms(){ localStorage.setItem("taskAlarms", JSON.stringify(taskAlarms)); }
+  function alarmFor(reqLink, title){
+    const v = taskAlarms[timeKey(reqLink, title)];
+    return (v === null || v === undefined || v === "") ? null : Number(v);
+  }
+  function setTaskAlarm(reqLink, title, minutes){
+    const k = timeKey(reqLink, title);
+    if(minutes === null || minutes === undefined || minutes === "") delete taskAlarms[k];
+    else taskAlarms[k] = Number(minutes);
+    saveTaskAlarms();
+  }
+  // 시트 dueISO(날짜) + 저장된 개인 시간 → 마감 타임스탬프 (없으면 18:00)
+  function deadlineFor(iso, reqLink, title){
+    let base = isoToDeadline(iso); // 그 날짜 18:00
+    const hm = taskTimes[timeKey(reqLink, title)];
+    if (hm && /^\d{1,2}:\d{2}$/.test(hm)) {
+      const [h,m] = hm.split(":").map(Number);
+      const d = new Date(base); d.setHours(h, m, 0, 0); base = d.getTime();
+    }
+    return base;
+  }
+
+  // 시트 dueISO("2026-06-15") → 마감 타임스탬프(그날 18:00 EOD 기준)
+  function isoToDeadline(iso){
+    if(iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)){
+      const [y,mo,d] = iso.split("-").map(Number);
+      return new Date(y, mo-1, d, 18, 0, 0, 0).getTime();
+    }
+    // 날짜 정보 없으면 오늘 18:00로 폴백
+    const t = new Date(); t.setHours(18,0,0,0); return t.getTime();
+  }
+
+  let tasks = [];          // 동기화로 채워짐 (내 영상작업)
+  let mgmtItems = [];      // 관리항목
+  let mgmtAdding = false;   // 관리항목 추가 입력 모드
+  let mgmtAddDraft = "";    // 추가 입력 중 텍스트(재렌더 보존용)
+  let collapsedState = { active:false, done:false, mgmt:false };
+  try { Object.assign(collapsedState, JSON.parse(localStorage.getItem("secCollapsed") || "{}")); } catch(e){}
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // "[라벨](https://...)" 마크다운 링크 → 클릭 가능한 링크로. (시트에서 작성한 하이퍼링크 인식)
+  // 전체를 먼저 esc()로 이스케이프한 뒤 변환하므로 XSS 안전. http/https만 허용.
+  function mdLinks(s){
+    return esc(s).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      (_, label, url) => `<a class="mdlink" href="#" data-url="${url}" onclick="openMdLink(event, this)">${label}</a>`);
+  }
+  function openMdLink(e, el){
+    e.preventDefault(); e.stopPropagation(); // 행 클릭/편집 동작과 분리
+    const url = el.dataset.url || "";
+    if(!/^https?:\/\//i.test(url)) return;
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.openExternal) window.timerAPI.openExternal(url); // 설정의 '링크 열기' 프로필 적용
+  }
+  let editingId=null, selDl=null, selAlarm=null, selDlImport=null, selDlEdit=null, lastOrder="";
+
+  // ── 작업자 롤링 (읽기 전용으로 다른 팀원 보드 넘겨보기) ──
+  const ROLL_ORDER = ["구민석","한영채","주지현","박나진","김본희","구정현","박지수"];
+  let allMembersData = [];
+  let viewName = null;
+  function firstName(full){ // 구민석 → 민석, 한영채 → 영채 (성 1자 제외)
+    full = (full || "").trim();
+    return full.length > 1 ? full.slice(1) : full;
+  }
+  // 앱 실행마다 랜덤 인사 (세션 동안 고정 — 보드 넘겼다 돌아와도 안 바뀜)
+  const GREETINGS = [
+    "Hello, {n}", "Hi, {n}",            // 영어
+    "Bonjour, {n}", "Salut, {n}",        // 프랑스어
+    "Hallo, {n}", "Guten Tag, {n}",      // 독일어
+    "Hola, {n}",                          // 스페인어
+    "Ciao, {n}",                          // 이탈리아어
+    "Salve, {n}", "Ave, {n}",            // 라틴어
+    "안녕, {n}", "반가워요, {n}"          // 한국어
+  ];
+  const sessionGreeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+  let navHideTimer = null, lastNavView;
+  let lastRenderView = null; // render() FLIP 가드: 같은 보드 재렌더 판별
+  function renderBoardNav(){
+    const nav = $("board-nav"); if(!nav) return;
+    const mine = getMyName();
+    const ro = viewName !== mine;
+    $("bn-name").textContent = ro ? (viewName || "") : sessionGreeting.replace("{n}", firstName(mine));
+    $("bn-ro").style.display = ro ? "inline-flex" : "none";
+    nav.classList.toggle("viewing-other", ro);
+
+    if(viewName === lastNavView) return; // 같은 보드 재렌더(주기 동기화 등) → 표시 상태 유지
+    lastNavView = viewName;
+    clearTimeout(navHideTimer);
+    if(ro){
+      nav.classList.remove("collapsed");      // 남의 보드: 계속 표시
+    } else {
+      nav.classList.remove("collapsed");      // 내 보드: 보였다가
+      navHideTimer = setTimeout(() => {        // 1.5초 후 접힘
+        if(viewName === getMyName()) nav.classList.add("collapsed");
+      }, 1500);
+    }
+  }
+  function rollView(dir){
+    if(isEditingNow()) return;
+    let i = ROLL_ORDER.indexOf(viewName); if(i<0) i=0;
+    const ni = (i + dir + ROLL_ORDER.length) % ROLL_ORDER.length;
+    applyView(ROLL_ORDER[ni]);
+  }
+  function gotoView(name){ if(isEditingNow()) return; applyView(name); }
+
+  // 테마
+  const TH_SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/>';
+  const TH_MOON = '<path d="M20 14.5A7.5 7.5 0 1110.5 5a5.8 5.8 0 009.5 9.5z"/>';
+  const themeIconState = { rot: 0, t: null };
+  function setThemeIcon() {
+    // 초기 로드용 정적 설정(회전/교체 애니메이션 없음)
+    const dark = document.body.classList.contains("dark");
+    const svg = $("theme-icon");
+    const need = (themeIconState.rot % 360) === 180;
+    const inner = dark ? TH_MOON : TH_SUN;
+    svg.innerHTML = need ? '<g transform="rotate(180 12 12)">' + inner + "</g>" : inner;
+  }
+  function toggleTheme() {
+    document.body.classList.toggle("dark");
+    const dark = document.body.classList.contains("dark");
+    // 메일 아이콘과 동일한 모션: 180° 회전 + 중간점(210ms)에서 글리프 교체
+    const svg = $("theme-icon");
+    themeIconState.rot += 180;
+    svg.style.transform = "rotate(" + themeIconState.rot + "deg)";
+    const need = (themeIconState.rot % 360) === 180;
+    const inner = dark ? TH_MOON : TH_SUN;
+    clearTimeout(themeIconState.t);
+    themeIconState.t = setTimeout(() => {
+      svg.innerHTML = need ? '<g transform="rotate(180 12 12)">' + inner + "</g>" : inner;
+    }, 180);
+  }
+
+  // 칩 렌더
+  function renderChips(gridId, onPick) {
+    const grid = $(gridId); grid.innerHTML = "";
+    // 그리드 열 수를 프리셋 개수에 맞춤
+    grid.style.gridTemplateColumns = `repeat(${PRESETS.length}, 1fr)`;
+    DAYS.forEach(day => {
+      PRESETS.forEach(p => {
+        const el = document.createElement("button");
+        el.className = "dchip";
+        el.innerHTML = `<div class="d">${day} ${p.name}</div><div class="t">${p.time}</div>`;
+        el.onclick = () => {
+          grid.querySelectorAll(".dchip").forEach(x => x.classList.remove("on"));
+          el.classList.add("on"); onPick(dlChip(day, p.name));
+        };
+        grid.appendChild(el);
+      });
+    });
+  }
+
+  function renderAlarms() {
+    const wrap = $("alarm-opts"); wrap.innerHTML = "";
+    ALARM_OPTS.forEach(a => {
+      const el = document.createElement("button");
+      el.className = "achip" + (selAlarm === a.min ? " on" : "");
+      el.textContent = a.label;
+      el.onclick = () => { selAlarm = a.min; wrap.querySelectorAll(".achip").forEach(x=>x.classList.remove("on")); el.classList.add("on"); };
+      wrap.appendChild(el);
+    });
+  }
+
+  function fmtDl(ts, compact) {
+    const d = new Date(ts); const days=["일","월","화","수","목","금","토"];
+    const today=new Date(); today.setHours(0,0,0,0);
+    const tg=new Date(ts); tg.setHours(0,0,0,0);
+    const diff=Math.round((tg-today)/86400000);
+    const hhmm = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    if (compact) {
+      // 매우 좁을 때: TODAY / D-1 / D-N
+      let dday;
+      if (diff===0) dday="TODAY";
+      else if (diff>0) dday=`D-${diff}`;
+      else dday=`D+${-diff}`;
+      return `${dday} ${hhmm}`;
+    }
+    let ds=`${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]})`;
+    if(diff===0)ds="오늘"; else if(diff===1)ds="내일"; else if(diff===2)ds="모레";
+    return `${ds} ${hhmm}`;
+  }
+  function showPrev(ts, scope) {
+    $(`dl-prev-${scope}`).style.display="flex";
+    $(`dl-prev-text-${scope}`).textContent = fmtDl(ts)+" 마감";
+  }
+
+  // 동기화 — Apps Script 읽기 API에서 내 영상작업 + 관리항목 가져오기
+  let lastSyncOkAt = 0;     // 마지막 동기화 성공 시각
+  let syncInFlight = false; // 조용한 동기화 포함 중복 실행 방지
+  async function doSync(opts) {
+    opts = opts || {};
+    const silent = !!opts.silent;
+    const pill = $("sync-pill");
+    const myName = getMyName();
+    if (!myName) {
+      if(!silent){ toast("설정에서 작업자를 먼저 선택해주세요"); openSettings(); }
+      return;
+    }
+    if (typeof window.timerAPI === "undefined") {
+      if(!silent) toast("앱(데스크톱)에서만 동기화돼요");
+      return;
+    }
+    if (syncInFlight) return; // 이미 동기화 중(조용한 호출 포함) → 중복 요청 무시
+    syncInFlight = true;
+
+    let textEl, orig;
+    if(!silent){
+      if (pill.classList.contains("syncing")) return;
+      pill.classList.add("syncing");
+      textEl = pill.querySelector(".sync-text");
+      orig = textEl.textContent;
+      textEl.textContent = "동기화 중";
+    }
+
+    try {
+      // 일시적 실패(Apps Script 콜드스타트 등 404/500) 대비 1회 자동 재시도
+      let res = await window.timerAPI.syncSheet();
+      if (!res || !res.ok) {
+        await new Promise(r => setTimeout(r, 2000));
+        res = await window.timerAPI.syncSheet();
+      }
+      if (!res || !res.ok) throw new Error(res && res.error || "응답 오류");
+
+      allMembersData = res.members || [];
+      if (!viewName) viewName = myName;
+      if (!allMembersData.find(m => m.name === viewName)) viewName = myName;
+      const cnt = applyView(viewName);
+      lastSyncOkAt = Date.now(); // 포커스 프리싱크 기준 시각
+      if(!silent) toast(`동기화 완료 · 작업 ${cnt}건`);
+    } catch (e) {
+      if(!silent) toast("동기화 실패: " + (e.message || e));
+    } finally {
+      syncInFlight = false;
+      if(!silent){ pill.classList.remove("syncing"); textEl.textContent = orig; }
+    }
+  }
+
+  // 현재 보는 사람(name) 기준으로 tasks/mgmt 매핑 + 렌더 (롤링)
+  function applyView(name) {
+    viewName = name;
+    const m = (allMembersData || []).find(x => x.name === name);
+    if (m) {
+      tasks = (m.video || []).map(v => ({
+        id: v.row,
+        title: v.title,
+        deadline: deadlineFor(v.dueISO, v.requestLink || "", v.title),
+        type: "req",
+        done: !!v.done,
+        alarm: alarmFor(v.requestLink || "", v.title),
+        reqLink: v.requestLink || "",
+        planLink: v.planLink || "",
+        _row: v.row, _status: v.status || "", _memo: v.memo || "", _side: m.side
+      }));
+      mgmtItems = m.mgmt || [];
+    } else {
+      tasks = []; mgmtItems = [];
+    }
+    document.body.classList.toggle("readonly", name !== getMyName());
+    // 데이터가 실제로 바뀐 렌더(첫 로드·동기화 반영·보드 전환)에만 등장 모션
+    const _sig = name + "|" + JSON.stringify(m ? m.video : null) + "|" + JSON.stringify(m ? m.mgmt : null);
+    const _changed = _sig !== lastBoardSig; lastBoardSig = _sig;
+    renderBoardNav();
+    renderMgmt();
+    render();
+    if (_changed) playEntrance(); // 쿨다운 없음 — 연속 전환도 매번 새 요소에 깨끗하게 재생
+    return tasks.length;
+  }
+  let lastBoardSig = null;
+  function playEntrance(){
+    const items = [...document.querySelectorAll(".task, .mgmt-item")]; // DOM(화면) 순서대로 스태거
+    items.forEach((el, i) => {
+      el.style.setProperty("--ei", Math.min(i, 14)); // 스태거 지연 상한
+      el.classList.add("enter"); // 방금 만들어진 요소에만 부여 → 이후 재렌더 요소엔 영향 없음
+    });
+  }
+  function isReadonly(){ return viewName !== getMyName(); }
+
+  // 모달
+  // 메일 (Gmail) — 다음 단계에서 구현. 지금은 자리만.
+  // 새 메일 알림: 카운트 증감이 아니라 '새로운 안읽음 메일 ID'가 생겼을 때만 1회 알림(중복 방지)
+  let notifiedIds = new Set();
+  try { const _a = JSON.parse(localStorage.getItem("notifiedMailIds") || "[]"); if(Array.isArray(_a)) notifiedIds = new Set(_a); } catch(e){}
+  function saveNotifiedIds(){ try { localStorage.setItem("notifiedMailIds", JSON.stringify([...notifiedIds].slice(-200))); } catch(e){} }
+  let lastBadgeCount = -1; // 경량 폴링 카운트 추적(증가 시에만 정밀 확인)
+
+  function notifyNewMailFor(messages, freshIds, count){
+    if(typeof window.timerAPI === "undefined" || !window.timerAPI.notify) return;
+    const fresh = (messages || []).filter(m => freshIds.indexOf(m.id) !== -1).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    const top = fresh[0];
+    const subject = top ? (top.subject || top.fullSubject || "") : "";
+    const mailId = top ? top.id : "";
+    const body = subject || (count > 1 ? `안읽은 메일 ${count}건` : "새 업무요청 메일이 도착했어요");
+    window.timerAPI.notify("새 업무요청 메일", body, mailId); // 클릭 시 설정대로 열도록 id 전달
+  }
+  // 전체 목록(정밀) 기준으로 '아직 알리지 않은 안읽음'만 골라 알림 — 중복 방지의 핵심
+  function maybeNotifyNewMail(messages){
+    if(!Array.isArray(messages)) return;
+    const unreadIds = messages.filter(m => m.unread).map(m => m.id);
+    const fresh = unreadIds.filter(id => !notifiedIds.has(id));
+    notifiedIds = new Set(unreadIds); // 현재 안읽음만 유지(읽음/삭제된 건 정리)
+    saveNotifiedIds();
+    if(fresh.length){
+      if(alarmSettings.sound) playAlarmSound();
+      if(alarmSettings.notify) notifyNewMailFor(messages, fresh, fresh.length);
+    }
+  }
+  function openSheet(){
+    const url = "https://docs.google.com/spreadsheets/d/18K3NKAkZwGvxS_QMV5boGNJtmay1ZJ_4xBs26SZZ_Bc/edit?gid=719745109#gid=719745109";
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.openExternal) window.timerAPI.openExternal(url);
+    else window.open(url, "_blank");
+  }
+
+  function setMailBadge(n){
+    const b = $("mail-badge"); if(!b) return;
+    if(n > 0){
+      b.textContent = n > 99 ? "99+" : String(n);
+      b.hidden = false; b.style.display = "inline-flex";
+      void b.offsetWidth; // 강제 reflow — 즉시 그려지게(리사이즈 전에도 표시)
+    } else {
+      b.hidden = true; b.style.display = "none";
+    }
+    // 트레이/작업표시줄 빨간 점 (알림 자체는 maybeNotifyNewMail에서 ID 기준으로 처리)
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.updateMailUnread){
+      window.timerAPI.updateMailUnread(n, { notify: !!alarmSettings.notify, sound: !!alarmSettings.sound });
+    }
+  }
+  // ── 메일 화면 ──
+  let mailMode = false, mailData = [], mailLatestFirst = true, mailLoading = false;
+  // 캐시가 있으면 시작 시 즉시 배지/목록 데이터 복원 (백그라운드 갱신 전까지 빈 화면 방지)
+  (function(){ try { const c = loadMailCache(); if(c && Array.isArray(c.messages)){ mailData = c.messages; setMailBadge(c.unreadCount || 0); mailData.filter(m=>m.unread).forEach(m=> notifiedIds.add(m.id)); saveNotifiedIds(); lastBadgeCount = c.unreadCount || 0; } } catch(e){} })();
+
+  // 메일 설정 (주기/개수) — localStorage 저장
+  let mailSettings = loadMailSettings();
+  function loadMailSettings(){
+    try {
+      const s = JSON.parse(localStorage.getItem("mailSettings") || "{}");
+      const mode = (["gmail","intranet","both"].includes(s.openMode)) ? s.openMode : "gmail";
+      return { pollSec: clampStep(s.pollSec, 10, 60, 30), fetchCount: clampStep(s.fetchCount, 50, 300, 100), openMode: mode };
+    } catch(e){ return { pollSec: 30, fetchCount: 100, openMode: "gmail" }; }
+  }
+  function clampStep(v, min, max, def){ v = Number(v); if(!v || isNaN(v)) return def; return Math.min(max, Math.max(min, v)); }
+  function saveMailSettings(){ try { localStorage.setItem("mailSettings", JSON.stringify(mailSettings)); } catch(e){} }
+  function onMailOpenMode(v){ if(!["gmail","intranet","both"].includes(v)) return; mailSettings.openMode = v; saveMailSettings(); }
+  function onPollSlide(v){ mailSettings.pollSec = Number(v); $("msl-poll-val").textContent = v + "초"; saveMailSettings(); restartMailPoll(); }
+  function onCountSlide(v){ mailSettings.fetchCount = Number(v); $("msl-count-val").textContent = v + "개"; saveMailSettings(); }
+  function syncMailSliders(){
+    const p = $("msl-poll"), c = $("msl-count");
+    if(p){ p.value = mailSettings.pollSec; $("msl-poll-val").textContent = mailSettings.pollSec + "초"; }
+    if(c){ c.value = mailSettings.fetchCount; $("msl-count-val").textContent = mailSettings.fetchCount + "개"; }
+    setSeg("seg-mail-open", mailSettings.openMode || "gmail");
+  }
+
+  // 메일 자동 새로고침(폴링) — 주기마다 안읽음 배지 갱신, 메일 화면 열려있으면 목록도 갱신
+  let mailPollTimer = null;
+  function restartMailPoll(){
+    if(mailPollTimer) clearInterval(mailPollTimer);
+    if(typeof window.timerAPI === "undefined") return;
+    mailPollTimer = setInterval(mailPollTick, mailSettings.pollSec * 1000);
+  }
+  async function mailPollTick(){
+    if(isEditingNow()) return;                 // 입력·모달 중엔 건너뜀
+    try {
+      const st = await window.timerAPI.gmailStatus();
+      if(!(st && st.connected)) return;
+      loadMail(true); // 탭 무관 단일 경로: 캐시 덕에 콜 2번이면 끝 → 배지·목록·알림이 항상 같은 데이터로 갱신
+    } catch(e){}
+  }
+
+  async function openMail(){
+    if(typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
+    if(mailMode){ exitMailMode(); return; } // 토글: 이미 메일 화면이면 타이머로
+    const st = await window.timerAPI.gmailStatus();
+    if(!(st && st.connected)){
+      toast("브라우저에서 로그인해주세요…");
+      const r = await window.timerAPI.gmailLogin();
+      if(!(r && r.ok)){ toast("메일 연결 실패: " + (r && r.error || "")); return; }
+      toast(`메일 연결 완료: ${r.email}`);
+    }
+    enterMailMode();
+    if(mailData.length){ renderMailList(); loadMail(true); } // 캐시 즉시 표시 + 조용히 백그라운드 갱신
+    else loadMail();                                          // 캐시 없으면(첫 로딩) 로딩 표시
+  }
+  function enterMailMode(){ mailMode = true; document.body.classList.add("mail-mode"); setMailIcon(true); checkStatsOverlap(); }
+  function exitMailMode(){ mailMode = false; document.body.classList.remove("mail-mode"); setMailIcon(false); checkStatsOverlap(); }
+
+  const MAIL_SVG  = '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.6 7l8.4 6 8.4-6"/>';
+  const CLOCK_SVG = '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.2 2"/>';
+  // 타이머→메일: 시계방향 회전 / 메일→타이머: 반시계방향 회전 (중간점에서 글리프 교체)
+  const mailBtnIconState = { rot: 0, t: null };
+  function setMailIcon(isMailView){
+    const icon = $("mail-icon"), label = $("mail-label");
+    if(!icon) return;
+    mailBtnIconState.rot += isMailView ? 180 : -180; // 메일로=시계방향(+), 타이머로=반시계방향(-)
+    icon.style.transform = "rotate(" + mailBtnIconState.rot + "deg)";
+    const need = (((mailBtnIconState.rot % 360) + 360) % 360) === 180; // 음수 회전도 정확히 판정
+    const inner = isMailView ? CLOCK_SVG : MAIL_SVG;
+    if(label) label.textContent = isMailView ? "타이머" : "메일";
+    const mb = document.querySelector(".mail-btn"); if(mb) mb.setAttribute("title", isMailView ? "타이머로" : "메일");
+    clearTimeout(mailBtnIconState.t);
+    mailBtnIconState.t = setTimeout(() => {
+      icon.innerHTML = need ? '<g transform="rotate(180 12 12)">' + inner + "</g>" : inner;
+    }, 180);
+  }
+
+  // 메일 아이콘 ↔ 스피너: Slate 테마전환과 동일한 회전+중간교체 모션
+  const MS_MAIL = '<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.6 7l8.4 6 8.4-6"/>';
+  const MS_SPIN = '<circle class="ms-spin-arc" cx="12" cy="12" r="8" stroke-dasharray="38 16"/>';
+  const msIconState = { rot: 0, t: null };
+  function spinMailIcon(toSpinner){
+    const svg = document.getElementById("ms-ic-svg");
+    if(!svg) return;
+    msIconState.rot += 180;
+    svg.style.transform = "rotate(" + msIconState.rot + "deg)";
+    const need = (msIconState.rot % 360) === 180;
+    const inner = toSpinner ? MS_SPIN : MS_MAIL;
+    clearTimeout(msIconState.t);
+    msIconState.t = setTimeout(() => {
+      svg.innerHTML = need ? '<g transform="rotate(180 12 12)">' + inner + "</g>" : inner;
+    }, 210);
+  }
+
+  // 카운트 ↔ '불러오는 중' B 슬라이드 제어
+  function mailCountLoading(){ const el = $("mh-count"); if(el) el.classList.add("is-loading"); }
+  function setMailCountText(t){ const c = $("mhc-count"); if(c) c.textContent = t; const el = $("mh-count"); if(el) el.classList.remove("is-loading"); }
+  // 메일 캐시 (즉시 표시 → 백그라운드 갱신)
+  function saveMailCache(){ try { localStorage.setItem("mailCache", JSON.stringify({ messages: mailData, unreadCount: mailData.filter(m=>m.unread).length, ts: Date.now() })); } catch(e){} }
+  function loadMailCache(){ try { return JSON.parse(localStorage.getItem("mailCache") || "null"); } catch(e){ return null; } }
+
+  let mailLoadPromise = null, mailSpinOn = false;
+  function showMailLoading(){ if(!mailSpinOn){ mailSpinOn = true; spinMailIcon(true); mailCountLoading(); } }
+  function hideMailLoading(){ if(mailSpinOn){ mailSpinOn = false; spinMailIcon(false); } }
+  async function loadMail(silent){
+    if(mailLoading && mailLoadPromise){
+      // 이미 불러오는 중: 요청을 버리지 않고 진행 중인 로딩에 합류.
+      // 수동 요청이면 즉시 로딩 표시를 켜고, 끝나면 같은 결과를 공유받음.
+      if(!silent) showMailLoading();
+      return mailLoadPromise;
+    }
+    mailLoading = true;
+    if(!silent) showMailLoading();
+    const loud = () => !silent || mailSpinOn; // 합류한 수동 요청이 있으면 실패 표시도 보여줌
+    mailLoadPromise = (async () => {
+    try {
+      const res = await window.timerAPI.gmailList({ max: mailSettings.fetchCount });
+      if(res && res.ok){
+        mailData = res.messages || [];
+        setMailBadge(res.unreadCount);
+        lastBadgeCount = res.unreadCount; // 정밀 값으로 폴링 기준 동기화(경량/정밀 불일치 방지)
+        renderMailList();
+        maybeNotifyNewMail(mailData); // 정밀 목록 기준 새 메일만 알림(중복 방지)
+      } else if(res && res.error === "not-connected"){
+        if(loud()){ setMailCountText(""); $("mail-list").innerHTML = `<div class="mail-empty">메일이 연결되지 않았어요<div class="me-sub">설정에서 메일을 연결해주세요</div></div>`; }
+      } else {
+        if(loud()){ setMailCountText(""); $("mail-list").innerHTML = `<div class="mail-empty">불러오기 실패<div class="me-sub">${esc(res && res.error || "")}</div></div>`; }
+      }
+    } catch(e){
+      if(loud()){ setMailCountText(""); $("mail-list").innerHTML = `<div class="mail-empty">불러오기 실패</div>`; }
+    } finally {
+      mailLoading = false; hideMailLoading();
+    }
+    })();
+    return mailLoadPromise;
+  }
+
+  function toggleMailSort(){
+    mailLatestFirst = !mailLatestFirst;
+    $("mh-toggle").classList.toggle("on", mailLatestFirst);
+    renderMailList();
+  }
+
+  // 상대+날짜 혼합 (폭 고정으로 레이아웃 안 흔들림)
+  function fmtMailTime(ts){
+    if(!ts) return "";
+    const now = Date.now(), diff = now - ts, d = new Date(ts);
+    const min = 60000, hr = 3600000, day = 86400000;
+    if(diff < min) return "방금";
+    if(diff < hr) return Math.floor(diff/min) + "분 전";
+    if(diff < day) return Math.floor(diff/hr) + "시간 전";
+    const today = new Date(); today.setHours(0,0,0,0);
+    const that = new Date(ts); that.setHours(0,0,0,0);
+    const dayDiff = Math.round((today - that) / day);
+    if(dayDiff === 1) return "어제";
+    if(d.getFullYear() === new Date().getFullYear()) return `${d.getMonth()+1}/${d.getDate()}`;
+    return `${String(d.getFullYear()).slice(2)}. ${d.getMonth()+1}/${d.getDate()}`;
+  }
+
+  async function trashMail(id){
+    const idx = mailData.findIndex(m => m.id === id);
+    if(idx < 0) return;
+    const removed = mailData[idx];
+    mailData.splice(idx, 1);              // 낙관적 제거
+    renderMailList();
+    setMailBadge(mailData.filter(m => m.unread).length);
+    if(typeof window.timerAPI === "undefined" || !window.timerAPI.gmailTrash){ toast("앱에서만 삭제돼요"); return; }
+    const r = await window.timerAPI.gmailTrash(id);
+    if(r && r.ok){ toast("메일을 휴지통으로 옮겼어요"); }
+    else { mailData.splice(idx, 0, removed); renderMailList(); setMailBadge(mailData.filter(m => m.unread).length); toast("삭제 실패 — 되돌렸어요"); }
+  }
+
+  function renderMailList(){
+    const host = $("mail-list");
+    const unread = mailData.filter(m=>m.unread).length;
+    setMailCountText(mailData.length ? `${mailData.length}건 · 안읽음 ${unread}` : "0건");
+    saveMailCache();
+    if(!mailData.length){
+      host.innerHTML = `<div class="mail-empty">업무요청 메일이 없어요</div>`;
+      return;
+    }
+    let list = mailData.slice().sort((a,b)=> b.ts - a.ts); // 기본 최신순(ON)
+    if(!mailLatestFirst){
+      list.sort((a,b)=>{
+        if(a.unread !== b.unread) return a.unread ? -1 : 1; // OFF: 안읽음 먼저
+        return b.ts - a.ts;
+      });
+    }
+    host.innerHTML = list.map(m => `
+      <div class="mail-item${m.unread?' unread':''}" onclick="openMailItem('${m.id}')">
+        <div class="mail-dot-col"><span class="mail-udot"></span></div>
+        <div class="mail-main">
+          <div class="mail-subject">${esc(m.subject || "(제목 없음)")}</div>
+          <div class="mail-meta">${m.requester ? `<span class="mail-requester">${esc(m.requester)}님</span> 업무요청` : "업무요청"}</div>
+        </div>
+        <div class="mail-right">
+          <div class="mail-time">${esc(fmtMailTime(m.ts))}</div>
+          <button class="mail-trash" title="삭제" onclick="event.stopPropagation(); trashMail('${m.id}')">${IC.trash}</button>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function openMailItem(id){
+    const m = mailData.find(x=>x.id===id);
+    // m이 목록에 없어도(알림 클릭 등) id만으로 동작하도록 Gmail 링크 구성
+    const gmailLink = (m && m.link) || `https://mail.google.com/mail/u/0/#all/${id}`;
+    // 낙관적: 읽음 처리 + 배지/목록 갱신
+    if(m && m.unread){
+      m.unread = false;
+      setMailBadge(mailData.filter(x=>x.unread).length);
+      renderMailList();
+    }
+    window.timerAPI.gmailMarkRead(id); // 읽음 처리 (목록에 없어도 id로 처리, 이미 읽음이면 무해)
+    const mode = (mailSettings && mailSettings.openMode) || "gmail";
+    // Gmail 웹에서 열기
+    if(mode === "gmail" || mode === "both"){
+      window.timerAPI.openExternal(gmailLink);
+    }
+    // 메일 본문에 담긴 인트라넷 요청글 열기
+    if(mode === "intranet" || mode === "both"){
+      try {
+        const r = await window.timerAPI.gmailIntranetLink(id);
+        if(r && r.ok && r.url){
+          window.timerAPI.openExternal(r.url);
+        } else if(mode === "intranet"){
+          // 인트라넷 전용인데 링크를 못 찾음 → Gmail로 폴백
+          toast("요청글 링크를 못 찾아 Gmail을 열어요");
+          window.timerAPI.openExternal(gmailLink);
+        }
+      } catch(e){
+        if(mode === "intranet"){ window.timerAPI.openExternal(gmailLink); }
+      }
+    }
+  }
+
+  function openAdd() {
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    editingId=null; selDl=null;
+    selAlarm = alarmSettings.defaultAlarm ? Number(alarmSettings.defaultAlarm) : null;
+    $("modal-title").textContent="작업추가"; $("f-title").value="";
+    $("f-reqlink").value=""; $("f-planlink").value="";
+    $("dl-prev-main").style.display="none"; $("custom-row-main").classList.remove("show");
+    resetCal("main");
+    renderChips("chip-grid", ts=>{selDl=ts; showPrev(ts,"main");});
+    renderAlarms();
+    $("modal-task").classList.add("show");
+    setTimeout(()=>$("f-reqlink").focus(),100);
+  }
+  function openEdit(id) {
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    const t=tasks.find(x=>x.id===id);
+    editingId=id; selDl=t.deadline; selAlarm=t.alarm;
+    $("modal-title").textContent="작업편집"; $("f-title").value=t.title;
+    $("f-reqlink").value=t.reqLink||""; $("f-planlink").value=t.planLink||"";
+    $("custom-row-main").classList.remove("show");
+    $("cal-pop-main").classList.remove("show");
+    // 직접 입력에 현재 마감 날짜·시간을 미리 채워둠 (마감편집과 동일)
+    (function(){
+      const d = new Date(t.deadline);
+      calState.main.view = new Date(d.getFullYear(), d.getMonth(), 1);
+      const sel = new Date(d.getFullYear(), d.getMonth(), d.getDate()); sel.setHours(0,0,0,0);
+      calState.main.sel = sel.getTime();
+      const days = ["일","월","화","수","목","금","토"];
+      $("cal-trig-text-main").textContent = `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]})`;
+      $("cal-trig-main").classList.add("has");
+      $("time-main").value = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    })();
+    renderChips("chip-grid", ts=>{selDl=ts; showPrev(ts,"main");});
+    renderAlarms(); showPrev(t.deadline,"main");
+    $("modal-task").classList.add("show");
+  }
+
+  // 인트라넷 링크에서 정보 불러오기
+  // (프로토타입: 더미 데이터. 실제 앱에선 내장 브라우저로 해당 URL을 열어
+  //  딸깍 확장의 content.js 파싱 로직을 재사용해 제목/마감/기획안을 추출)
+  function fetchFromLink() {
+    const url = $("f-reqlink").value.trim();
+    if (!url) { toast("요청글 링크를 입력해주세요"); return; }
+    if (!url.includes("intranet.adef.co.kr")) { toast("인트라넷 요청글 링크가 아니에요"); return; }
+    toast("불러오는 중...");
+    // 프로토타입 시연용 더미 응답
+    setTimeout(() => {
+      $("f-title").value = "[더한섬닷컴] 5월 3주차 라이프 스타일 기획전 모션배너";
+      $("f-planlink").value = "https://docs.google.com/presentation/d/fetched";
+      // 마감: 내일 오후로 자동 설정 예시
+      const ts = dlChip("내일","오후");
+      selDl = ts; showPrev(ts,"main");
+      toast("불러왔어요");
+    }, 600);
+  }
+
+  function openImport() {
+    selDlImport=null;
+    $("dl-prev-import").style.display="none"; $("custom-row-import").classList.remove("show");
+    resetCal("import");
+    renderChips("chip-grid-import", ts=>{selDlImport=ts; showPrev(ts,"import");});
+    $("modal-import").classList.add("show");
+  }
+  function closeModal(id){ $(id).classList.remove("show"); if(typeof closeColorPicker==="function") closeColorPicker(); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
+
+  function toggleCustom(scope){ $(`custom-row-${scope}`).classList.toggle("show"); }
+
+  // 캘린더
+  const calState = { main:{view:new Date(),sel:null}, import:{view:new Date(),sel:null}, edit:{view:new Date(),sel:null} };
+  function toggleCal(scope) {
+    const pop=$(`cal-pop-${scope}`); const open=pop.classList.contains("show");
+    document.querySelectorAll(".cal-pop").forEach(p=>p.classList.remove("show"));
+    if(!open){ renderCal(scope); pop.classList.add("show"); }
+  }
+  function renderCal(scope) {
+    const st=calState[scope]; const pop=$(`cal-pop-${scope}`);
+    const y=st.view.getFullYear(), mo=st.view.getMonth();
+    const startDow=new Date(y,mo,1).getDay();
+    const dim=new Date(y,mo+1,0).getDate();
+    const today=new Date(); today.setHours(0,0,0,0);
+    const dows=["일","월","화","수","목","금","토"];
+    let h=`<div class="cal-h"><div class="tt">${y}년 ${mo+1}월</div><div class="cal-nav"><button type="button" onclick="calMove(event,'${scope}',-1)">${IC.chevL}</button><button type="button" onclick="calMove(event,'${scope}',1)">${IC.chevR}</button></div></div><div class="cal-grid">`;
+    dows.forEach((d,i)=>{ h+=`<div class="cal-dow ${i===0?'sun':i===6?'sat':''}">${d}</div>`; });
+    for(let i=0;i<startDow;i++) h+=`<div class="cal-d empty"></div>`;
+    for(let d=1;d<=dim;d++){
+      const cur=new Date(y,mo,d); cur.setHours(0,0,0,0);
+      const dow=cur.getDay();
+      const holiday=getHoliday(y,mo,d);
+      let cls="cal-d";
+      if(cur.getTime()===today.getTime())cls+=" today";
+      if(cur.getTime()<today.getTime())cls+=" past";
+      if(st.sel&&cur.getTime()===st.sel)cls+=" sel";
+      if(holiday||dow===0)cls+=" holiday";
+      else if(dow===6)cls+=" sat";
+      const title=holiday?` title="${holiday}"`:"";
+      h+=`<button type="button" class="${cls}"${title} onclick="calPick(event,'${scope}',${y},${mo},${d})">${d}${holiday?'<span class="hdot"></span>':''}</button>`;
+    }
+    h+=`</div>`; pop.innerHTML=h;
+  }
+  function calMove(ev,scope,dir){ if(ev)ev.stopPropagation(); calState[scope].view.setMonth(calState[scope].view.getMonth()+dir); renderCal(scope); }
+  function calPick(ev,scope,y,mo,d) {
+    if(ev)ev.stopPropagation();
+    const p=new Date(y,mo,d); p.setHours(0,0,0,0);
+    calState[scope].sel=p.getTime();
+    const days=["일","월","화","수","목","금","토"];
+    $(`cal-trig-text-${scope}`).textContent=`${mo+1}/${d}(${days[p.getDay()]})`;
+    $(`cal-trig-${scope}`).classList.add("has");
+    renderCal(scope); $(`cal-pop-${scope}`).classList.remove("show");
+    applyCustom(scope);
+  }
+  function resetCal(scope) {
+    calState[scope].view=new Date(); calState[scope].sel=null;
+    $(`cal-trig-text-${scope}`).textContent="날짜 선택";
+    $(`cal-trig-${scope}`).classList.remove("has");
+    $(`time-${scope}`).value=""; $(`cal-pop-${scope}`).classList.remove("show");
+  }
+  function applyCustom(scope) {
+    const st=calState[scope]; const ts0=$(`time-${scope}`).value.trim();
+    if(!st.sel||!ts0)return;
+    const ts=normalizeTime(ts0); if(!ts)return;
+    const m=ts.match(/^(\d{1,2}):(\d{2})$/); if(!m)return;
+    const dt=new Date(st.sel); dt.setHours(+m[1],+m[2],0,0);
+    if(scope==="main"){selDl=dt.getTime(); showPrev(selDl,"main");}
+    else if(scope==="edit"){selDlEdit=dt.getTime(); showPrev(selDlEdit,"edit");}
+    else{selDlImport=dt.getTime(); showPrev(selDlImport,"import");}
+  }
+  document.addEventListener("input", e=>{
+    if(e.target.id==="time-main") applyCustom("main");
+    if(e.target.id==="time-import") applyCustom("import");
+    if(e.target.id==="time-edit") applyCustom("edit");
+  });
+  // 시간 직접입력: 엔터로도 즉시 적용 (포커스 해제 없이)
+  document.addEventListener("keydown", e=>{
+    if(e.key !== "Enter") return;
+    const id = e.target && e.target.id;
+    const scope = id==="time-main" ? "main" : id==="time-import" ? "import" : id==="time-edit" ? "edit" : null;
+    if(!scope) return;
+    e.preventDefault();
+    e.target.value = normalizeTime(e.target.value) || e.target.value;
+    applyCustom(scope);
+  });
+  document.addEventListener("click", e=>{
+    if(!e.target.closest(".cal-pop")&&!e.target.closest(".cal-trigger"))
+      document.querySelectorAll(".cal-pop").forEach(p=>p.classList.remove("show"));
+  });
+
+  async function saveTask() {
+    const title=$("f-title").value.trim();
+    const reqLink=$("f-reqlink").value.trim();
+    const planLink=$("f-planlink").value.trim();
+    if(!title){toast("제목을 입력해주세요");return;}
+    if(!selDl){toast("마감 시간을 선택해주세요");return;}
+    if(editingId){
+      const t = tasks.find(x=>x.id===editingId);
+      if(!reqLink){ toast("요청글 링크를 입력해주세요"); return; }
+      const myName = getMyName();
+      if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
+      closeModal("modal-task");
+      const d = new Date(selDl);
+      const ymdStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      const hmStr  = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+      // 시간 로컬 저장 (요청글 링크 키)
+      taskTimes[timeKey(reqLink, title)] = hmStr; saveTaskTimes();
+      // 낙관적 반영
+      const prev = { title:t.title, deadline:t.deadline, alarm:t.alarm, reqLink:t.reqLink, planLink:t.planLink };
+      t.title=title; t.deadline=selDl; t.alarm=selAlarm; t.reqLink=reqLink; t.planLink=planLink;
+      setTaskAlarm(reqLink, title, selAlarm); // 알람 시점 로컬 저장(동기화 후 유지)
+      firedAlarms.delete(t.id); // 마감/알람 변경 → 알람 재발화 허용
+      render();
+      const r = await window.timerAPI.postSheet({
+        action:"updateTask", member:myName, row: t._row || t.id,
+        title, url: reqLink, planLink, dueDate: ymdStr
+      });
+      if(r && r.ok){ toast("작업을 수정했어요"); await doSync({ silent:true }); }
+      else { Object.assign(t, prev); render(); toast("수정 실패 — 되돌렸어요"); } // 롤백
+    } else {
+      if(!reqLink){toast("요청글 링크를 입력해주세요");return;}
+      closeModal("modal-task");
+      const myName = getMyName();
+      if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 추가돼요"); return; }
+      // 시트엔 날짜만 기록 (시간은 동기화 후 18:00 기본, 카드에서 개인 설정 예정)
+      const d = new Date(selDl);
+      const ymd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      const type = reqLink ? "req" : "manual";
+      const temp = { id:`tmp_${Date.now()}`, title, deadline:selDl, type, done:false, alarm:selAlarm, reqLink, planLink, _temp:true }; // ① 즉시 표시
+      tasks.push(temp);
+      setTaskAlarm(reqLink, title, selAlarm); // 알람 시점 로컬 저장(동기화 후 유지)
+      render();
+      const r = await window.timerAPI.postSheet({ // ② 시트 기록 (insert)
+        targetMember: myName, title, url: reqLink, planLink, dueDate: ymd, dupCheck: "0"
+      });
+      if(r && r.ok){
+        const dd = new Date(selDl); // 선택한 시간을 개인 저장(요청글 링크 키)
+        taskTimes[timeKey(reqLink, title)] = `${String(dd.getHours()).padStart(2,"0")}:${String(dd.getMinutes()).padStart(2,"0")}`;
+        saveTaskTimes();
+        toast("작업을 추가했어요"); await doSync({ silent:true });
+      } // ③ 행번호 reconcile
+      else if(r && r.duplicate){ tasks = tasks.filter(x=>x.id!==temp.id); render(); toast("이미 등록된 작업이에요"); }
+      else { tasks = tasks.filter(x=>x.id!==temp.id); render(); toast("추가 실패 — 되돌렸어요"); } // ④ 롤백
+    }
+  }
+  function confirmImport() {
+    if(!selDlImport){toast("마감 시간을 선택해주세요");return;}
+    tasks.push({id:Date.now(),title:"[더한섬닷컴] 5월 3주차 라이프 스타일 기획전 모션배너",deadline:selDlImport,type:"req",done:false,alarm:60,reqLink:"https://intranet.adef.co.kr/creative/view?idx=49334",planLink:"https://docs.google.com/presentation/d/imported"});
+    closeModal("modal-import"); toast("인트라넷 작업을 가져왔어요"); render();
+  }
+  async function delTask(id){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    const t = tasks.find(x=>x.id===id); if(!t) return;
+    const myName = getMyName();
+    if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
+    const idx = tasks.indexOf(t);
+    tasks.splice(idx, 1); render();              // ① 즉시 제거
+    toast("작업을 삭제했어요");
+    const r = await window.timerAPI.postSheet({   // ② 시트 기록
+      action:"deleteTask", member:myName, row: t._row || t.id
+    });
+    if(r && r.ok){ await doSync({ silent:true }); } // ③ compaction으로 행이 당겨지므로 _row 재정렬
+    else { tasks.splice(idx, 0, t); render(); toast("삭제 실패 — 되돌렸어요"); } // 롤백
+  }
+  let doneCtx = null; // { id, toDone }
+  function toggleDone(id){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    const t = tasks.find(x=>x.id===id); if(!t) return;
+    const toDone = !t.done;
+    doneCtx = { id, toDone };
+    $("done-title").textContent = toDone ? "완료 처리" : "되돌리기";
+    $("done-sub").textContent = t.title || "";
+    const presets = toDone ? ["전달 완료","수정 전달 완료","담당 제작 완료"] : ["수정 진행","베리 진행"];
+    let presetHtml = presets
+      .map(p => `<button class="preset-pill" onclick="confirmDone('${p}')">${esc(p)}</button>`).join("");
+    if(!toDone){
+      // 되돌리기 팝업에만: 완료 상태를 유지한 채 '전달 완료'로 보내는 검은 버튼 (진행중으로 안 감)
+      presetHtml += `<button class="preset-pill preset-pill-dark" onclick="confirmDone('전달 완료', true)">전달 완료</button>`;
+    }
+    $("done-presets").innerHTML = presetHtml;
+    const inp = $("done-input");
+    inp.value = toDone ? "전달 완료" : "";
+    $("modal-done").classList.add("show");
+    setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
+  }
+  function confirmDoneFromInput(){
+    confirmDone($("done-input").value.trim()); // 빈칸이면 빈칸 그대로 기록
+  }
+  async function confirmDone(statusText, forceDone){
+    const ctx = doneCtx; if(!ctx){ closeModal("modal-done"); return; }
+    const t = tasks.find(x=>x.id===ctx.id);
+    if(!t){ closeModal("modal-done"); return; }
+    closeModal("modal-done");
+    const myName = getMyName();
+    if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
+    const target = (forceDone === true) ? true : ctx.toDone; // '전달 완료'는 완료 상태 유지(진행중으로 안 감)
+    const prevDone = t.done, prevStatus = t._status; // 롤백용
+    t.done = target; t._status = statusText;          // ① 낙관적 즉시 반영
+    render();
+    const r = await window.timerAPI.postSheet({       // ② 시트 기록 (체크박스 A/I + G/O 상태열)
+      action:"toggleDone", member:myName, row: t._row || t.id,
+      done: target ? "1" : "0", status: statusText
+    });
+    if(r && r.ok){ toast(forceDone === true ? "전달 완료로 보냈어요" : (target ? "완료 처리했어요" : "되돌렸어요")); }
+    else { t.done = prevDone; t._status = prevStatus; render(); toast("처리 실패 — 되돌렸어요"); } // ③ 롤백
+  }
+  // 공용 확인 모달
+  let confirmCb = null;
+  function openConfirm(title, msg, okLabel, cb){
+    $("confirm-title").textContent = title;
+    $("confirm-msg").textContent = msg;
+    $("confirm-ok").textContent = okLabel || "확인";
+    confirmCb = cb;
+    $("modal-confirm").classList.add("show");
+  }
+  function doConfirm(){ closeModal("modal-confirm"); const cb = confirmCb; confirmCb = null; if(cb) cb(); }
+
+  // 카드에서 마감 편집 (날짜→시트, 시간→로컬)
+  let dueCtx = null;
+  function ymd(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+  // "1800"→"18:00", "930"→"09:30", "18"→"18:00", "18:00"→"18:00". 잘못된 값은 "".
+  function normalizeTime(s){
+    s = (s || "").trim();
+    let h, m;
+    let mm = s.match(/^(\d{1,2}):(\d{2})$/);
+    if(mm){ h = +mm[1]; m = +mm[2]; }
+    else {
+      const d = s.replace(/[^\d]/g, "");
+      if(d.length === 4){ h = +d.slice(0,2); m = +d.slice(2); }
+      else if(d.length === 3){ h = +d.slice(0,1); m = +d.slice(1); }
+      else if(d.length === 1 || d.length === 2){ h = +d; m = 0; }
+      else return "";
+    }
+    if(isNaN(h) || isNaN(m) || h > 23 || m > 59) return "";
+    return String(h).padStart(2,"0") + ":" + String(m).padStart(2,"0");
+  }
+  function openTimeEdit(id){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    const t = tasks.find(x=>x.id===id); if(!t) return;
+    dueCtx = id;
+    $("time-sub").textContent = t.title || "";
+    const d = new Date(t.deadline);
+    // 작업편집과 동일한 마감 블록 — 칩 그리드 + 직접 입력(캘린더+시간) + 미리보기
+    renderChips("chip-grid-edit", ts=>{ selDlEdit=ts; showPrev(ts,"edit"); });
+    selDlEdit = t.deadline;
+    showPrev(selDlEdit, "edit");
+    calState.edit.view = new Date(d.getFullYear(), d.getMonth(), 1);
+    const sel = new Date(d.getFullYear(), d.getMonth(), d.getDate()); sel.setHours(0,0,0,0);
+    calState.edit.sel = sel.getTime();
+    const days = ["일","월","화","수","목","금","토"];
+    $("cal-trig-text-edit").textContent = `${d.getMonth()+1}/${d.getDate()}(${days[d.getDay()]})`;
+    $("cal-trig-edit").classList.add("has");
+    $("time-edit").value = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    $("custom-row-edit").classList.remove("show");
+    $("cal-pop-edit").classList.remove("show");
+    $("modal-time").classList.add("show");
+  }
+  // 날짜+시간 확정: 날짜는 시트, 시간은 로컬. (프리셋·저장 버튼 공통)
+  async function commitDue(dateStr, timeStr){
+    const t = tasks.find(x=>x.id===dueCtx); if(!t){ closeModal("modal-time"); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){ toast("날짜를 선택해주세요"); return; }
+    timeStr = normalizeTime(timeStr);
+    if(!timeStr){ toast("시간을 입력해주세요 (예: 1800)"); return; }
+    const [y,mo,da] = dateStr.split("-").map(Number);
+    const [h,mi]    = timeStr.split(":").map(Number);
+    const newTs = new Date(y, mo-1, da, h, mi, 0, 0).getTime();
+    closeModal("modal-time");
+
+    taskTimes[timeKey(t.reqLink, t.title)] = timeStr; saveTaskTimes(); // 시간 로컬 저장
+    const prevTs = t.deadline;
+    t.deadline = newTs; firedAlarms.delete(t.id); render();             // 낙관적 + 알람 재발화 허용
+
+    const myName = getMyName();
+    if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
+    const r = await window.timerAPI.postSheet({ action:"updateDue", member:myName, row: t._row || t.id, dueDate: dateStr });
+    if(r && r.ok){ toast("마감을 변경했어요"); }
+    else { t.deadline = prevTs; render(); toast("변경 실패 — 되돌렸어요"); }
+  }
+  function saveDueEdit(){
+    if(!selDlEdit){ toast("마감 시간을 선택해주세요"); return; }
+    const d = new Date(selDlEdit);
+    commitDue(ymd(d), `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`);
+  }
+
+  function clearDone(){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    const cnt = tasks.filter(t=>t.done).length;
+    if(!cnt) return;
+    openConfirm("완료 비우기", `완료된 작업 ${cnt}건을 삭제할까요? 시트에서도 지워져요.`, "삭제", doClearDone);
+  }
+  async function doClearDone(){
+    const myName = getMyName();
+    if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
+    // 행 번호 큰 것부터 삭제 → compaction 시 위쪽(아직 삭제할) 행번호가 안 틀어짐
+    const doneTasks = tasks.filter(t=>t.done).slice().sort((a,b)=>(b._row||b.id)-(a._row||a.id));
+    if(!doneTasks.length) return;
+    tasks = tasks.filter(t=>!t.done); render(); // ① 즉시 화면에서 제거
+    let failed = 0;
+    for(const t of doneTasks){
+      const r = await window.timerAPI.postSheet({ action:"deleteTask", member:myName, row: t._row || t.id });
+      if(!(r && r.ok)) failed++;
+    }
+    await doSync({ silent:true }); // ② 시트 기준으로 재정렬
+    toast(failed ? `${doneTasks.length-failed}건 삭제 · ${failed}건 실패` : `완료 ${doneTasks.length}건을 비웠어요`);
+  }
+
+  // ── 설정 (프리셋 + 알람) ──
+  let draftPresets = [];
+  let alarmSettings = { notify: true, sound: true, soundType: "ding", repeat: "1", defaultAlarm: "60", volume: 0.8, customSoundData: null, customSoundName: "" };
+  try { const _as = JSON.parse(localStorage.getItem("alarmSettings") || "null"); if (_as && typeof _as === "object") alarmSettings = { ...alarmSettings, ..._as }; } catch(e){}
+  function saveAlarmAndPresets(){
+    try {
+      localStorage.setItem("alarmSettings", JSON.stringify(alarmSettings)); // 커스텀 음원(dataURL) 포함 영속화
+      localStorage.setItem("presets", JSON.stringify(PRESETS));
+    } catch(e){ toast("저장 공간이 부족해 음원을 저장하지 못했어요 — 더 작은 파일을 사용해주세요"); }
+  }
+  let draftAlarm = {};
+
+  // ── 내 이름 커스텀 드롭다운 ──
+  function renderNamePop(){
+    const pop = $("name-pop"); if(!pop) return;
+    const cur = getMyName();
+    pop.innerHTML = "";
+    MEMBERS.forEach(n => {
+      const b = document.createElement("button");
+      b.className = "name-opt" + (n === cur ? " sel" : "");
+      b.textContent = n;
+      b.onclick = () => pickName(n);
+      pop.appendChild(b);
+    });
+  }
+  function toggleNamePop(){
+    const pop = $("name-pop"), trig = $("name-trigger");
+    if (pop.classList.contains("show")) { pop.classList.remove("show"); trig.classList.remove("open"); }
+    else { renderNamePop(); pop.classList.add("show"); trig.classList.add("open"); }
+  }
+  function pickName(n){
+    const prev = getMyName();
+    setMyName(n);
+    syncNameTrigger();
+    $("name-pop").classList.remove("show");
+    $("name-trigger").classList.remove("open");
+    if (n !== prev) { viewName = n; doSync(); }
+  }
+  function syncNameTrigger(){
+    const t = $("name-trigger-text");
+    if (t) t.textContent = getMyName() || "— 선택 —";
+  }
+
+  function openSettings() {
+    syncNameTrigger();
+    $("name-pop").classList.remove("show");
+    $("name-trigger").classList.remove("open");
+    draftPresets = JSON.parse(JSON.stringify(PRESETS));
+    draftAlarm = { ...alarmSettings };
+    renderPresetList();
+    syncSegments();
+    renderGmailConn();
+    syncMailSliders();
+    renderAutostart();
+    renderLinkProfile();
+    renderStatusColors();
+    $("modal-settings").classList.add("show");
+  }
+
+  // ── 단축키 커스터마이징 팝업 ──
+  const RESERVED_KEYS = new Set(["escape","backspace","enter","tab"," ","w","arrowleft","arrowright","arrowup","arrowdown","home","end","pageup","pagedown","delete","insert"]);
+  let keyCaptureId = null;
+
+  function openKeysModal(){
+    keyCaptureId = null;
+    renderKeysList();
+    $("modal-keys").classList.add("show");
+  }
+  function renderKeysList(){
+    const host = $("keys-list"); if(!host) return;
+    let html = KEY_ACTIONS.map(a => `
+      <div class="key-row">
+        <span class="key-label">${a.label}</span>
+        <button class="key-cap${keyCaptureId===a.id?' capturing':''}" id="kc-${a.id}" onclick="startKeyCapture('${a.id}')">${keyCaptureId===a.id ? "키 입력…" : esc(keymap[a.id])}</button>
+      </div>
+    `).join("");
+    // 고정 단축키 (변경 불가)
+    html += `
+      <div class="key-row">
+        <span class="key-label">관리 항목 / 최신순 토글</span>
+        <button class="key-cap fixed" onclick="toast('고정 단축키예요')">W</button>
+      </div>
+      <div class="key-row">
+        <span class="key-label">동기화 / 새로고침</span>
+        <button class="key-cap fixed" onclick="toast('고정 단축키예요')">Space</button>
+      </div>`;
+    host.innerHTML = html;
+  }
+  function startKeyCapture(id){
+    keyCaptureId = (keyCaptureId === id) ? null : id; // 다시 누르면 취소
+    renderKeysList();
+  }
+  function resetKeymap(){
+    keymap = defaultKeymap();
+    saveKeymap();
+    keyCaptureId = null;
+    renderKeysList();
+    toast("단축키를 기본값으로 되돌렸어요");
+  }
+  // 캡처 전용 리스너 (capture 단계에서 가로채 전역 단축키보다 먼저 처리)
+  window.addEventListener("keydown", (e) => {
+    if(keyCaptureId === null) return;
+    if(!$("modal-keys").classList.contains("show")){ keyCaptureId = null; return; }
+    e.preventDefault(); e.stopPropagation();
+    if(e.key === "Escape"){ keyCaptureId = null; renderKeysList(); return; } // 취소
+    if(e.metaKey || e.ctrlKey || e.altKey) return; // 조합키 무시(계속 대기)
+    const k = e.key.toLowerCase();
+    if(RESERVED_KEYS.has(k) || k.length !== 1 || !/[a-z0-9]/.test(k)){
+      toast("문자·숫자 키만 쓸 수 있어요"); return; // 계속 대기
+    }
+    // 중복 검사
+    const dup = KEY_ACTIONS.find(a => a.id !== keyCaptureId && keymap[a.id] === k);
+    if(dup){ toast(`이미 "${dup.label}"에 쓰는 키예요`); return; } // 계속 대기
+    keymap[keyCaptureId] = k;
+    saveKeymap();
+    keyCaptureId = null;
+    renderKeysList();
+    toast("단축키를 바꿨어요");
+  }, true); // capture phase
+
+  // 시작 시 자동 실행
+  // ── 상태 색상 (마감임박/오늘마감/여유있음) 사용자 지정 ──
+  const COLOR_PALETTE = ["#FF3333","#FF7A33","#FFAC24","#04C766","#2E96FF","#9A4DFF"];
+  const STATUS_DEFS = [
+    { key:"urgent", id:"color-urgent", label:"마감 임박", def:"#FF3333" },
+    { key:"today",  id:"color-today",  label:"오늘 마감", def:"#FFAC24" },
+    { key:"soon",   id:"color-soon",   label:"여유 있음", def:"#04C766" },
+  ];
+  let statusColors = {};
+  try { statusColors = JSON.parse(localStorage.getItem("statusColors") || "{}"); } catch(e){ statusColors = {}; }
+  function effStatusColor(key){ const d = STATUS_DEFS.find(s=>s.key===key); return (statusColors[key] || (d && d.def) || "#888"); }
+  function applyStatusColors(){
+    STATUS_DEFS.forEach(s => {
+      if(statusColors[s.key]) document.documentElement.style.setProperty("--st-" + s.key, statusColors[s.key]);
+      else document.documentElement.style.removeProperty("--st-" + s.key); // 기본값(테마 적응) 사용
+    });
+  }
+  function setStatusColor(key, hex){
+    statusColors[key] = String(hex).toLowerCase();
+    localStorage.setItem("statusColors", JSON.stringify(statusColors));
+    applyStatusColors();
+    renderStatusColors();
+  }
+  // ── 커스텀 컬러 피커 ──
+  let cpickKey = null, cpickHue = 0, cpickSat = 1, cpickVal = 1;
+  function hsvToRgb(h, s, v){
+    const c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c;
+    let r, g, b;
+    if(h < 60){ r=c; g=x; b=0; } else if(h<120){ r=x; g=c; b=0; } else if(h<180){ r=0; g=c; b=x; }
+    else if(h<240){ r=0; g=x; b=c; } else if(h<300){ r=x; g=0; b=c; } else { r=c; g=0; b=x; }
+    return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+  }
+  function rgbToHsv(r, g, b){
+    r/=255; g/=255; b/=255;
+    const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+    let h=0;
+    if(d){ if(max===r) h=60*(((g-b)/d)%6); else if(max===g) h=60*((b-r)/d+2); else h=60*((r-g)/d+4); }
+    if(h<0) h+=360;
+    return [h, max?d/max:0, max];
+  }
+  function hex2(n){ return n.toString(16).padStart(2,"0"); }
+  function curHex(){ const [r,g,b]=hsvToRgb(cpickHue,cpickSat,cpickVal); return "#"+hex2(r)+hex2(g)+hex2(b); }
+  function parseHex(hex){
+    const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim()); if(!m) return null;
+    const n = parseInt(m[1],16); return [(n>>16)&255,(n>>8)&255,n&255];
+  }
+  function cpickRender(){
+    const hex = curHex();
+    const sv = $("cpick-sv");
+    if(sv){ const [hr,hg,hb]=hsvToRgb(cpickHue,1,1); sv.style.background = `rgb(${hr},${hg},${hb})`; }
+    const svc = $("cpick-sv-cursor");
+    if(svc){ svc.style.left = (cpickSat*100)+"%"; svc.style.top = ((1-cpickVal)*100)+"%"; svc.style.background = hex; }
+    const hc = $("cpick-hue-cursor"); if(hc) hc.style.left = (cpickHue/360*100)+"%";
+    const pv = $("cpick-preview"); if(pv) pv.style.background = hex;
+    const hx = $("cpick-hex"); if(hx && document.activeElement !== hx) hx.value = hex.slice(1).toUpperCase();
+  }
+  function cpickApply(){ if(cpickKey) setStatusColorLive(cpickKey, curHex()); cpickRender(); }
+  // 라이브 적용(피커 다시 그리지 않음 — 입력 중 깜빡임 방지)
+  function setStatusColorLive(key, hex){
+    statusColors[key] = String(hex).toLowerCase();
+    localStorage.setItem("statusColors", JSON.stringify(statusColors));
+    applyStatusColors();
+    // 행의 cdot/트리거/스와치 활성만 갱신
+    const def = STATUS_DEFS.find(s=>s.key===key); if(!def) return;
+    const row = $(def.id); if(!row) return;
+    const eff = hex.toLowerCase();
+    const cdot = row.querySelector(".cdot"); if(cdot) cdot.style.background = eff;
+    const trig = row.querySelector(".color-pick"); if(trig) trig.style.background = eff;
+    row.querySelectorAll(".swatch").forEach(sw => sw.classList.toggle("on", (sw.title||"").toLowerCase()===eff));
+  }
+  function openColorPicker(ev, key){
+    ev.stopPropagation();
+    cpickKey = key;
+    const rgb = parseHex(effStatusColor(key)) || [220,38,38];
+    [cpickHue, cpickSat, cpickVal] = rgbToHsv(rgb[0],rgb[1],rgb[2]);
+    const pop = $("cpick"); pop.style.display = "block";
+    // 위치: 트리거 버튼 근처
+    const r = ev.currentTarget.getBoundingClientRect();
+    let left = r.right - 196, top = r.bottom + 8;
+    if(top + 200 > window.innerHeight) top = r.top - 200;
+    if(left < 8) left = 8;
+    pop.style.left = left + "px"; pop.style.top = top + "px";
+    cpickRender();
+  }
+  function closeColorPicker(){ const p=$("cpick"); if(p) p.style.display="none"; cpickKey=null; }
+  // SV 영역 드래그
+  function cpickSVDrag(e){
+    const sv = $("cpick-sv"); const rect = sv.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width));
+    const y = Math.max(0, Math.min(1, (e.clientY-rect.top)/rect.height));
+    cpickSat = x; cpickVal = 1-y; cpickApply();
+  }
+  function cpickHueDrag(e){
+    const hue = $("cpick-hue"); const rect = hue.getBoundingClientRect();
+    const x = Math.max(0, Math.min(1, (e.clientX-rect.left)/rect.width));
+    cpickHue = x*360; cpickApply();
+  }
+  function initColorPicker(){
+    const sv = $("cpick-sv"), hue = $("cpick-hue"), hx = $("cpick-hex");
+    if(!sv) return;
+    const startDrag = (handler) => (e) => {
+      e.preventDefault();
+      handler(e);
+      const move = (ev) => handler(ev);
+      const up = () => { document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up); };
+      document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
+    };
+    sv.addEventListener("mousedown", startDrag(cpickSVDrag));
+    hue.addEventListener("mousedown", startDrag(cpickHueDrag));
+    hx.addEventListener("input", () => {
+      const rgb = parseHex("#"+hx.value); if(!rgb) return;
+      [cpickHue,cpickSat,cpickVal] = rgbToHsv(rgb[0],rgb[1],rgb[2]);
+      if(cpickKey) setStatusColorLive(cpickKey, "#"+hex2(rgb[0])+hex2(rgb[1])+hex2(rgb[2]));
+      cpickRender();
+    });
+    // 바깥 클릭 시 닫기
+    document.addEventListener("mousedown", (e) => {
+      const p = $("cpick");
+      if(p && p.style.display !== "none" && !p.contains(e.target) && !(e.target.classList && e.target.classList.contains("color-pick"))) closeColorPicker();
+    });
+  }
+
+  function renderStatusColors(){
+    STATUS_DEFS.forEach(s => {
+      const row = $(s.id); if(!row) return;
+      const eff = effStatusColor(s.key).toLowerCase();
+      const sw = COLOR_PALETTE.map(c =>
+        `<span class="swatch${c.toLowerCase()===eff?' on':''}" style="background:${c}" title="${c}" onclick="setStatusColor('${s.key}','${c}')"></span>`
+      ).join("");
+      row.innerHTML =
+        `<span class="color-name"><span class="cdot" style="background:${eff}"></span>${s.label}</span>` +
+        `<div class="swatches">${sw}</div>` +
+        `<button type="button" class="color-pick" style="background:${eff}" title="직접 선택" onclick="openColorPicker(event,'${s.key}')"></button>`;
+    });
+  }
+
+  // 링크 열기 — Chrome 프로필 선택
+  function getLinkProfile(){ return localStorage.getItem("linkProfile") || ""; }
+  function applyLinkProfile(){
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.setLinkProfile)
+      window.timerAPI.setLinkProfile(getLinkProfile());
+  }
+  async function renderLinkProfile(){
+    const sel = $("link-profile");
+    if(!sel || typeof window.timerAPI === "undefined" || !window.timerAPI.listChromeProfiles) return;
+    const saved = getLinkProfile();
+    let opts = '<option value="">기본 브라우저</option>';
+    try {
+      const r = await window.timerAPI.listChromeProfiles();
+      if(r && r.ok && r.chrome && r.profiles && r.profiles.length){
+        r.profiles.forEach(p => { opts += `<option value="${esc(p.dir)}">Chrome · ${esc(p.name)}</option>`; });
+      } else if(r && !r.chrome){
+        opts = '<option value="">기본 브라우저 (Chrome 미설치)</option>';
+      }
+    } catch(e){}
+    sel.innerHTML = opts;
+    // 저장값이 목록에 있으면 선택, 없으면 기본
+    sel.value = [...sel.options].some(o => o.value === saved) ? saved : "";
+    if(sel.value !== saved){ localStorage.setItem("linkProfile", sel.value); applyLinkProfile(); }
+  }
+  function onLinkProfileChange(val){
+    localStorage.setItem("linkProfile", val || "");
+    applyLinkProfile();
+    toast(val ? "선택한 Chrome 프로필로 링크를 열어요" : "기본 브라우저로 링크를 열어요");
+  }
+
+  // 시작 시 자동 실행 — 선택값을 localStorage에 저장(표시 안정), 시작 때마다 OS에 재등록
+  function getAutostartPref(){ return localStorage.getItem("autostart") === "1"; }
+  function getAutostartMinPref(){ return localStorage.getItem("autostartMin") === "1"; }
+  function renderAutostart(){
+    const t = $("autostart-toggle"); if(t) t.classList.toggle("on", getAutostartPref());
+    const mt = $("autostart-min-toggle"); if(mt) mt.classList.toggle("on", getAutostartMinPref());
+    // 자동 실행이 꺼져 있으면 "트레이로 시작" 옵션은 흐리게(비활성 느낌)
+    const mr = $("autostart-min-row"); if(mr){ mr.style.opacity = getAutostartPref() ? "1" : "0.4"; }
+  }
+  function applyAutostartMin(){
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.setAutostartMinimized)
+      window.timerAPI.setAutostartMinimized(getAutostartMinPref());
+  }
+  async function toggleAutostartMin(){
+    if(typeof window.timerAPI === "undefined") return;
+    if(!getAutostartPref()){ toast("먼저 '시작 시 자동 실행'을 켜주세요"); return; }
+    const next = !getAutostartMinPref();
+    localStorage.setItem("autostartMin", next ? "1" : "0");
+    renderAutostart();
+    if(window.timerAPI.setAutostartMinimized) await window.timerAPI.setAutostartMinimized(next);
+    toast(next ? "자동 실행 시 트레이로 시작" : "자동 실행 시 창 표시");
+  }
+  function applyAutostart(){
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.setAutostart)
+      window.timerAPI.setAutostart(getAutostartPref());
+  }
+  async function toggleAutostart(){
+    if(typeof window.timerAPI === "undefined" || !window.timerAPI.setAutostart){ toast("앱에서만 설정돼요"); return; }
+    const next = !getAutostartPref();
+    localStorage.setItem("autostart", next ? "1" : "0");
+    renderAutostart();
+    const r = await window.timerAPI.setAutostart(next);
+    if(!(r && r.ok)){
+      localStorage.setItem("autostart", next ? "0" : "1"); renderAutostart();
+      toast("자동 실행 설정 실패");
+    } else {
+      toast(next ? "시작 시 자동 실행 켜짐" : "시작 시 자동 실행 꺼짐");
+    }
+  }
+
+  // 닫기 = 항상 트레이로 최소화 (옵션 없음). 완전 종료는 트레이 우클릭 → 종료.
+
+  // 메일 연동 상태 표시 + 연결/해제
+  async function renderGmailConn(){
+    const dot = $("gmail-dot"), txt = $("gmail-conn-text"), btn = $("gmail-conn-btn");
+    if(typeof window.timerAPI === "undefined" || !window.timerAPI.gmailStatus){
+      txt.textContent = "앱에서만 사용 가능"; dot.classList.remove("on");
+      btn.style.display = "none"; return;
+    }
+    btn.style.display = "";
+    const st = await window.timerAPI.gmailStatus();
+    if(st && st.connected){
+      dot.classList.add("on");
+      txt.textContent = st.email || "연결됨";
+      btn.textContent = "연결 해제"; btn.classList.add("disconnect");
+    } else {
+      dot.classList.remove("on");
+      txt.textContent = "연결 안 됨";
+      btn.textContent = "연결"; btn.classList.remove("disconnect");
+    }
+  }
+  async function toggleGmailConn(){
+    const st = await window.timerAPI.gmailStatus();
+    if(st && st.connected){
+      await window.timerAPI.gmailLogout();
+      setMailBadge(0);
+      toast("메일 연결을 해제했어요");
+      renderGmailConn();
+    } else {
+      toast("브라우저에서 로그인해주세요…");
+      const r = await window.timerAPI.gmailLogin();
+      if(r && r.ok){ toast(`메일 연결 완료: ${r.email}`); renderGmailConn(); loadMail(true); }
+      else { toast("메일 연결 실패: " + (r && r.error || "")); }
+    }
+  }
+
+  function syncSegments() {
+    // 알람 방식 (다중)
+    setToggle("seg-mode", "notify", draftAlarm.notify);
+    setToggle("seg-mode", "sound", draftAlarm.sound);
+    setSeg("seg-sound", draftAlarm.soundType);
+    setSeg("seg-default-alarm", draftAlarm.defaultAlarm);
+    // 음량 슬라이더 동기화
+    const vs = $("vol-slider"), vv = $("vol-val");
+    if(vs){ const pct = Math.round((draftAlarm.volume ?? 0.8) * 100); vs.value = pct; if(vv) vv.textContent = pct + "%"; }
+    // 커스텀 음원 이름 표시 (이름 클릭=교체, X=삭제)
+    const nameEl = $("custom-sound-name");
+    if (draftAlarm.customSoundName) {
+      nameEl.style.display = "flex";
+      nameEl.innerHTML = `${IC.bell}<span class="csn-text" title="클릭하면 다른 파일로 교체" onclick="replaceCustomSound()">${draftAlarm.customSoundName}</span>`
+        + `<button type="button" class="csn-remove" title="음원 삭제" onclick="removeCustomSound(event)"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`;
+    } else {
+      nameEl.style.display = "none";
+      nameEl.innerHTML = "";
+    }
+    updateAlarmFieldStates();
+  }
+  // 커스텀 음원 교체(탐색기 열기) / 삭제
+  function replaceCustomSound(){
+    const inp = $("custom-sound-input");
+    if(inp){ inp.value = ""; inp.click(); } // 같은 파일 다시 선택해도 동작하도록 초기화
+  }
+  function removeCustomSound(ev){
+    if(ev) ev.stopPropagation();
+    draftAlarm.customSoundData = null;
+    draftAlarm.customSoundName = "";
+    if(draftAlarm.soundType === "custom") draftAlarm.soundType = "ding"; // 기본음으로 되돌림
+    const inp = $("custom-sound-input"); if(inp) inp.value = "";
+    syncSegments();
+    toast("음원을 삭제했어요");
+  }
+
+  function setToggle(segId, val, on) {
+    const btn = document.querySelector(`#${segId} .seg-btn[data-val="${val}"]`);
+    if (btn) btn.classList.toggle("on", !!on);
+  }
+  function setSeg(segId, val) {
+    document.querySelectorAll(`#${segId} .seg-btn`).forEach(b => {
+      b.classList.toggle("on", b.dataset.val === val);
+    });
+  }
+  function updateAlarmFieldStates() {
+    const allOff = !draftAlarm.notify && !draftAlarm.sound;
+    $("field-sound").classList.toggle("disabled", !draftAlarm.sound);
+  }
+
+  // 세그먼트 클릭 (이벤트 위임)
+  document.addEventListener("click", e => {
+    const btn = e.target.closest(".seg-btn");
+    if (!btn) return;
+    const seg = btn.closest(".seg");
+    if (!seg) return;
+    const val = btn.dataset.val;
+
+    if (seg.id === "seg-mode") {
+      if (val === "off") {
+        draftAlarm.notify = false; draftAlarm.sound = false;
+        setToggle("seg-mode","notify",false); setToggle("seg-mode","sound",false);
+      } else {
+        // 알림/소리 토글
+        draftAlarm[val] = !draftAlarm[val];
+        btn.classList.toggle("on", draftAlarm[val]);
+      }
+      updateAlarmFieldStates();
+      return;
+    }
+
+    // 단일 선택 세그먼트
+    seg.querySelectorAll(".seg-btn").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    if (seg.id === "seg-sound") {
+      draftAlarm.soundType = val;
+      if (val === "custom") {
+        // 커스텀 음원: 이미 있으면 미리듣기, 없으면 파일 선택
+        if (draftAlarm.customSoundData) playPreview("custom");
+        else $("custom-sound-input").click();
+      } else {
+        playPreview(val);
+      }
+    }
+    else if (seg.id === "seg-default-alarm") draftAlarm.defaultAlarm = val;
+    else if (seg.id === "seg-mail-open") onMailOpenMode(val);
+  });
+
+  // 커스텀 음원 파일 선택 (제한: 5MB, 10초, 오디오 형식)
+  document.addEventListener("change", e => {
+    if (e.target.id !== "custom-sound-input") return;
+    const file = e.target.files[0];
+    if (!file) return;
+    // 형식 검증
+    if (!file.type.startsWith("audio/")) { toast("오디오 파일만 추가할 수 있어요"); e.target.value=""; return; }
+    // 용량 검증 (5MB)
+    if (file.size > 5 * 1024 * 1024) { toast("음원은 5MB 이하만 가능해요"); e.target.value=""; return; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target.result;
+      // 길이 검증 (10초)
+      const probe = new Audio();
+      probe.onloadedmetadata = () => {
+        if (probe.duration > 10.5) { toast("음원은 10초 이하만 가능해요"); e.target.value=""; return; }
+        draftAlarm.customSoundData = dataUrl;
+        draftAlarm.customSoundName = file.name;
+        draftAlarm.soundType = "custom";
+        syncSegments();
+        setSeg("seg-sound", "custom");
+        playPreview("custom");
+        toast("음원을 추가했어요");
+      };
+      probe.onerror = () => { toast("음원을 읽을 수 없어요"); e.target.value=""; };
+      probe.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // 소리 미리듣기 (합성음 또는 커스텀 음원)
+  let audioCtx, customAudio, customSrcNode, customGain;
+  let customFadeT = null;
+  // 음원 길이를 보고 끝나기 0.1초 전부터 음량을 0으로 디졸브 (툭 끊김 방지)
+  function scheduleCustomFadeOut(v){
+    clearTimeout(customFadeT);
+    const arm = () => {
+      const dur = customAudio.duration;
+      if (!isFinite(dur) || dur <= 0.25) return; // 너무 짧은 음원은 생략
+      customFadeT = setTimeout(() => {
+        try {
+          const now = audioCtx.currentTime;
+          customGain.gain.cancelScheduledValues(now);
+          customGain.gain.setValueAtTime(Math.max(customGain.gain.value || v, 0.0001), now);
+          customGain.gain.linearRampToValueAtTime(0.0001, now + 0.1);
+        } catch(e){}
+      }, Math.max(0, (dur - 0.12) * 1000));
+    };
+    if (isFinite(customAudio.duration) && customAudio.duration > 0) arm();
+    else customAudio.onloadedmetadata = arm;
+  }
+  function onVolSlide(v){ draftAlarm.volume = Number(v) / 100; const vv = $("vol-val"); if(vv) vv.textContent = v + "%"; }
+
+  function playPreview(type, vol) {
+    // 설정창이 열려 있으면 편집 중 값(draft), 닫혀 있으면 저장된 값 사용
+    // (실제 알람은 설정창이 닫힌 상태에서 울리므로 — 이전엔 draft만 참조해 커스텀 소리가 누락되던 문제 수정)
+    const _m = $("modal-settings");
+    const src = (_m && _m.classList.contains("show") && typeof draftAlarm === "object" && draftAlarm) ? draftAlarm : alarmSettings;
+    const v = Math.max(0, Math.min(2, typeof vol === "number" ? vol : (src.volume ?? 0.8)));
+    if (type === "custom") {
+      const data = src.customSoundData;
+      if (!data) return;
+      if (v <= 0) return;
+      try {
+        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        customAudio = customAudio || new Audio();
+        // 200%까지 증폭하려면 Web Audio 게인 경유 (HTMLAudio.volume은 최대 1.0)
+        if (!customSrcNode) {
+          customSrcNode = audioCtx.createMediaElementSource(customAudio);
+          customGain = audioCtx.createGain();
+          customSrcNode.connect(customGain);
+          customGain.connect(audioCtx.destination);
+        }
+        if (customAudio._data !== data) { customAudio.src = data; customAudio._data = data; }
+        // 시작 0.1초 디졸브(페이드 인): 0 → 목표 음량
+        const now0 = audioCtx.currentTime;
+        customGain.gain.cancelScheduledValues(now0);
+        customGain.gain.setValueAtTime(0.0001, now0);
+        customGain.gain.linearRampToValueAtTime(v, now0 + 0.1);
+        customAudio.currentTime = 0;
+        customAudio.play();
+        scheduleCustomFadeOut(v); // 끝 0.1초 디졸브 예약
+      } catch (e) { /* 무시 */ }
+      return;
+    }
+    if (v <= 0) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const now = audioCtx.currentTime;
+      const peak = 0.25 * v;
+      const presets = {
+        ding:  [{f:880, t:0, d:0.3}],
+        bell:  [{f:660, t:0, d:0.2}, {f:880, t:0.15, d:0.35}],
+        chime: [{f:523, t:0, d:0.2}, {f:659, t:0.15, d:0.2}, {f:784, t:0.3, d:0.4}],
+        alert: [{f:1000, t:0, d:0.12}, {f:1000, t:0.2, d:0.12}],
+      };
+      (presets[type] || presets.ding).forEach(n => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine"; osc.frequency.value = n.f;
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        gain.gain.setValueAtTime(0.0001, now + n.t);
+        gain.gain.exponentialRampToValueAtTime(peak, now + n.t + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + n.t + n.d);
+        osc.start(now + n.t); osc.stop(now + n.t + n.d + 0.05);
+      });
+    } catch (e) { /* 미리듣기 실패 무시 */ }
+  }
+
+  function renderPresetList() {
+    const wrap = $("preset-list"); wrap.innerHTML = "";
+    // 헤더
+    const head = document.createElement("div");
+    head.className = "preset-head";
+    head.innerHTML = `<span class="ph-name">이름</span><span class="ph-time">시간</span><span></span>`;
+    wrap.appendChild(head);
+    draftPresets.forEach((p, i) => {
+      const row = document.createElement("div");
+      row.className = "preset-row";
+      row.innerHTML = `
+        <input type="text" size="1" class="preset-name" value="${p.name}" placeholder="예: 오전" oninput="updatePreset(${i},'name',this.value)">
+        <input type="text" size="1" class="preset-time" value="${p.time}" placeholder="00:00" oninput="updatePreset(${i},'time',this.value)" onblur="normalizePresetTime(${i}, this)" onkeydown="if(event.key==='Enter'){event.preventDefault(); normalizePresetTime(${i}, this); this.blur();}">
+        <button class="preset-del" onclick="delPreset(${i})" title="삭제">${IC.trash}</button>
+      `;
+      wrap.appendChild(row);
+    });
+  }
+  function updatePreset(i, key, val) { draftPresets[i][key] = val; }
+  function normalizePresetTime(i, el){
+    const n = normalizeTime(el.value);
+    if(n){ el.value = n; draftPresets[i].time = n; } // 1111 → 11:11, 9 → 09:00 등
+  }
+  function delPreset(i) {
+    if (draftPresets.length <= 1) { toast("최소 1개는 있어야 해요"); return; }
+    draftPresets.splice(i, 1); renderPresetList();
+  }
+  function addPreset() {
+    if (draftPresets.length >= 5) { toast("프리셋은 최대 5개예요"); return; }
+    draftPresets.push({ name: "새 프리셋", time: "12:00" }); renderPresetList();
+  }
+  function resetPresets() {
+    draftPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+    renderPresetList(); toast("기본값으로 초기화했어요");
+  }
+
+  // 설정 초기화 — 작업자(이름)·메일 연동·단축키는 그대로 두고 나머지를 기본값으로
+  function resetSettings(){
+    // 마감 프리셋 (드래프트 → 저장 시 적용)
+    draftPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
+    renderPresetList();
+    // 알람 방식/소리/반복/기본시점 + 커스텀 음원 제거 (드래프트 → 저장 시 적용)
+    draftAlarm = { notify: true, sound: true, soundType: "ding", repeat: "1", defaultAlarm: "60", volume: 0.8, customSoundData: null, customSoundName: "" };
+    const inp = $("custom-sound-input"); if(inp) inp.value = "";
+    syncSegments();
+    // 메일 새로고침 주기 / 불러올 메일 수 (즉시 적용)
+    mailSettings = { pollSec: 30, fetchCount: 100 };
+    saveMailSettings(); syncMailSliders(); restartMailPoll();
+    // 시작 시 자동 실행 끄기 (즉시 적용)
+    localStorage.setItem("autostart", "0");
+    localStorage.setItem("autostartMin", "0");
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.setAutostart) window.timerAPI.setAutostart(false);
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.setAutostartMinimized) window.timerAPI.setAutostartMinimized(false);
+    renderAutostart();
+    // 상태 색상 기본값으로
+    statusColors = {};
+    localStorage.setItem("statusColors", "{}");
+    applyStatusColors(); renderStatusColors();
+    toast("설정을 초기화했어요");
+  }
+  function saveSettings() {
+    // 검증: 시간 형식, 이름 빈값
+    for (const p of draftPresets) {
+      if (!p.name.trim()) { toast("프리셋 이름을 입력해주세요"); return; }
+      const nt = normalizeTime(p.time);
+      if (!nt) { toast(`"${p.name}" 시간 형식이 올바르지 않아요 (예: 14:00)`); return; }
+      p.time = nt; // 1111 등도 정규화해서 저장
+    }
+    PRESETS = JSON.parse(JSON.stringify(draftPresets));
+    alarmSettings = { ...draftAlarm };
+    saveAlarmAndPresets(); // 재시작 후에도 유지(커스텀 음원 포함)
+    closeModal("modal-settings");
+    toast("설정을 저장했어요");
+  }
+
+  function urgency(ts) {
+    const left=ts-Date.now();
+    if(left<3*3600000) return "red";
+    const eod=new Date(); eod.setHours(23,59,59,999);
+    if(ts<=eod.getTime()) return "orange";
+    return "green";
+  }
+  function cdText(ts) {
+    const compact = window.innerWidth <= 400;
+    let left=ts-Date.now();
+    if(left<0){ left=-left; const h=Math.floor(left/3600000),m=Math.floor((left%3600000)/60000); return {t:`+${h}:${String(m).padStart(2,"0")}`,l:""}; }
+    const days=Math.floor(left/86400000),h=Math.floor((left%86400000)/3600000),m=Math.floor((left%3600000)/60000),s=Math.floor((left%60000)/1000);
+    if(days>0) return {t:`${days}d ${h}h`,l:""};
+    // 매우 좁을 땐 초 제거 (시:분만)
+    if(compact) return {t:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`,l:""};
+    return {t:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`,l:""};
+  }
+
+  function updateStats() {
+    const a=tasks.filter(t=>!t.done); let r=0,o=0,g=0;
+    a.forEach(t=>{const u=urgency(t.deadline); if(u==="red")r++;else if(u==="orange")o++;else g++;});
+    $("s-red").textContent=r; $("s-orange").textContent=o; $("s-green").textContent=g;
+  }
+
+  // ── 타이머 알람 발화 ──
+  // 작업별 'N분 전' 시점에 도달하면 알림(메인 프로세스 → 트레이 상태에서도 옴) + 소리.
+  // 이미 지난 알람(앱 시작 시 과거분)은 울리지 않게 표시만 한다.
+  const firedAlarms = new Set();
+  function checkAlarms(){
+    if(typeof window.timerAPI === "undefined") return;        // 앱에서만
+    if(!alarmSettings.notify && !alarmSettings.sound) return;  // 알람 꺼짐
+    const now = Date.now();
+    tasks.forEach(t => {
+      if(t.done || t.alarm == null) return;
+      if(firedAlarms.has(t.id)) return;
+      const offset = Number(t.alarm) || 0;                    // 분
+      const alarmAt = t.deadline - offset * 60000;
+      if(now >= alarmAt){
+        firedAlarms.add(t.id);
+        if(now - alarmAt < 90000) fireAlarm(t, offset);       // 방금 도달한 것만 울림
+      }
+    });
+  }
+  function playAlarmSound(){
+    try { playPreview(alarmSettings.soundType === "custom" ? "custom" : (alarmSettings.soundType || "ding"), alarmSettings.volume); } catch(e){}
+  }
+  function fireAlarm(t, offset){
+    const when = offset >= 60 ? (offset/60) + "시간 전" : (offset > 0 ? offset + "분 전" : "지금");
+    const body = `${t.title} · 마감 ${when}`;
+    if(alarmSettings.notify && window.timerAPI.notify) window.timerAPI.notify("작업 마감 알림", body);
+    if(alarmSettings.sound) playAlarmSound();
+  }
+
+  function tick() {
+    updateStats();
+    checkAlarms();
+    let reorder=false;
+    document.querySelectorAll(".task[data-id]").forEach(card=>{
+      const id=+card.dataset.id; const t=tasks.find(x=>x.id===id);
+      if(!t||t.done)return;
+      const u=urgency(t.deadline), cd=cdText(t.deadline);
+      const tEl=card.querySelector(".count .t");
+      if(tEl&&tEl.textContent!==cd.t)tEl.textContent=cd.t;
+      if(!card.classList.contains(u)){
+        card.classList.remove("red","orange","green"); card.classList.add(u);
+        const c=card.querySelector(".count"); c.classList.remove("red","orange","green"); c.classList.add(u);
+        reorder=true;
+      }
+    });
+    if(reorder)reorderCards();
+  }
+  function reorderCards() {
+    const a=tasks.filter(t=>!t.done).sort((x,y)=>x.deadline-y.deadline);
+    const o=a.map(t=>t.id).join(",");
+    if(o!==lastOrder){ lastOrder=o; render(); }
+  }
+
+  // 공통 접이식 섹션 래퍼 (진행 중 / 완료 / 관리 항목 공용)
+  function sectionGroup(key, label, count, inner, extra){
+    const col = collapsedState[key] ? " collapsed" : "";
+    return `<div class="sec-group${col}" id="sec-${key}">
+      <div class="sec-head" onclick="toggleSec('${key}')">
+        <svg class="chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4"/></svg>
+        <span class="sh-label">${label} · ${count}</span><span class="ln"></span>${extra || ""}
+      </div>
+      <div class="sec-body" id="body-${key}">${inner}</div>
+    </div>`;
+  }
+  function toggleSec(key){
+    collapsedState[key] = !collapsedState[key];
+    localStorage.setItem("secCollapsed", JSON.stringify(collapsedState));
+    const g = $("sec-" + key);
+    if(g) g.classList.toggle("collapsed", collapsedState[key]);
+  }
+
+  // ── 관리 항목 편집/삭제 (updateMemo) ──
+  function mgmtFind(row){ return mgmtItems.find(m => m.row === row); }
+
+  async function deleteMgmt(row, col){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해주세요"); return; }
+    const myName = getMyName();
+    if(!myName || typeof window.timerAPI === "undefined") { toast("앱에서만 동작해요"); return; }
+    const m = mgmtFind(row); if(!m) return;
+    const prev = m[col];               // 롤백용 원본
+    m[col] = "";                       // ① 즉시 반영
+    renderMgmt();
+    const payload = { action:"updateMemo", targetMember:myName, row };
+    payload[col === "b" ? "memoB" : "memoC"] = "";
+    const r = await window.timerAPI.postSheet(payload);   // ② 백그라운드 기록
+    if(r && r.ok){ toast("관리 항목을 삭제했어요"); }       // ③ 결과 알림
+    else { m[col] = prev; renderMgmt(); toast("삭제 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
+  }
+
+  function editMgmt(row, col){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해주세요"); return; }
+    const el = document.querySelector(`.mgmt-item[data-row="${row}"][data-col="${col}"]`);
+    const m = mgmtFind(row);
+    if(!el || !m) return;
+    el.classList.add("editing");
+    const cur = m[col] || "";
+    const textEl = el.querySelector(".mgmt-text");
+    const acts = el.querySelector(".mgmt-acts");
+    textEl.outerHTML = `<div class="mgmt-edit"><input type="text" id="medit-input"></div>`;
+    acts.innerHTML =
+      `<button class="mact save" title="저장"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6"/></svg></button>` +
+      `<button class="mact" title="취소"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`;
+    const input = el.querySelector("#medit-input");
+    input.value = cur; input.focus(); input.select();
+    const save = () => commitMgmt(row, col, input.value);
+    const cancel = () => renderMgmt();
+    acts.children[0].onclick = save;
+    acts.children[1].onclick = cancel;
+    input.onkeydown = (e) => {
+      if(e.key === "Enter"){ e.preventDefault(); save(); }
+      else if(e.key === "Escape"){ e.preventDefault(); cancel(); }
+    };
+  }
+
+  async function commitMgmt(row, col, text){
+    const myName = getMyName();
+    if(!myName || typeof window.timerAPI === "undefined") { toast("앱에서만 동작해요"); return; }
+    const m = mgmtFind(row); if(!m) return;
+    const val = String(text).trim();
+    const prev = m[col];               // 롤백용 원본
+    if(val === String(prev || "")) { renderMgmt(); return; }  // 변경 없으면 그냥 닫기
+    m[col] = val;                      // ① 즉시 반영
+    renderMgmt();
+    const payload = { action:"updateMemo", targetMember:myName, row };
+    payload[col === "b" ? "memoB" : "memoC"] = val;
+    const r = await window.timerAPI.postSheet(payload);   // ② 백그라운드 기록
+    if(r && r.ok){ toast("저장했어요"); }                   // ③ 결과 알림
+    else { m[col] = prev; renderMgmt(); toast("저장 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
+  }
+
+  // ── 관리 항목 추가 (addMemo) ──
+  function startAddMgmt(){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    collapsedState.mgmt = false; // 추가 시 섹션 펼침
+    localStorage.setItem("secCollapsed", JSON.stringify(collapsedState));
+    mgmtAdding = true;
+    mgmtAddDraft = "";
+    renderMgmt(); // 포커스는 renderMgmt가 처리
+  }
+  function cancelAddMgmt(){ mgmtAdding = false; mgmtAddDraft = ""; renderMgmt(); }
+  async function submitAddMgmt(text){
+    const val = String(text).trim();
+    if(!val){ cancelAddMgmt(); return; }
+    const myName = getMyName();
+    if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
+    mgmtAdding = false;
+    mgmtAddDraft = "";
+    const temp = { row: -1, b: val, c: "", done: false, _temp: true };  // ① 즉시 표시
+    mgmtItems.push(temp);
+    renderMgmt();
+    const r = await window.timerAPI.postSheet({ action:"addMemo", targetMember:myName, text:val });  // ② 기록
+    if(r && r.ok){ toast("관리 항목을 추가했어요"); await doSync({ silent:true }); }  // ③ 행번호 reconcile
+    else { mgmtItems = mgmtItems.filter(x => x !== temp); renderMgmt(); toast("추가 실패 — 되돌렸어요"); }
+  }
+
+  // 관리 항목 섹션 HTML. B·C를 각각 별개 항목으로 분리, 시트 순서 그대로.
+  function mgmtSectionHtml(){
+    if(!mgmtItems.length && !mgmtAdding) return "";
+    // 각 행의 B/C를 동등한 별개 항목으로 펼침 (col: 편집 시 어느 셀인지 식별용)
+    const flat = [];
+    mgmtItems.forEach(m => {
+      const temp = !!m._temp || !m.row || m.row < 1;
+      if(m.b && m.b.trim()) flat.push({ row:m.row, col:"b", text:m.b, done:m.done, temp });
+      if(m.c && m.c.trim()) flat.push({ row:m.row, col:"c", text:m.c, done:m.done, temp });
+    });
+    let rows = "";
+    flat.forEach(it => {
+      const acts = it.temp
+        ? `<div class="mgmt-acts"><span class="mgmt-pending">반영 중…</span></div>`
+        : `<div class="mgmt-acts">`
+          +   `<button class="mact" onclick="editMgmt(${it.row},'${it.col}')" title="편집">${IC.edit}</button>`
+          +   `<button class="mact del" onclick="deleteMgmt(${it.row},'${it.col}')" title="삭제">${IC.trash}</button>`
+          + `</div>`;
+      rows += `<div class="mgmt-item${it.done?' done':''}${it.temp?' pending':''}" data-row="${it.row}" data-col="${it.col}">`
+        + `<span class="pin"></span>`
+        + `<div class="mgmt-text">${mdLinks(it.text)}</div>`
+        + acts
+        + `</div>`;
+    });
+    if(mgmtAdding){
+      rows += `<div class="mgmt-item adding"><span class="pin"></span>`
+        + `<div class="mgmt-edit"><input type="text" id="madd-input" placeholder="새 관리 항목" value="${esc(mgmtAddDraft)}" oninput="mgmtAddDraft=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAddMgmt(this.value)}else if(event.key==='Escape'){event.preventDefault();cancelAddMgmt()}"></div>`
+        + `<div class="mgmt-acts">`
+        +   `<button class="mact save" title="추가" onclick="submitAddMgmt(document.getElementById('madd-input').value)"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6"/></svg></button>`
+        +   `<button class="mact" title="취소" onclick="cancelAddMgmt()"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`
+        + `</div></div>`;
+    }
+    const addBtn = `<button class="add-mgmt" onclick="event.stopPropagation(); startAddMgmt()"><svg viewBox="0 0 20 20"><path d="M10 4v12M4 10h12"/></svg><span>추가</span></button>`;
+    return sectionGroup("mgmt", "관리 항목", flat.length, rows, addBtn);
+  }
+
+  // #list 안을 관리 항목(mgmt-host) / 작업(task-host) 두 컨테이너로 분리.
+  // 작업 액션 시 task-host만 다시 그려 관리 항목 DOM은 건드리지 않음(깜빡임 방지).
+  function ensureHosts(){
+    const list = $("list");
+    if(!$("task-host")){
+      list.innerHTML = '<div id="mgmt-host"></div><div id="task-host"></div>';
+    }
+  }
+  function renderMgmt(){
+    ensureHosts();
+    $("mgmt-host").innerHTML = mgmtSectionHtml();
+    if(mgmtAdding){
+      const inp = $("madd-input");
+      if(inp){ inp.focus(); const v = inp.value; inp.value = ""; inp.value = v; } // 커서 끝으로
+    }
+  }
+
+  function render() {
+    if (window.__hideTooltip) window.__hideTooltip(); // 재렌더 시 떠있던/대기중 툴팁 정리
+    ensureHosts();
+    const host = $("task-host");
+    // FLIP은 "같은 보드를 다시 그릴 때"만 (마감 변경 등 순서 이동). 팀원 전환 시엔 끔.
+    // 좌/우 단이 행 번호를 공유해서, 전환 시 data-id가 겹치면 카드가 엉뚱하게 멀리서 날아옴.
+    const sameBoard = (lastRenderView === viewName);
+    lastRenderView = viewName;
+    // FLIP: 기존 카드들의 위치 기록 (같은 보드일 때만)
+    const prevPos = {};
+    if (sameBoard) {
+      host.querySelectorAll(".task[data-id]").forEach(el => {
+        prevPos[el.dataset.id] = el.getBoundingClientRect().top;
+      });
+    }
+
+    const active=tasks.filter(t=>!t.done).sort((a,b)=>a.deadline-b.deadline);
+    const done=tasks.filter(t=>t.done);
+    updateStats();
+    let html="";
+    if(active.length){ html+=sectionGroup("active","진행 중",active.length, active.map(card).join("")); }
+    if(done.length){ html+=sectionGroup("done","완료",done.length, done.map(card).join(""), `<button class="clear-done" onclick="event.stopPropagation(); clearDone()">${IC.trash}<span>비우기</span></button>`); }
+    if(!tasks.length && !mgmtItems.length) html=`<div class="empty">${IC.inbox}<div class="msg">작업이 없어요. 인트라넷에서 가져오거나 직접 추가해보세요.</div></div>`;
+    host.innerHTML=html;
+    lastOrder=active.map(t=>t.id).join(",");
+
+    // FLIP: 새 위치와 비교해 부드럽게 이동 (같은 보드일 때만)
+    if (sameBoard) {
+      host.querySelectorAll(".task[data-id]").forEach(el => {
+        const id = el.dataset.id;
+        const prev = prevPos[id];
+        if (prev === undefined) { el.classList.add("card-new"); return; } // 진짜 새 카드만 cardIn
+        const now = el.getBoundingClientRect().top;
+        const delta = prev - now;
+        if (Math.abs(delta) < 1) return;
+        el.style.animation = "none";
+        el.style.transform = `translateY(${delta}px)`;
+        el.style.transition = "transform 0s";
+        requestAnimationFrame(() => {
+          el.style.transition = "transform 0.4s cubic-bezier(0.16,1,0.3,1)";
+          el.style.transform = "";
+        });
+      });
+    }
+  }
+  function card(t) {
+    const u=urgency(t.deadline), cd=cdText(t.deadline);
+    const compact = window.innerWidth <= 400;
+    const tag=t.type==="req"?'<span class="chip-tag req sub-extra">인트라넷</span>':'<span class="chip-tag sub-extra">직접추가</span>';
+    const alarm=t.alarm?`<span class="meta-text sub-extra">${IC.bell}${t.alarm>=60?(t.alarm/60)+"시간":t.alarm+"분"} 전</span>`:"";
+    const reqBtn=t.reqLink?`<a class="link-mini" href="${t.reqLink}" target="_blank" title="요청글 링크" onclick="event.stopPropagation()">${IC.link}</a>`:"";
+    const planBtn=t.planLink?`<a class="link-mini" href="${t.planLink}" target="_blank" title="기획안 링크" onclick="event.stopPropagation()">${IC.deck}</a>`:"";
+    const links=(reqBtn||planBtn)?`<span class="link-group">${reqBtn}${planBtn}</span>`:"";
+    return `<div class="task ${u} ${t.done?'done':''}" data-id="${t.id}" onclick="openTaskReq(${t.id}, event)" style="cursor:pointer">
+      <div class="check ${t.done?'on':''}" onclick="toggleDone(${t.id})">${IC.check}</div>
+      <div class="task-main">
+        <div class="task-title">${t.title}</div>
+        <div class="task-sub">${tag}<span class="meta-text meta-deadline" title="마감 시간 설정" onclick="event.stopPropagation(); openTimeEdit(${t.id})" style="cursor:pointer">${fmtDl(t.deadline, compact)}</span>${alarm}${links}</div>
+      </div>
+      <div class="count ${u}"><div class="t">${t.done?"":cd.t}</div></div>
+      <div class="actions">
+        <button class="act" onclick="openEdit(${t.id})" title="편집">${IC.edit}</button>
+        <button class="act del" onclick="delTask(${t.id})" title="삭제">${IC.trash}</button>
+      </div>
+    </div>`;
+  }
+
+  function openTaskReq(id, e){
+    // 버튼·체크·링크·마감칩 영역 클릭은 각자 동작 유지 (카드 이동 무시)
+    if(e && e.target && e.target.closest && e.target.closest(".check, .actions, a.link-mini, .meta-deadline")) return;
+    const t = tasks.find(x => x.id === id); if(!t) return;
+    const url = t.reqLink;
+    if(!url){ toast("요청글 링크가 없어요"); return; }
+    if(typeof window.timerAPI !== "undefined" && window.timerAPI.openExternal) window.timerAPI.openExternal(url);
+    else window.open(url, "_blank");
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const el=$("toast");
+    el.innerHTML=`${IC.check} ${msg}`; el.classList.add("show");
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),2200);
+  }
+
+  document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("show");}));
+
+  // 창 컨트롤 — Electron이면 실제 동작, 브라우저면 시연 토스트
+  const isElectron = typeof window.timerAPI !== "undefined";
+  document.querySelectorAll(".win-btn").forEach(b=>b.addEventListener("click",()=>{
+    if (isElectron) {
+      if (b.id==="win-min") window.timerAPI.winMinimize();
+      else if (b.id==="win-max") window.timerAPI.winMaximize();
+      else if (b.id==="win-close") window.timerAPI.winClose();
+    } else {
+      toast(b.id==="win-close"?"실제 앱에선 트레이로 최소화돼요":b.title+" (실제 앱에서 작동)");
+    }
+  }));
+
+  // 최대화 상태에 따라 최대화/복원 아이콘 전환
+  const ICON_MAXIMIZE = '<svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5"/></svg>';
+  // 복원(restore) 아이콘 — 네모 두 개가 겹쳐진 모양
+  const ICON_RESTORE = '<svg viewBox="0 0 12 12"><rect x="2.2" y="3.6" width="6.2" height="6.2" rx="1.3"/><path d="M4.4 3.6V2.8a1.3 1.3 0 011.3-1.3h3.1a1.3 1.3 0 011.3 1.3v3.1a1.3 1.3 0 01-1.3 1.3h-.8"/></svg>';
+  if (isElectron && window.timerAPI.onMaximizedChanged) {
+    window.timerAPI.onMaximizedChanged(isMax => {
+      const btn = document.getElementById("win-max");
+      if (!btn) return;
+      btn.innerHTML = isMax ? ICON_RESTORE : ICON_MAXIMIZE;
+      btn.title = isMax ? "이전 크기로" : "최대화";
+    });
+  }
+
+  // 윈도우 알림창 클릭 → 설정(Gmail/요청글/둘 다)대로 해당 메일 열기
+  if (isElectron && window.timerAPI.onNotificationMailClick) {
+    window.timerAPI.onNotificationMailClick(id => { if (id) openMailItem(id); });
+  }
+
+  // 창 크기 변화 시 카운트다운 포맷(초 포함/제외) 재반영
+  let lastCompact = window.innerWidth <= 400;
+  window.addEventListener("resize", () => {
+    const c = window.innerWidth <= 400;
+    if (c !== lastCompact) { lastCompact = c; render(); }
+    checkStatsOverlap();
+  });
+
+  // ── 통계 라벨 겹침 스마트 감지 (깜빡임 없음) ──
+  // 측정용 클래스 토글 대신, 펼친 상태의 폭을 캐시하고 히스테리시스를 둬서
+  // 경계에서 펼침↔축약이 반복되지 않게 함. 통계·버튼·동기화가 한 트리거로 동시 변경.
+  function checkStatsOverlap() {
+    const topbar = document.querySelector(".topbar");
+    const controls = document.querySelector(".top-controls");
+    // 메일 모드면 좌측 = 메일 제목 블록, 아니면 통계 라인
+    const leftEl = document.body.classList.contains("mail-mode")
+      ? document.querySelector(".mail-stat")
+      : document.querySelector(".stat-line");
+    if (!topbar || !leftEl || !controls) return;
+
+    const cs = getComputedStyle(topbar);
+    const gap = parseFloat(cs.columnGap || cs.gap || "16") || 16;
+    const padL = parseFloat(cs.paddingLeft) || 0;
+    const padR = parseFloat(cs.paddingRight) || 0;
+    const inner = topbar.clientWidth - padL - padR;
+
+    const isCompact = document.body.classList.contains("stats-compact");
+
+    if (isCompact) {
+      const needed = statsFullWidth + gap + controlsFullWidth;
+      if (statsFullWidth > 0 && inner >= needed + 24) { // +24 히스테리시스
+        document.body.classList.remove("stats-compact");
+      }
+    } else {
+      const lw = leftEl.scrollWidth;
+      if (lw > 0) statsFullWidth = lw;   // 0(숨김 상태)은 캐시하지 않음 — 고착 방지
+      controlsFullWidth = controls.offsetWidth;
+      const needed = statsFullWidth + gap + controlsFullWidth;
+      if (statsFullWidth > 0 && inner < needed) {
+        document.body.classList.add("stats-compact");
+      }
+    }
+  }
+  let statsFullWidth = 0, controlsFullWidth = 0;
+
+  setInterval(tick,1000);
+  renderMgmt();
+  render();
+
+  // 초기 동기화 — 시트 먼저, 메일 배지는 시트 동기화가 끝난 뒤에 (경쟁 방지)
+  if (isElectron) {
+    if (getMyName()) {
+      doSync().finally(() => loadMail(true));
+    } else {
+      toast("설정에서 작업자를 선택하면 동기화돼요"); setTimeout(openSettings, 700);
+      setTimeout(() => loadMail(true), 3000);
+    }
+    restartMailPoll(); // 메일 자동 새로고침 시작
+    applyAutostart();   // 저장된 자동 실행 설정을 OS에 재등록
+    applyAutostartMin(); // 자동 실행 시 최소화 시작 설정을 main에 반영
+    applyLinkProfile(); // 저장된 링크 열기 프로필을 메인에 반영
+  }
+  applyStatusColors(); // 저장된 상태 색상 적용 (앱/브라우저 공통)
+  initColorPicker();   // 커스텀 컬러 피커 드래그/입력 핸들러 연결
+
+  // 모든 선을 "정확히 1 디바이스 픽셀"로 — 배율(125/150%) 화면에서 1px이 1.5px로 반올림돼
+  // 위치마다 두께가 달라 보이는 현상 방지. devicePixelRatio가 바뀌면(줌·모니터 이동) 재설정.
+  function applyHairline(){
+    const d = window.devicePixelRatio || 1;
+    // 1 디바이스 픽셀에 해당하는 CSS 길이. 100%면 1px, 150%면 약 0.6667px, 125%면 0.8px.
+    document.documentElement.style.setProperty('--hairline', (1 / d) + 'px');
+  }
+  applyHairline();
+  window.addEventListener('resize', applyHairline); // 줌 변경/모니터 이동 시 resize 발생
+  if (window.matchMedia) {
+    try { window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener('change', applyHairline); } catch(e) {}
+  }
+
+  // 메일 안읽은 수만 가볍게(1요청) 가져와 배지 갱신 — 시트 동기화와 무관
+
+  // 자동 동기화(10분) — 편집 중이면 건너뛰고, 조용히(silent) 시트→앱만 갱신.
+  // 앱→시트는 각 동작에서 이미 즉시 기록되므로 여기선 내려받기만.
+  function isEditingNow(){
+    const ae = document.activeElement;
+    if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return true; // 입력 중
+    if (mgmtAdding) return true; // 관리항목 추가 입력 모드
+    for (const id of ["modal-done","modal-task","modal-import","modal-settings","modal-confirm","modal-time","modal-keys"]) {
+      const el = $(id); if (el && el.classList.contains("show")) return true; // 팝업/모달 열림
+    }
+    return false;
+  }
+  if (isElectron) {
+    // 포커스 프리싱크: 창에 돌아왔을 때 마지막 동기화가 오래됐으면 미리 조용히 동기화
+    // (Apps Script 콜드스타트를 미리 깨우고 데이터도 최신화 → 수동 동기화 체감 단축)
+    const FOCUS_PRESYNC_MIN = 3; // 분 — 체감에 따라 이 숫자만 조절
+    window.addEventListener("focus", () => {
+      if (!getMyName()) return;
+      if (isEditingNow()) return;                                      // 편집 중 보호
+      if (Date.now() - lastSyncOkAt < FOCUS_PRESYNC_MIN * 60000) return; // 최근에 했으면 생략
+      doSync({ silent: true });                                        // 진행 중이면 내부 가드가 무시
+    });
+    setInterval(() => {
+      if (!getMyName()) return;
+      if (isEditingNow()) return; // 편집 중 → 이번 주기 건너뜀
+      doSync({ silent: true });
+    }, 10 * 60 * 1000);
+  }
+
+  // 마우스 클릭으로 생기는 포커스 링 제거 (키보드 탭 포커스는 유지)
+  document.addEventListener("mousedown", (e) => {
+    const el = e.target.closest("button, .pill-btn, .sync-pill, .win-btn, .clear-done, .act, .mact, .preset-pill, .close-btn, .cal-trigger, .dchip, .name-opt");
+    if (!el) return;
+    if (el.matches("input, textarea, select") || el.querySelector("input, textarea")) return;
+    e.preventDefault(); // 포커스 이동만 막음 (클릭 동작은 그대로 발생)
+  });
+
+  // 마우스 4/5(뒤로/앞으로) 버튼으로 작업자 롤링
+  window.addEventListener("mouseup", (e) => {
+    if (e.button === 3) { e.preventDefault(); openMail(); }       // 4번째 버튼 → 타이머↔메일
+    else if (e.button === 4) { e.preventDefault(); openMail(); }  // 5번째 버튼 → 타이머↔메일
+  });
+  window.addEventListener("mousedown", (e) => { if(e.button===3||e.button===4) e.preventDefault(); }); // 기본 뒤로/앞으로 막기
+
+  // 전역 단축키 — 입력/모달/캘린더 중에는 비활성(타이핑 충돌 방지)
+  const MODAL_IDS = ["modal-done","modal-task","modal-import","modal-settings","modal-confirm","modal-time","modal-keys"];
+  function anyModalOpen(){ return MODAL_IDS.some(id => { const el=$(id); return el && el.classList.contains("show"); }); }
+  function closeTopModal(){ MODAL_IDS.forEach(id => { const el=$(id); if(el && el.classList.contains("show")) closeModal(id); }); }
+  function backToMyBoard(){ const mine=getMyName(); if(mine && viewName!==mine) applyView(mine); }
+
+  // 커스터마이징 가능한 단축키 정의 (문자·숫자 키만)
+  const KEY_ACTIONS = [
+    { id:"theme",    label:"테마 전환",        def:"t", run:()=>toggleTheme() },
+    { id:"settings", label:"설정 열기/닫기",   def:"o", run:()=>openSettings() },
+    { id:"add",      label:"작업 추가",        def:"a", run:()=>openAdd() },
+    { id:"mail",     label:"메일 ↔ 타이머",    def:"s", run:()=>openMail() },
+    { id:"prev",     label:"이전 작업자",      def:"q", run:()=>rollView(-1) },
+    { id:"next",     label:"다음 작업자",      def:"e", run:()=>rollView(1) },
+    { id:"max",      label:"최대화 / 복원",    def:"f", run:()=>{ if(window.timerAPI && window.timerAPI.winMaximize) window.timerAPI.winMaximize(); } },
+  ];
+  function defaultKeymap(){ const d={}; KEY_ACTIONS.forEach(a=>d[a.id]=a.def); return d; }
+  let keymap = (function(){
+    const d = defaultKeymap();
+    try { const s = JSON.parse(localStorage.getItem("keymap")||"{}");
+      KEY_ACTIONS.forEach(a=>{ if(s[a.id] && typeof s[a.id]==="string") d[a.id]=s[a.id].toLowerCase(); });
+    } catch(e){}
+    return d;
+  })();
+  function saveKeymap(){ try{ localStorage.setItem("keymap", JSON.stringify(keymap)); }catch(e){} }
+  function actionForKey(k){ return KEY_ACTIONS.find(a => keymap[a.id] === k) || null; }
+
+  window.addEventListener("keydown", (e) => {
+    const ae = document.activeElement;
+    const inField = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable);
+
+    // Esc / (입력칸 밖)Backspace → 팝업 닫기, 메일 화면이면 타이머로, 아니면 내 보드 복귀
+    if (e.key === "Escape" || (e.key === "Backspace" && !inField)) {
+      if (anyModalOpen()) { e.preventDefault(); closeTopModal(); return; }
+      if (mailMode) { e.preventDefault(); exitMailMode(); return; }
+      e.preventDefault(); backToMyBoard(); return;
+    }
+
+    // 설정 단축키를 다시 누르면 설정 닫기 (입력 중이 아닐 때 — isEditingNow 가드보다 먼저 처리)
+    if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      const m = $("modal-settings");
+      if (m && m.classList.contains("show") && e.key.toLowerCase() === keymap["settings"]) {
+        e.preventDefault(); closeModal("modal-settings"); return;
+      }
+    }
+
+    if (e.metaKey || e.ctrlKey || e.altKey) return; // 조합키 제외
+    if (isEditingNow()) return;                     // 입력칸·모달·추가모드 중 무시
+
+    const k = e.key.toLowerCase();
+
+    // W(고정) — 타이머탭: 관리 항목 접기/펴기 / 메일탭: 최신순 토글
+    if (k === "w") {
+      e.preventDefault();
+      if (mailMode) toggleMailSort();
+      else toggleSec("mgmt");
+      return;
+    }
+
+    // 스페이스바(고정) — 타이머탭: 시트 동기화 / 메일탭: 메일 새로고침
+    if (e.key === " " || e.code === "Space") {
+      e.preventDefault();
+      if (mailMode) loadMail();
+      else doSync();
+      return;
+    }
+
+    // 보드 롤링 보조키(←/→/Home)는 타이머 화면에서만
+    if (!mailMode) {
+      if (e.key === "ArrowLeft")  { e.preventDefault(); rollView(-1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); rollView(1);  return; }
+      if (e.key === "Home")       { e.preventDefault(); backToMyBoard(); return; }
+    }
+
+    // 커스터마이징 단축키 — 모든 탭에서 작동
+    const act = actionForKey(k);
+    if (act) {
+      e.preventDefault();
+      // 메일 화면에서 타이머 전용 동작이면 타이머로 돌아간 뒤 실행
+      if (mailMode && (act.id === "add" || act.id === "prev" || act.id === "next")) exitMailMode();
+      act.run();
+    }
+  });
+  // 초기 + 폰트 로딩 후 재측정
+  checkStatsOverlap();
+  setTimeout(checkStatsOverlap, 300);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(checkStatsOverlap);
+
+  // ── Electron 플랫폼별 처리 ──
+  if (isElectron) {
+    // 맥: OS 신호등 버튼을 쓰므로 커스텀 창 컨트롤 숨김 + 좌측 신호등 공간 확보
+    if (window.timerAPI.platform === "darwin") {
+      const wc = document.querySelector(".win-controls");
+      if (wc) wc.style.display = "none";
+      const tb = document.querySelector(".titlebar");
+      if (tb) tb.style.paddingLeft = "78px"; // 신호등 3버튼 공간
+    }
+    // 카드 안 링크(요청글/기획안)는 기본 브라우저로 열기
+    document.addEventListener("click", e => {
+      const a = e.target.closest("a.link-mini");
+      if (a && a.href) {
+        e.preventDefault();
+        window.timerAPI.openExternal(a.href);
+      }
+    });
+  }
+
+  // ── 커스텀 오버레이 스크롤바 ──
+  // 네이티브 스크롤바를 숨기고, 스크롤 컨테이너의 부모에 thumb를 띄워 제어.
+  // 레이아웃을 밀지 않고, 스크롤할 때만 잠깐 나타남. 드래그도 지원.
+  function attachOverlayScrollbar(container) {
+    if (!container || container._ovsbAttached) return;
+    const parent = container.parentElement;
+    if (!parent) return;
+    container._ovsbAttached = true;
+
+    // 부모가 위치 기준이 되도록
+    const pPos = getComputedStyle(parent).position;
+    if (pPos === "static") parent.style.position = "relative";
+
+    const thumb = document.createElement("div");
+    thumb.className = "ovsb hoverable";
+    parent.appendChild(thumb);
+
+    let hideTimer = null;
+    let dragging = false;
+    let dragStartY = 0, dragStartScroll = 0;
+
+    function update() {
+      const { scrollHeight, clientHeight, scrollTop, offsetTop } = container;
+      if (scrollHeight <= clientHeight + 1) {
+        thumb.style.display = "none";
+        return;
+      }
+      thumb.style.display = "block";
+      const trackH = clientHeight - 8;
+      const thumbH = Math.max(28, trackH * (clientHeight / scrollHeight));
+      const maxScroll = scrollHeight - clientHeight;
+      const maxThumbTop = trackH - thumbH;
+      const top = offsetTop + 4 + (scrollTop / maxScroll) * maxThumbTop;
+      thumb.style.height = thumbH + "px";
+      thumb.style.top = top + "px";
+    }
+
+    function flash() {
+      thumb.classList.add("show");
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        if (!dragging) thumb.classList.remove("show");
+      }, 600);
+    }
+
+    container.addEventListener("scroll", () => { update(); flash(); }, { passive: true });
+
+    thumb.addEventListener("mousedown", e => {
+      dragging = true;
+      thumb.classList.add("dragging", "show");
+      dragStartY = e.clientY;
+      dragStartScroll = container.scrollTop;
+      e.preventDefault();
+    });
+    window.addEventListener("mousemove", e => {
+      if (!dragging) return;
+      const { scrollHeight, clientHeight } = container;
+      const trackH = clientHeight - 8;
+      const thumbH = Math.max(28, trackH * (clientHeight / scrollHeight));
+      const maxScroll = scrollHeight - clientHeight;
+      const maxThumbTop = trackH - thumbH;
+      const deltaY = e.clientY - dragStartY;
+      const scrollDelta = (deltaY / maxThumbTop) * maxScroll;
+      container.scrollTop = dragStartScroll + scrollDelta;
+    });
+    window.addEventListener("mouseup", () => {
+      if (!dragging) return;
+      dragging = false;
+      thumb.classList.remove("dragging");
+      flash();
+    });
+
+    // 영역 진입 시엔 위치만 갱신(표시는 스크롤할 때만)
+    container.addEventListener("mouseenter", () => { update(); });
+
+    const ro = new ResizeObserver(() => update());
+    ro.observe(container);
+    const mo = new MutationObserver(() => update());
+    mo.observe(container, { childList: true, subtree: true });
+
+    update();
+    container._ovsbUpdate = update;
+  }
+
+  // 메인 리스트에 적용
+  attachOverlayScrollbar(document.getElementById("list"));
+  attachOverlayScrollbar(document.getElementById("mail-view"));
+
+  // ── 커스텀 툴팁 (네이티브 title 가로채기) ──
+  (function(){
+    const tip = document.createElement("div");
+    tip.className = "tooltip";
+    document.body.appendChild(tip);
+    let tipEl = null, tipText = "", showTimer = null;
+
+    function position(el){
+      // 보드 전환 등으로 요소가 화면에서 사라졌으면(detached) 위치가 0,0으로 잡혀
+      // 좌상단에 툴팁이 뜨는 버그 방지 — 그냥 숨김
+      if (!el || !el.isConnected) { tip.classList.remove("show"); return; }
+      const r = el.getBoundingClientRect();
+      if (r.width === 0 && r.height === 0) { tip.classList.remove("show"); return; }
+      tip.style.left = (r.left + r.width/2) + "px";
+      // 기본은 아래, 화면 하단에 가까우면 위로
+      tip.classList.remove("show"); // 측정용 잠깐
+      tip.style.top = "0px";
+      const th = tip.offsetHeight || 28;
+      let top = r.bottom + 8;
+      if (top + th > window.innerHeight - 6) top = r.top - th - 8;
+      tip.style.top = top + "px";
+      // 좌우 화면 밖 방지
+      const tw = tip.offsetWidth;
+      let cx = r.left + r.width/2;
+      const half = tw/2;
+      if (cx - half < 6) cx = 6 + half;
+      if (cx + half > window.innerWidth - 6) cx = window.innerWidth - 6 - half;
+      tip.style.left = cx + "px";
+    }
+    function hide(){
+      clearTimeout(showTimer);
+      tip.classList.remove("show");
+      if (tipEl && tipEl.getAttribute("data-tip") !== null){
+        tipEl.setAttribute("title", tipEl.getAttribute("data-tip"));
+        tipEl.removeAttribute("data-tip");
+      }
+      tipEl = null;
+    }
+    document.addEventListener("mouseover", (e) => {
+      const el = e.target.closest("[title]");
+      if (!el || el === tipEl) return;
+      const t = el.getAttribute("title");
+      if (!t) return;
+      if (tipEl) hide();
+      el.setAttribute("data-tip", t);   // 원본 보관
+      el.removeAttribute("title");       // 네이티브 툴팁 억제
+      tipEl = el; tipText = t;
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => {
+        // 타이머 대기 중 보드 전환 등으로 요소가 사라졌으면 표시하지 않음
+        if (!tipEl || !tipEl.isConnected) { hide(); return; }
+        tip.textContent = tipText;
+        position(el);
+        tip.classList.add("show");
+      }, 320);
+    });
+    document.addEventListener("mouseout", (e) => {
+      if (!tipEl) return;
+      const to = e.relatedTarget;
+      if (!to || !tipEl.contains(to)) hide();
+    });
+    document.addEventListener("scroll", hide, true);
+    document.addEventListener("mousedown", hide, true);
+    window.addEventListener("blur", hide);
+    window.__hideTooltip = hide;   // 보드 재렌더 등에서 호출해 잔상/오위치 방지
+  })();
+
+  // 모달이 열릴 때 modal-inner에 적용
+  ["modal-task","modal-import","modal-settings","modal-done"].forEach(id => {
+    const inner = document.querySelector(`#${id} .modal-inner`);
+    if (inner) attachOverlayScrollbar(inner);
+  });
+
+  // 모달 열림 감지 → 스크롤바 갱신 (display:none→flex로 크기가 잡힌 직후)
+  ["modal-task","modal-import","modal-settings","modal-done"].forEach(id => {
+    const ov = document.getElementById(id);
+    if (!ov) return;
+    const obs = new MutationObserver(() => {
+      if (ov.classList.contains("show")) {
+        const inner = ov.querySelector(".modal-inner");
+        if (inner && inner._ovsbUpdate) {
+          // 렌더 후 크기 반영되도록 약간 지연
+          requestAnimationFrame(() => inner._ovsbUpdate());
+          setTimeout(() => inner._ovsbUpdate(), 100);
+        }
+      }
+    });
+    obs.observe(ov, { attributes: true, attributeFilter: ["class"] });
+  });
+</script>
+</body>
+</html>
