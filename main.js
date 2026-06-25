@@ -107,7 +107,8 @@ function createWindow() {
     minWidth: 320,
     minHeight: 420,
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
+    trafficLightPosition: process.platform === 'darwin' ? { x: 13, y: 12 } : undefined, // 신호등 위치 명시(38px 타이틀바 중앙)
     frame: process.platform === 'darwin' ? true : false, // 윈도우는 커스텀 타이틀바 사용
     backgroundColor: '#ffffff',
     show: false,
