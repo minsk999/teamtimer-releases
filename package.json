@@ -1,6 +1,6 @@
 {
   "name": "team-timer",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "작업 타이머 - 마감까지 남은 시간을 한눈에",
   "main": "main.js",
   "author": "ADEF Video Team",
@@ -39,7 +39,6 @@
       "build/overlay-dot.png"
     ],
     "mac": {
-      "category": "public.app-category.productivity",
       "target": [
         {
           "target": "dmg",
@@ -51,8 +50,6 @@
       ],
       "artifactName": "TeamTimer-${version}-${arch}.${ext}",
       "icon": "build/icon.icns",
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false,
       "identity": "-"
     },
     "win": {
