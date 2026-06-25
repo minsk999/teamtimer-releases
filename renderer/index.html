@@ -739,6 +739,9 @@
     letter-spacing: -0.01em;
   }
   .preset-pill:hover { border-color: var(--ink); background: var(--bg-soft); }
+  /* 되돌리기 팝업 전용 — 완료 상태를 유지한 채 '전달 완료'로 보내는 검은 버튼 */
+  .preset-pill-dark { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .preset-pill-dark:hover { background: var(--ink); color: var(--surface); border-color: var(--ink); opacity: 0.86; }
 
   /* 메일 버튼 배지 (좌상단, 1자리=원 / 여러자리=알약) */
   .mail-btn { position: relative; overflow: visible; }
@@ -2398,8 +2401,13 @@
     $("done-title").textContent = toDone ? "완료 처리" : "되돌리기";
     $("done-sub").textContent = t.title || "";
     const presets = toDone ? ["전달 완료","수정 전달 완료","담당 제작 완료"] : ["수정 진행","베리 진행"];
-    $("done-presets").innerHTML = presets
+    let presetHtml = presets
       .map(p => `<button class="preset-pill" onclick="confirmDone('${p}')">${esc(p)}</button>`).join("");
+    if(!toDone){
+      // 되돌리기 팝업에만: 완료 상태를 유지한 채 '전달 완료'로 보내는 검은 버튼 (진행중으로 안 감)
+      presetHtml += `<button class="preset-pill preset-pill-dark" onclick="confirmDone('전달 완료', true)">전달 완료</button>`;
+    }
+    $("done-presets").innerHTML = presetHtml;
     const inp = $("done-input");
     inp.value = toDone ? "전달 완료" : "";
     $("modal-done").classList.add("show");
@@ -2408,22 +2416,22 @@
   function confirmDoneFromInput(){
     confirmDone($("done-input").value.trim()); // 빈칸이면 빈칸 그대로 기록
   }
-  async function confirmDone(statusText){
+  async function confirmDone(statusText, forceDone){
     const ctx = doneCtx; if(!ctx){ closeModal("modal-done"); return; }
     const t = tasks.find(x=>x.id===ctx.id);
     if(!t){ closeModal("modal-done"); return; }
     closeModal("modal-done");
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
-    const target = ctx.toDone;
+    const target = (forceDone === true) ? true : ctx.toDone; // '전달 완료'는 완료 상태 유지(진행중으로 안 감)
     const prevDone = t.done, prevStatus = t._status; // 롤백용
     t.done = target; t._status = statusText;          // ① 낙관적 즉시 반영
     render();
-    const r = await window.timerAPI.postSheet({       // ② 시트 기록
+    const r = await window.timerAPI.postSheet({       // ② 시트 기록 (체크박스 A/I + G/O 상태열)
       action:"toggleDone", member:myName, row: t._row || t.id,
       done: target ? "1" : "0", status: statusText
     });
-    if(r && r.ok){ toast(target ? "완료 처리했어요" : "되돌렸어요"); }
+    if(r && r.ok){ toast(forceDone === true ? "전달 완료로 보냈어요" : (target ? "완료 처리했어요" : "되돌렸어요")); }
     else { t.done = prevDone; t._status = prevStatus; render(); toast("처리 실패 — 되돌렸어요"); } // ③ 롤백
   }
   // 공용 확인 모달
