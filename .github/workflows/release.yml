@@ -48,6 +48,10 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Patch mac executable name (ASCII path fix)
+        if: matrix.os == 'macos-latest'
+        run: node patch-mac-name.js
+
       - name: Build
         run: npm run ${{ matrix.script }}
 
