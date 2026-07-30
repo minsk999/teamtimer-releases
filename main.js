@@ -107,9 +107,10 @@ function createWindow() {
     minWidth: 320,
     minHeight: 420,
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
-    titleBarStyle: process.platform === 'darwin' ? 'hidden' : 'default',
-    trafficLightPosition: process.platform === 'darwin' ? { x: 13, y: 12 } : undefined, // 신호등 위치 명시(38px 타이틀바 중앙)
-    frame: process.platform === 'darwin' ? true : false, // 윈도우는 커스텀 타이틀바 사용
+    // 전 플랫폼 커스텀 타이틀바. 맥의 네이티브 신호등은 OS가 웹 화면 위에 직접 그려서
+    // (1) 항상 좌측 고정이라 윈도우와 레이아웃이 어긋나고 (2) 모달 블러가 적용되지 않는다.
+    // → frame:false 로 신호등을 없애고, 렌더러의 커스텀 버튼(우측)을 양쪽 플랫폼 공통으로 사용.
+    frame: false,
     backgroundColor: '#ffffff',
     show: false,
     webPreferences: {

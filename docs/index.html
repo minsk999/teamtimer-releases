@@ -244,7 +244,7 @@
       <span class="logo"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6"/></svg></span>
       작업 타이머
     </div>
-    <span class="ver">v1.0.19</span>
+    <span class="ver">v1.0.20</span>
     <span class="spacer"></span>
     <button class="theme-btn" id="theme" aria-label="테마 전환">
       <svg id="theme-ic" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -299,10 +299,10 @@
         <div class="pane on" data-pane="win">
           <div class="card dlcard">
             <div class="dlinfo">
-              <div class="dltitle">Windows · 작업 타이머 <span class="ver">v1.0.19</span></div>
+              <div class="dltitle">Windows · 작업 타이머 <span class="ver">v1.0.20</span></div>
               <div class="dlmeta">Windows 데스크톱 앱 설치 파일</div>
             </div>
-            <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.19/TeamTimer-Setup-1.0.19.exe" download>
+            <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.20/TeamTimer-Setup-1.0.20.exe" download>
               <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
               <span>다운로드 <span class="sz">EXE</span></span>
             </a>
@@ -320,15 +320,15 @@
         <div class="pane" data-pane="mac">
           <div class="card dlcard">
             <div class="dlinfo">
-              <div class="dltitle">macOS · 작업 타이머 <span class="ver">v1.0.19</span></div>
+              <div class="dltitle">macOS · 작업 타이머 <span class="ver">v1.0.20</span></div>
               <div class="dlmeta">본인 Mac 칩에 맞는 버전을 받으세요. (<b>사과 메뉴 → 이 Mac에 관하여</b>에서 확인)</div>
             </div>
             <div class="dlbtns">
-              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.19/TeamTimer-1.0.19-arm64.dmg" download>
+              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.20/TeamTimer-1.0.20-arm64.dmg" download>
                 <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
                 <span>Apple Silicon <span class="sz">DMG</span></span>
               </a>
-              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.19/TeamTimer-1.0.19-x64.dmg" download>
+              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.20/TeamTimer-1.0.20-x64.dmg" download>
                 <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
                 <span>Intel <span class="sz">DMG</span></span>
               </a>
@@ -667,7 +667,14 @@
         <div class="card">
           <div class="changelog">
             <details class="cl-entry current" open>
-              <summary class="cl-head"><span class="cl-ver">v1.0.19</span><span class="cl-date">2026-07-30</span><span class="cl-badge">최신</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <summary class="cl-head"><span class="cl-ver">v1.0.20</span><span class="cl-date">2026-07-30</span><span class="cl-badge">최신</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul>
+                <li><b>Mac 창 버튼을 Windows와 동일하게</b> — Mac에서도 로고·제목이 <b>왼쪽 끝</b>, 최소화·최대화·닫기 버튼이 <b>오른쪽 끝</b>으로 통일됐어요. (macOS 기본 신호등 버튼 대신 앱 자체 버튼을 써요)</li>
+                <li><b>팝업 흐림 효과 정상화</b> — 설정 같은 팝업이 열릴 때 타이틀바의 창 버튼에도 흐림이 함께 적용돼요.</li>
+              </ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.19</span><span class="cl-date">2026-07-30</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
               <div class="cl-body"><div class="cl-body-inner"><ul>
                 <li><b>Mac 실행 문제 해결</b> — Mac에서 앱이 실행되지 않던 문제를 해결했어요. 앱 이름이 한글이라 macOS 내부 경로 처리와 충돌한 것이 원인이었고, 그래서 <b>Mac에서는 앱 이름이 <code>TeamTimer</code>로 표시</b>돼요. 기능과 데이터는 그대로예요.</li>
                 <li><b>메일 새로고침 주기 5초 추가</b> — 가장 짧은 주기가 10초에서 <b>5초</b>로 내려갔어요. (5 · 10 · 20 · 30 · 40 · 50 · 60초)</li>
@@ -753,7 +760,7 @@
         </div>
       </section>
 
-      <footer>작업 타이머 v1.0.19 · 영상팀 내부용 · ADEF</footer>
+      <footer>작업 타이머 v1.0.20 · 영상팀 내부용 · ADEF</footer>
     </main>
   </div>
 </div>

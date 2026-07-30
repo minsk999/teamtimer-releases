@@ -3743,13 +3743,6 @@
 
   // ── Electron 플랫폼별 처리 ──
   if (isElectron) {
-    // 맥: OS 신호등 버튼을 쓰므로 커스텀 창 컨트롤 숨김 + 좌측 신호등 공간 확보
-    if (window.timerAPI.platform === "darwin") {
-      const wc = document.querySelector(".win-controls");
-      if (wc) wc.style.display = "none";
-      const tb = document.querySelector(".titlebar");
-      if (tb) tb.style.paddingLeft = "78px"; // 신호등 3버튼 공간
-    }
     // 카드 안 링크(요청글/기획안)는 기본 브라우저로 열기
     document.addEventListener("click", e => {
       const a = e.target.closest("a.link-mini");
