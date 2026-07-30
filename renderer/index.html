@@ -1298,8 +1298,8 @@
             <span class="msl-label">메일 새로고침 주기</span>
             <span class="msl-val" id="msl-poll-val">30초</span>
           </div>
-          <input type="range" class="mail-slider" id="msl-poll" min="10" max="60" step="10" value="30" oninput="onPollSlide(this.value)">
-          <div class="msl-ticks"><span>10초</span><span>60초</span></div>
+          <input type="range" class="mail-slider" id="msl-poll" min="0" max="6" step="1" value="3" oninput="onPollSlide(this.value)">
+          <div class="msl-ticks"><span>5초</span><span>60초</span></div>
         </div>
 
         <div class="mail-slider-row">
@@ -1940,23 +1940,33 @@
   // 캐시가 있으면 시작 시 즉시 배지/목록 데이터 복원 (백그라운드 갱신 전까지 빈 화면 방지)
   (function(){ try { const c = loadMailCache(); if(c && Array.isArray(c.messages)){ mailData = c.messages; setMailBadge(c.unreadCount || 0); mailData.filter(m=>m.unread).forEach(m=> notifiedIds.add(m.id)); saveNotifiedIds(); lastBadgeCount = c.unreadCount || 0; } } catch(e){} })();
 
+  // 메일 새로고침 주기 단계값 — 5초만 예외적으로 촘촘하고, 10초부터는 10초 간격
+  const POLL_STEPS = [5, 10, 20, 30, 40, 50, 60];
+  function snapPollSec(v){
+    v = Number(v);
+    if(!v || isNaN(v)) return 30;
+    // 목록에 없는 값(구버전 설정 등)은 가장 가까운 단계로 맞춤
+    return POLL_STEPS.reduce(function(a,b){ return Math.abs(b-v) < Math.abs(a-v) ? b : a; }, POLL_STEPS[0]);
+  }
+  function pollIndex(sec){ const i = POLL_STEPS.indexOf(snapPollSec(sec)); return i < 0 ? 3 : i; }
+
   // 메일 설정 (주기/개수) — localStorage 저장
   let mailSettings = loadMailSettings();
   function loadMailSettings(){
     try {
       const s = JSON.parse(localStorage.getItem("mailSettings") || "{}");
       const mode = (["gmail","intranet","both"].includes(s.openMode)) ? s.openMode : "gmail";
-      return { pollSec: clampStep(s.pollSec, 10, 60, 30), fetchCount: clampStep(s.fetchCount, 50, 300, 100), openMode: mode };
+      return { pollSec: snapPollSec(s.pollSec), fetchCount: clampStep(s.fetchCount, 50, 300, 100), openMode: mode };
     } catch(e){ return { pollSec: 30, fetchCount: 100, openMode: "gmail" }; }
   }
   function clampStep(v, min, max, def){ v = Number(v); if(!v || isNaN(v)) return def; return Math.min(max, Math.max(min, v)); }
   function saveMailSettings(){ try { localStorage.setItem("mailSettings", JSON.stringify(mailSettings)); } catch(e){} }
   function onMailOpenMode(v){ if(!["gmail","intranet","both"].includes(v)) return; mailSettings.openMode = v; saveMailSettings(); }
-  function onPollSlide(v){ mailSettings.pollSec = Number(v); $("msl-poll-val").textContent = v + "초"; saveMailSettings(); restartMailPoll(); }
+  function onPollSlide(v){ const sec = POLL_STEPS[Number(v)] || 30; mailSettings.pollSec = sec; $("msl-poll-val").textContent = sec + "초"; saveMailSettings(); restartMailPoll(); }
   function onCountSlide(v){ mailSettings.fetchCount = Number(v); $("msl-count-val").textContent = v + "개"; saveMailSettings(); }
   function syncMailSliders(){
     const p = $("msl-poll"), c = $("msl-count");
-    if(p){ p.value = mailSettings.pollSec; $("msl-poll-val").textContent = mailSettings.pollSec + "초"; }
+    if(p){ p.value = pollIndex(mailSettings.pollSec); $("msl-poll-val").textContent = mailSettings.pollSec + "초"; }
     if(c){ c.value = mailSettings.fetchCount; $("msl-count-val").textContent = mailSettings.fetchCount + "개"; }
     setSeg("seg-mail-open", mailSettings.openMode || "gmail");
   }
