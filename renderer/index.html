@@ -1598,7 +1598,25 @@
   }
 
   // ── 시트 연동: 팀원 목록 + 내 이름 ──
-  const MEMBERS = ["구민석","한영채","주지현","박나진","김본희","구정현","박지수"];
+  // 팀원 명단은 시트('🤖자동화' A열)에서 받아온다 — 코드에 고정하지 않음.
+  // 앱 시작 직후(동기화 전)에는 마지막으로 받아둔 목록을 쓰고, 그것도 없으면 아래 기본값.
+  const MEMBERS_FALLBACK = ["구민석","한영채","주지현","박나진","김본희","구정현","박지수"];
+  function loadMembers(){
+    try {
+      const saved = JSON.parse(localStorage.getItem("memberNames") || "null");
+      if (Array.isArray(saved) && saved.length) return saved;
+    } catch(e){}
+    return MEMBERS_FALLBACK.slice();
+  }
+  let MEMBERS = loadMembers();
+  // 시트에서 새 명단을 받으면 반영 + 저장 (다음 실행 때 바로 사용)
+  function applyMemberNames(names){
+    if (!Array.isArray(names) || !names.length) return;
+    if (names.join("|") === MEMBERS.join("|")) return;   // 변화 없음
+    MEMBERS = names.slice();
+    try { localStorage.setItem("memberNames", JSON.stringify(MEMBERS)); } catch(e){}
+    try { renderNamePop(); } catch(e){}                  // 설정의 작업자 목록 갱신
+  }
   function getMyName(){ return localStorage.getItem("myName") || ""; }
   function setMyName(v){ localStorage.setItem("myName", v || ""); }
 
@@ -1667,7 +1685,7 @@
   let editingId=null, selDl=null, selAlarm=null, selDlImport=null, selDlEdit=null, lastOrder="";
 
   // ── 작업자 롤링 (읽기 전용으로 다른 팀원 보드 넘겨보기) ──
-  const ROLL_ORDER = ["구민석","한영채","주지현","박나진","김본희","구정현","박지수"];
+  // 넘겨보기 순서는 시트 '🤖자동화' A열 순서를 그대로 따름 (MEMBERS 사용)
   let allMembersData = [];
   let viewName = null;
   function firstName(full){ // 구민석 → 민석, 한영채 → 영채 (성 1자 제외)
@@ -1709,9 +1727,9 @@
   }
   function rollView(dir){
     if(isEditingNow()) return;
-    let i = ROLL_ORDER.indexOf(viewName); if(i<0) i=0;
-    const ni = (i + dir + ROLL_ORDER.length) % ROLL_ORDER.length;
-    applyView(ROLL_ORDER[ni]);
+    let i = MEMBERS.indexOf(viewName); if(i<0) i=0;
+    const ni = (i + dir + MEMBERS.length) % MEMBERS.length;
+    applyView(MEMBERS[ni]);
   }
   function gotoView(name){ if(isEditingNow()) return; applyView(name); }
 
@@ -1833,6 +1851,7 @@
       if (!res || !res.ok) throw new Error(res && res.error || "응답 오류");
 
       allMembersData = res.members || [];
+      applyMemberNames(res.memberNames);   // 시트에서 받은 팀원 명단 반영
       if (!viewName) viewName = myName;
       if (!allMembersData.find(m => m.name === viewName)) viewName = myName;
       const cnt = applyView(viewName);
