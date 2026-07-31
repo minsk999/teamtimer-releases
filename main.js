@@ -232,15 +232,9 @@ app.on('before-quit', () => { isQuitting = true; });
 // OS 레벨 알림 (알람 기능에서 사용)
 ipcMain.handle('notify', (event, { title, body, mailId }) => {
   if (!Notification.isSupported()) return false;
-  const nIcon = nativeImage.createFromPath(
-    path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
-  );
-  const n = new Notification({
-    title: title || '작업 타이머',
-    body: body || '',
-    silent: true,
-    icon: nIcon.isEmpty() ? undefined : nIcon,
-  });
+  // icon 은 지정하지 않는다 — Windows에서 본문 좌측에 큰 이미지로 들어가 공간만 차지함.
+  // 헤더의 작은 앱 아이콘/이름은 app.setAppUserModelId 로 이미 처리됨.
+  const n = new Notification({ title: title || '작업 타이머', body: body || '', silent: true });
   n.on('click', () => {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();

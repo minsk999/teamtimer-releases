@@ -1901,7 +1901,7 @@
   const MAIL_KINDS = [
     { re: /코멘트\s*알림/, label: "코멘트 알림" },
     { re: /업무\s*전달/,   label: "담당자 배정" },
-    { re: /업무\s*요청/,   label: "새 업무 요청" },
+    { re: /업무\s*요청/,   label: "업무 요청" },
   ];
   function mailKind(text){
     const s = String(text || "");
@@ -1914,10 +1914,18 @@
     const subj = String(m.subject || m.fullSubject || "").trim();
     const k = mailKind(subj);
     let rest = subj;
-    if(k) rest = subj.replace(k.re, "").replace(/^[\s\-–—:·|\]\)]+/, "").trim();
+    // 실제 제목 형식 예) "[Intranet-영상] 업무 요청>ASAP [구달] … 요청의 건_8월_TXA"
+    // → 말머리 뒤의 구분기호('>' 포함)를 모두 제거
+    if(k) rest = subj.replace(k.re, "").replace(/^[\s\-–—:·|>\]\)]+/, "").trim();
     if(rest) return rest;
     if(m.requester) return `${m.requester}님의 업무요청`;
     return String(m.snippet || "").trim().slice(0, 80);
+  }
+
+  // 메일 탭 표시용 제목 — '업무 전달'만 '담당자 배정'으로 바꿔 보여줌
+  // ('업무 요청'·'코멘트 알림'은 원문 그대로 유지)
+  function displaySubject(s){
+    return String(s || "").replace(/업무\s*전달/, "담당자 배정");
   }
 
   function notifyNewMailFor(messages, freshIds, count){
@@ -2164,7 +2172,7 @@
       <div class="mail-item${m.unread?' unread':''}" onclick="openMailItem('${m.id}')">
         <div class="mail-dot-col"><span class="mail-udot"></span></div>
         <div class="mail-main">
-          <div class="mail-subject">${esc(m.subject || "(제목 없음)")}</div>
+          <div class="mail-subject">${esc(displaySubject(m.subject) || "(제목 없음)")}</div>
           <div class="mail-meta">${m.requester ? `<span class="mail-requester">${esc(m.requester)}님</span> 업무요청` : "업무요청"}</div>
         </div>
         <div class="mail-right">

@@ -1,6 +1,6 @@
 {
   "name": "team-timer",
-  "version": "1.0.21",
+  "version": "1.0.22",
   "description": "작업 타이머 - 마감까지 남은 시간을 한눈에",
   "main": "main.js",
   "author": "ADEF Video Team",
