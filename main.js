@@ -7,6 +7,11 @@ const http = require('http');
 const fs = require('fs');
 const { execFile } = require('child_process');
 
+// ── Windows 알림 표시 이름/아이콘 ──
+// AppUserModelID를 지정하지 않으면 Windows가 알림 좌상단에 앱 아이콘을 못 찾고
+// 이름 자리에 'electron.app.…'을 표시한다. 설치본 바로가기의 ID(=build.appId)와 맞춘다.
+if (process.platform === 'win32') app.setAppUserModelId('kr.co.adef.jakeop-timer');
+
 // ── 빌드 비밀값 (공개 레포 보호를 위해 소스에서 분리) ──
 // 로컬 빌드: 옆의 build-secrets.js 사용 (git에는 올라가지 않음, 배포 zip에는 포함)
 // CI 빌드: GitHub Actions가 저장소 Secrets로 build-secrets.js를 생성
@@ -227,7 +232,15 @@ app.on('before-quit', () => { isQuitting = true; });
 // OS 레벨 알림 (알람 기능에서 사용)
 ipcMain.handle('notify', (event, { title, body, mailId }) => {
   if (!Notification.isSupported()) return false;
-  const n = new Notification({ title: title || '작업 타이머', body: body || '', silent: true });
+  const nIcon = nativeImage.createFromPath(
+    path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+  );
+  const n = new Notification({
+    title: title || '작업 타이머',
+    body: body || '',
+    silent: true,
+    icon: nIcon.isEmpty() ? undefined : nIcon,
+  });
   n.on('click', () => {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();

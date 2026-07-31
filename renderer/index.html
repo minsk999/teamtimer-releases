@@ -1894,14 +1894,40 @@
   function saveNotifiedIds(){ try { localStorage.setItem("notifiedMailIds", JSON.stringify([...notifiedIds].slice(-200))); } catch(e){} }
   let lastBadgeCount = -1; // 경량 폴링 카운트 추적(증가 시에만 정밀 확인)
 
+  // 인트라넷 메일 제목의 말머리 → 알림 제목
+  //   "업무 요청"   → 새 업무 요청
+  //   "업무 전달"   → 담당자 배정
+  //   "코멘트 알림" → 코멘트 알림
+  const MAIL_KINDS = [
+    { re: /코멘트\s*알림/, label: "코멘트 알림" },
+    { re: /업무\s*전달/,   label: "담당자 배정" },
+    { re: /업무\s*요청/,   label: "새 업무 요청" },
+  ];
+  function mailKind(text){
+    const s = String(text || "");
+    for(const k of MAIL_KINDS){ if(k.re.test(s)) return k; }
+    return null;
+  }
+  // 말머리를 뺀 '실제 제목'만 추림. 제목이 말머리뿐이면 요청자/본문요약으로 대체.
+  function mailBodyText(m){
+    if(!m) return "";
+    const subj = String(m.subject || m.fullSubject || "").trim();
+    const k = mailKind(subj);
+    let rest = subj;
+    if(k) rest = subj.replace(k.re, "").replace(/^[\s\-–—:·|\]\)]+/, "").trim();
+    if(rest) return rest;
+    if(m.requester) return `${m.requester}님의 업무요청`;
+    return String(m.snippet || "").trim().slice(0, 80);
+  }
+
   function notifyNewMailFor(messages, freshIds, count){
     if(typeof window.timerAPI === "undefined" || !window.timerAPI.notify) return;
     const fresh = (messages || []).filter(m => freshIds.indexOf(m.id) !== -1).sort((a,b)=>(b.ts||0)-(a.ts||0));
     const top = fresh[0];
-    const subject = top ? (top.subject || top.fullSubject || "") : "";
     const mailId = top ? top.id : "";
-    const body = subject || (count > 1 ? `안읽은 메일 ${count}건` : "새 업무요청 메일이 도착했어요");
-    window.timerAPI.notify("새 업무요청 메일", body, mailId); // 클릭 시 설정대로 열도록 id 전달
+    const title = (mailKind(top ? (top.subject || top.fullSubject) : "") || {}).label || "새 업무요청 메일";
+    const body = mailBodyText(top) || (count > 1 ? `안읽은 메일 ${count}건` : "새 업무요청 메일이 도착했어요");
+    window.timerAPI.notify(title, body, mailId); // 클릭 시 설정대로 열도록 id 전달
   }
   // 전체 목록(정밀) 기준으로 '아직 알리지 않은 안읽음'만 골라 알림 — 중복 방지의 핵심
   function maybeNotifyNewMail(messages){
