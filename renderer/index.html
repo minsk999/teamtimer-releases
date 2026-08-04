@@ -1832,13 +1832,14 @@
     if (syncInFlight) return; // 이미 동기화 중(조용한 호출 포함) → 중복 요청 무시
     syncInFlight = true;
 
+    // ⚠ 여기서부터 finally 전까지 절대 return 하지 말 것.
+    //   try 밖에서 빠져나가면 syncInFlight 가 true 로 남아 이후 모든 동기화가 막힌다.
+    //   (예전 버그: pill.classList.contains("syncing") 체크 후 return → 앱 재시작 전까지 먹통)
     let textEl, orig;
-    if(!silent){
-      if (pill.classList.contains("syncing")) return;
+    if(!silent && pill){
       pill.classList.add("syncing");
       textEl = pill.querySelector(".sync-text");
-      orig = textEl.textContent;
-      textEl.textContent = "동기화 중";
+      if(textEl){ orig = textEl.textContent; textEl.textContent = "동기화 중"; }
     }
 
     try {
@@ -1860,8 +1861,11 @@
     } catch (e) {
       if(!silent) toast("동기화 실패: " + (e.message || e));
     } finally {
-      syncInFlight = false;
-      if(!silent){ pill.classList.remove("syncing"); textEl.textContent = orig; }
+      syncInFlight = false;   // 어떤 경로로 끝나도 반드시 잠금 해제
+      if(!silent && pill){
+        pill.classList.remove("syncing");
+        if(textEl && orig !== undefined) textEl.textContent = orig;
+      }
     }
   }
 
