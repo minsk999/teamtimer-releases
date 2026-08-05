@@ -1,6 +1,6 @@
 {
   "name": "team-timer",
-  "version": "1.0.24",
+  "version": "1.0.25",
   "description": "작업 타이머 - 마감까지 남은 시간을 한눈에",
   "main": "main.js",
   "author": "ADEF Video Team",
@@ -9,7 +9,7 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "build": "electron-builder",
-    "build:mac": "electron-builder --mac --x64 --publish never && electron-builder --mac --arm64 --publish never",
+    "build:mac": "electron-builder --mac --x64 --dir --publish never && node sign-mac.js x64 && electron-builder --mac --x64 --prepackaged dist/mac/TeamTimer.app --publish never && electron-builder --mac --arm64 --dir --publish never && node sign-mac.js arm64 && electron-builder --mac --arm64 --prepackaged dist/mac-arm64/TeamTimer.app --publish never",
     "build:win": "electron-builder --win --publish never",
     "build:all": "electron-builder --mac --win"
   },

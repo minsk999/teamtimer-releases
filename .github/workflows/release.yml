@@ -55,6 +55,18 @@ jobs:
       - name: Build
         run: npm run ${{ matrix.script }}
 
+      - name: Verify mac signature
+        if: matrix.os == 'macos-latest'
+        run: |
+          for A in dist/mac/TeamTimer.app dist/mac-arm64/TeamTimer.app; do
+            [ -d "$A" ] || continue
+            echo "── $A ──"
+            test -f "$A/Contents/_CodeSignature/CodeResources" \
+              && echo "  CodeResources 있음" \
+              || { echo "  ❌ CodeResources 없음"; exit 1; }
+            codesign --verify --deep --strict --verbose=2 "$A"
+          done
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
