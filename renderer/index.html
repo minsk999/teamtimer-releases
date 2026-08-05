@@ -2976,7 +2976,7 @@
     const nameEl = $("custom-sound-name");
     if (draftAlarm.customSoundName) {
       nameEl.style.display = "flex";
-      nameEl.innerHTML = `${IC.bell}<span class="csn-text" title="클릭하면 다른 파일로 교체" onclick="replaceCustomSound()">${draftAlarm.customSoundName}</span>`
+      nameEl.innerHTML = `${IC.bell}<span class="csn-text" title="클릭하면 미리 들어봐요" onclick="previewCustomSound()">${draftAlarm.customSoundName}</span>`
         + `<button type="button" class="csn-remove" title="음원 삭제" onclick="removeCustomSound(event)"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`;
     } else {
       nameEl.style.display = "none";
@@ -2985,6 +2985,9 @@
     updateAlarmFieldStates();
   }
   // 커스텀 음원 교체(탐색기 열기) / 삭제
+  function previewCustomSound(){
+    if (draftAlarm.customSoundData) playPreview("custom");
+  }
   function replaceCustomSound(){
     const inp = $("custom-sound-input");
     if(inp){ inp.value = ""; inp.click(); } // 같은 파일 다시 선택해도 동작하도록 초기화
@@ -3040,9 +3043,8 @@
     if (seg.id === "seg-sound") {
       draftAlarm.soundType = val;
       if (val === "custom") {
-        // 커스텀 음원: 이미 있으면 미리듣기, 없으면 파일 선택
-        if (draftAlarm.customSoundData) playPreview("custom");
-        else $("custom-sound-input").click();
+        // '직접 추가' 버튼 = 항상 파일 선택(교체). 미리듣기는 아래 파일명 클릭.
+        replaceCustomSound();
       } else {
         playPreview(val);
       }

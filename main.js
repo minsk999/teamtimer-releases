@@ -161,12 +161,23 @@ function createTray() {
   // 윈도우는 .ico(멀티사이즈)가 가장 선명, 그 외엔 png
   let icon;
   try {
-    const icoPath = path.join(__dirname, 'build', 'tray.ico');
-    const pngPath = path.join(__dirname, 'build', 'tray.png');
-    const tryPath = (process.platform === 'win32') ? icoPath : pngPath;
-    icon = nativeImage.createFromPath(tryPath);
-    if (icon.isEmpty()) icon = nativeImage.createFromPath(pngPath);
-    if (icon.isEmpty()) icon = nativeImage.createFromPath(path.join(__dirname, 'build', 'icon.ico'));
+    if (process.platform === 'darwin') {
+      // 맥 메뉴바는 높이가 22pt — 32px 원본을 그대로 쓰면 잘리고 흐려진다.
+      // 22px(@1x) + 44px(@2x, 레티나) 세트를 쓰고 템플릿으로 지정해
+      // 다크/라이트 메뉴바에 맞춰 OS가 자동으로 색을 맞추게 한다.
+      icon = nativeImage.createFromPath(path.join(__dirname, 'build', 'trayTemplate.png'));
+      const hi = nativeImage.createFromPath(path.join(__dirname, 'build', 'trayTemplate@2x.png'));
+      if (!icon.isEmpty() && !hi.isEmpty()) icon.addRepresentation({ scaleFactor: 2, buffer: hi.toPNG() });
+      if (!icon.isEmpty()) icon.setTemplateImage(true);
+      if (icon.isEmpty()) icon = nativeImage.createFromPath(path.join(__dirname, 'build', 'tray.png'));
+    } else {
+      const icoPath = path.join(__dirname, 'build', 'tray.ico');
+      const pngPath = path.join(__dirname, 'build', 'tray.png');
+      const tryPath = (process.platform === 'win32') ? icoPath : pngPath;
+      icon = nativeImage.createFromPath(tryPath);
+      if (icon.isEmpty()) icon = nativeImage.createFromPath(pngPath);
+      if (icon.isEmpty()) icon = nativeImage.createFromPath(path.join(__dirname, 'build', 'icon.ico'));
+    }
   } catch (e) {
     icon = nativeImage.createEmpty();
   }
@@ -610,7 +621,17 @@ function loadBadgeIcons(){
   const p = (f) => path.join(__dirname, 'build', f);
   const winIco = (a,b) => process.platform === 'win32' ? a : b;
   if (!trayIconNormal) trayIconNormal = nativeImage.createFromPath(p(winIco('tray.ico','tray.png')));
-  if (!trayIconDot) trayIconDot = nativeImage.createFromPath(p(winIco('tray-dot.ico','tray-dot.png')));
+  if (!trayIconDot) {
+    if (process.platform === 'darwin') {
+      trayIconDot = nativeImage.createFromPath(p('trayDotTemplate.png'));
+      const hiD = nativeImage.createFromPath(p('trayDotTemplate@2x.png'));
+      if (!trayIconDot.isEmpty() && !hiD.isEmpty()) trayIconDot.addRepresentation({ scaleFactor: 2, buffer: hiD.toPNG() });
+      if (!trayIconDot.isEmpty()) trayIconDot.setTemplateImage(true);
+      if (trayIconDot.isEmpty()) trayIconDot = nativeImage.createFromPath(p('tray-dot.png'));
+    } else {
+      trayIconDot = nativeImage.createFromPath(p(winIco('tray-dot.ico','tray-dot.png')));
+    }
+  }
   if (!overlayDot) overlayDot = nativeImage.createFromPath(p('overlay-dot.png'));
 }
 ipcMain.handle('update-mail-unread', (event, count, opts) => {
