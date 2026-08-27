@@ -625,25 +625,41 @@ ipcMain.handle('fetch-members', async () => {
 // ⚠ 타임아웃은 { timeout:true } 로 구분해서 돌려준다. 렌더러가 이걸 롤백으로 처리하면 안 된다 —
 //   Apps Script 는 응답만 늦고 쓰기는 이미 커밋된 경우가 흔해서, 되돌리면
 //   "삭제가 취소된 것처럼" 보였다가 다음 동기화에 다시 사라진다.
+// 한 번 보내기. busy 재시도는 바깥에서 판단한다.
+async function postSheetOnce(payload) {
+  const body = Object.keys(payload || {})
+    .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(payload[k] == null ? '' : payload[k]))
+    .join('&');
+  const res = await fetchWithTimeout(WEBAPP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+    redirect: 'follow',
+  }, 20000);
+  const text = await res.text();
+  if (isDev) console.log('[post-sheet] status:', res.status, 'resp:', text.slice(0, 300));
+  if (!res.ok) {
+    return { ok: false, error: 'HTTP ' + res.status + (text ? ' · ' + text.slice(0, 150) : '') };
+  }
+  try { return JSON.parse(text); }
+  catch (e) { return { ok: false, error: '응답 파싱 실패: ' + text.slice(0, 150) }; }
+}
+
 ipcMain.handle('post-sheet', async (event, payload) => {
   try {
-    const body = Object.keys(payload || {})
-      .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(payload[k] == null ? '' : payload[k]))
-      .join('&');
     if (isDev) console.log('[post-sheet] action:', (payload && payload.action) || '(insert)');
-    const res = await fetchWithTimeout(WEBAPP_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-      redirect: 'follow',
-    }, 20000);
-    const text = await res.text();
-    if (isDev) console.log('[post-sheet] status:', res.status, 'resp:', text.slice(0, 300));
-    if (!res.ok) {
-      return { ok: false, error: 'HTTP ' + res.status + (text ? ' · ' + text.slice(0, 150) : '') };
+    let r = await postSheetOnce(payload);
+    // ★서버(v56+)가 쓰기 락을 못 잡으면 { ok:false, busy:true } 를 돌려준다.
+    //   busy 는 "락을 못 잡았다" = **쓰기가 확실히 일어나지 않았다** 는 뜻이라
+    //   재시도해도 중복 적용될 수 없다. 여기서 한 번만 조용히 다시 보낸다 —
+    //   안 그러면 렌더러의 낙관적 UI 가 롤백되고 사용자는 '실패'로 읽는다.
+    //   (busy 를 일반 ok:false 로 주면 이 구분이 불가능하다. 서버와 합의된 계약이다.)
+    if (r && r.busy) {
+      await new Promise(res => setTimeout(res, 1500));
+      if (isDev) console.log('[post-sheet] busy → 1회 재시도');
+      r = await postSheetOnce(payload);
     }
-    try { return JSON.parse(text); }
-    catch (e) { return { ok: false, error: '응답 파싱 실패: ' + text.slice(0, 150) }; }
+    return r;
   } catch (e) {
     if (e && e.name === 'AbortError') return { ok: false, timeout: true, error: '응답 지연(타임아웃)' };
     return { ok: false, error: String(e && e.message || e) };
