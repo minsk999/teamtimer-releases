@@ -1884,6 +1884,24 @@
   let syncInFlight = false;         // 조용한 동기화 포함 중복 실행 방지
   let syncInFlightPromise = null;   // 진행 중인 동기화 — 겹친 호출은 이걸 그대로 돌려받는다
   let syncQueued = false;           // 진행 중에 새 요청이 들어옴 → 끝나고 한 번 더
+  let syncLoud = false;             // 지금 진행분에 '수동 요청'이 섞여 있나(pill·토스트 표시 여부)
+
+  // ── 동기화 pill 표시 ──
+  // 여러 회차에 걸쳐 켜져 있어야 하므로 doSync 가 관리한다. runSyncOnce 가 회차마다
+  // 껐다 켜면 합류한 수동 요청이 깜빡이거나 아예 안 보인다.
+  let syncPillOrig = null;
+  function syncPillOn(){
+    const pill = $("sync-pill"); if(!pill || pill.classList.contains("syncing")) return;
+    pill.classList.add("syncing");
+    const t = pill.querySelector(".sync-text");
+    if(t){ if(syncPillOrig === null) syncPillOrig = t.textContent; t.textContent = "동기화 중"; }
+  }
+  function syncPillOff(){
+    const pill = $("sync-pill"); if(!pill) return;
+    pill.classList.remove("syncing");
+    const t = pill.querySelector(".sync-text");
+    if(t && syncPillOrig !== null){ t.textContent = syncPillOrig; syncPillOrig = null; }
+  }
 
   // ⚠ 겹친 호출을 그냥 버리면(예전: `if (syncInFlight) return;`) `await doSync()` 가
   //   아무것도 기다리지 않은 채 통과한다. 그 결과
@@ -1891,50 +1909,54 @@
   //     ② 삭제 뒤 행번호 재조정이 무효가 되며
   //     ③ 수동 요청(스페이스바·동기화 pill)이 아무 반응 없이 씹힌다.
   //   → 진행 중인 회차를 돌려주고, 그 뒤에 한 번 더 돌려서 호출자가 방금 쓴 내용까지 반영한다.
-  //   (메일 쪽 loadMail 이 쓰던 "진행 중인 로딩에 합류" 패턴과 같은 방식)
+  //
+  // ★그리고 합류한 요청이 '수동'이면 진행분 전체를 시끄럽게 바꾼다(syncLoud).
+  //   예전엔 후속 회차를 무조건 조용히 돌려서, 백그라운드 동기화(포커스 프리싱크·10분 주기)가
+  //   도는 중에 동기화 버튼을 누르면 **pill 스피너도 토스트도 안 떴다**(실사용 제보).
+  //   창을 클릭해 포커스를 준 직후 버튼을 누르는 흔한 순서에서 정확히 걸린다.
   async function doSync(opts) {
     opts = opts || {};
-    let silent = !!opts.silent;
+    const loud = !opts.silent;
     const myName = getMyName();
     if (!myName) {
-      if(!silent){ toast("설정에서 작업자를 먼저 선택해주세요"); openSettings(); }
+      if(loud){ toast("설정에서 작업자를 먼저 선택해주세요"); openSettings(); }
       return;
     }
     if (typeof window.timerAPI === "undefined") {
-      if(!silent) toast("앱(데스크톱)에서만 동기화돼요");
+      if(loud) toast("앱(데스크톱)에서만 동기화돼요");
       return;
     }
-    if (syncInFlight) { syncQueued = true; return syncInFlightPromise; }
+    if (syncInFlight) {
+      syncQueued = true;
+      if (loud && !syncLoud) { syncLoud = true; syncPillOn(); }  // 합류 즉시 반응을 보여준다
+      return syncInFlightPromise;
+    }
 
     syncInFlight = true;
+    syncLoud = loud;
+    if (loud) syncPillOn();
     syncInFlightPromise = (async () => {
       try {
         let last, rounds = 0;
         do {
           syncQueued = false;
-          last = await runSyncOnce(silent);
-          silent = true;                 // 후속 회차는 조용히 (토스트·pill 중복 방지)
+          last = await runSyncOnce(!syncLoud);
         } while (syncQueued && ++rounds < 4);   // 상한 — 폭주 방지
         return last;
       } finally {
         syncInFlight = false;            // 어떤 경로로 끝나도 반드시 잠금 해제
         syncInFlightPromise = null;
+        syncQueued = false;
+        syncLoud = false;
+        syncPillOff();
       }
     })();
     return syncInFlightPromise;
   }
 
-  // 실제 1회 동기화. 잠금은 doSync 가 잡고 있으므로 여기서는 건드리지 않는다.
+  // 실제 1회 동기화. 잠금·pill 은 doSync 가 잡고 있으므로 여기서는 건드리지 않는다.
   async function runSyncOnce(silent) {
-    const pill = $("sync-pill");
     const myName = getMyName();
-    let textEl, orig;
-    if(!silent && pill){
-      pill.classList.add("syncing");
-      textEl = pill.querySelector(".sync-text");
-      if(textEl){ orig = textEl.textContent; textEl.textContent = "동기화 중"; }
-    }
-
     try {
       // 일시적 실패(Apps Script 콜드스타트 등 404/500) 대비 1회 자동 재시도
       let res = await window.timerAPI.syncSheet();
@@ -1954,11 +1976,6 @@
       return cnt;
     } catch (e) {
       if(!silent) toast("동기화 실패: " + (e.message || e));
-    } finally {
-      if(!silent && pill){
-        pill.classList.remove("syncing");
-        if(textEl && orig !== undefined) textEl.textContent = orig;
-      }
     }
   }
 
@@ -2040,6 +2057,22 @@
   let notifiedIds = new Set();
   try { const _a = JSON.parse(localStorage.getItem("notifiedMailIds") || "[]"); if(Array.isArray(_a)) notifiedIds = new Set(_a); } catch(e){}
   function saveNotifiedIds(){ try { localStorage.setItem("notifiedMailIds", JSON.stringify([...notifiedIds].slice(-200))); } catch(e){} }
+
+  // ── 로컬 읽음 표시 ────────────────────────────────────────────
+  // ★Gmail 은 messages.modify 로 UNREAD 를 떼도 **is:unread 검색 인덱스가 몇 초~수십 초 늦게**
+  //   따라온다. 기본 폴링이 10초라, 카드를 눌러 읽음 처리한 직후의 폴링 응답이 그 지연 창에
+  //   정확히 들어가 "안읽음"을 다시 싣고 온다 → 화면이 읽지않음으로 되돌아간다(실사용 제보).
+  //   그래서 내가 방금 읽은 id 는 일정 시간 화면에서 읽음으로 고정한다.
+  const locallyRead = new Map();          // id → 만료 시각
+  const LOCAL_READ_TTL = 180000;          // 3분 — 인덱스 지연 여유
+  function markLocallyRead(id){ locallyRead.set(id, Date.now() + LOCAL_READ_TTL); }
+  function unmarkLocallyRead(id){ locallyRead.delete(id); }
+  function applyLocalRead(list){
+    if(!locallyRead.size) return list || [];
+    const now = Date.now();
+    locallyRead.forEach((exp, id) => { if(exp <= now) locallyRead.delete(id); });
+    return (list || []).map(m => (m && m.unread && locallyRead.has(m.id)) ? { ...m, unread: false } : m);
+  }
   let lastBadgeCount = -1; // 경량 폴링 카운트 추적(증가 시에만 정밀 확인)
 
   // 인트라넷 메일 제목의 말머리 → 알림 제목
@@ -2115,7 +2148,13 @@
     if(!Array.isArray(messages)) return;
     const allowedIds = messages.filter(m => m.unread && mailNotifyOk(m)).map(m => m.id);
     const fresh = allowedIds.filter(id => !notifiedIds.has(id));
-    notifiedIds = new Set(allowedIds); // 알림 대상 안읽음만 유지(읽음/삭제/필터제외분 정리)
+    // ★이미 알린 id 는 "읽음이 됐다"고 지우지 않는다. 지우면 위(로컬 읽음 주석)의 인덱스 지연으로
+    //   같은 메일이 안읽음으로 되돌아왔을 때 **두 번째 알림**이 뜬다(실사용 제보).
+    //   목록에서 아예 사라진 것만 정리한다 — 새 메일 판정은 그대로 유지된다.
+    const present = new Set(messages.map(m => m.id));
+    const kept = [];
+    notifiedIds.forEach(id => { if(present.has(id)) kept.push(id); });
+    notifiedIds = new Set(kept.concat(allowedIds));
     saveNotifiedIds();
     if(fresh.length){
       if(alarmSettings.sound) playAlarmSound();
@@ -2275,7 +2314,7 @@
     try {
       const res = await window.timerAPI.gmailList({ max: mailSettings.fetchCount });
       if(res && res.ok){
-        mailData = res.messages || [];
+        mailData = applyLocalRead(res.messages || []);
         setMailBadge();   // 서버 카운트 대신 필터 반영된 목록에서 센다
         lastBadgeCount = res.unreadCount; // 정밀 값으로 폴링 기준 동기화(경량/정밀 불일치 방지)
         renderMailList();
@@ -2372,10 +2411,19 @@
     // 낙관적: 읽음 처리 + 배지/목록 갱신
     if(m && m.unread){
       m.unread = false;
+      markLocallyRead(id);   // 폴링이 옛 안읽음을 실어와도 화면이 안 되돌아가게
       setMailBadge();
       renderMailList();
     }
-    window.timerAPI.gmailMarkRead(id); // 읽음 처리 (목록에 없어도 id로 처리, 이미 읽음이면 무해)
+    // 읽음 처리는 기다리지 않는다(링크가 먼저 열려야 한다). 다만 실패는 알린다 —
+    // 예전엔 조용히 삼켜서, 읽음이 됐다가 나중에 되돌아오는 이유를 알 수 없었다.
+    window.timerAPI.gmailMarkRead(id).then(rr => {
+      if(rr && rr.ok) return;
+      unmarkLocallyRead(id);
+      const cur = mailData.find(x => x.id === id);
+      if(cur){ cur.unread = true; setMailBadge(); renderMailList(); }
+      toast("읽음 처리에 실패했어요 — 다시 눌러주세요");
+    }).catch(() => {});
     const mode = (mailSettings && mailSettings.openMode) || "gmail";
     // Gmail 웹에서 열기
     if(mode === "gmail" || mode === "both"){
