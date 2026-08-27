@@ -21,7 +21,7 @@ const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
 // ⚠️⚠️ 여기에 실제 웹앱 URL 을 다시 넣지 말 것. ⚠️⚠️
 //
 // _apptest 는 맥 크래시 진단용으로 만든 **앱 전체의 낡은 포크**다(렌더러가 본체와 169줄 다름).
-// 웹앱은 무인증이라 build-secrets 없이도 시트 읽기·쓰기가 전부 동작하고,
+// build-secrets 가 없어도 시트 읽기·쓰기가 전부 동작하고,
 // 아래 post-sheet 쓰기 핸들러도 살아 있다. 게다가 .github/workflows/apptest.yml 은
 // `apptest-*` 태그만 밀면 이 포크를 맥에서 빌드해 릴리스에 DMG 로 붙인다.
 // → 그 DMG 로 완료 체크·삭제를 눌러 보면 **팀의 실제 업무 시트가 바뀐다.**
