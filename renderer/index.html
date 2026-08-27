@@ -3011,7 +3011,11 @@
   async function doClearDone(){
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
-    // 행 번호 큰 것부터 삭제 → compaction 시 위쪽(아직 삭제할) 행번호가 안 틀어짐
+    // ★내림차순(행 번호 큰 것부터)은 **바꾸면 안 된다.** 세 가지가 여기에 걸려 있다.
+    //   ① compaction 은 자기 단에서 아래 행을 위로 당긴다 → 위쪽(아직 지울) 행번호가 안 틀어짐
+    //   ② 그래서 expectTitle/expectIdx 지문이 회차마다 계속 유효하다
+    //   ③ 오름차순이면 시트의 lastRow 가 내려가면서 서버의 scanCount<1 가드에 걸린다
+    //   중간에 doSync 를 안 하므로 정렬 순서가 유일한 안전장치다.
     const doneTasks = tasks.filter(t=>t.done).slice().sort((a,b)=>(b._row||b.id)-(a._row||a.id));
     if(!doneTasks.length) return;
     tasks = tasks.filter(t=>!t.done); render(); // ① 즉시 화면에서 제거
