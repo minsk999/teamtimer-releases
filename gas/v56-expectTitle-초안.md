@@ -94,10 +94,35 @@ row 기반 쓰기 4종에 `expectTitle` 추가. 값은 **타이머가 그 행에
 
 **되돌릴 수 없는 유일한 액션이니 둘 다 요구한다.** 비용은 셀 읽기 하나.
 
+> **프레이밍 주의.** 지금 같은 칸 안 중복은 idx·제목 모두 **0건**이다.
+> "2종 쪼개기"도 아직 실현되지 않았다. 조합 지문은 **지금 뚫린 구멍을 막는 게 아니라**
+> 방어 깊이를 더하는 것이다. 사용자에게 사고가 난 것처럼 전달하지 말 것.
+> (양쪽 세션이 이번에 빈도를 과장했다가 정정한 게 두 번이다.)
+
+⚠️ **`scanCount < 1` 가드가 먼저다 — stale row 의 한 갈래가 정확히 여기로 온다.**
+
+`deleteTask:900-902` 는 `scanCount = Math.max(0, lastRow - row + 1)` 로 잡고 바로
+`getRange(row, col, scanCount, 2)` 를 부른다. 타이머가 든 row 가 현재 `lastRow` 보다 크면
+`scanCount` 가 0 이 되고 Apps Script 가 `"The number of rows in the range must be at least 1"`
+로 던진다. 바깥 try 가 잡긴 하지만 **지문 검사에 닿기도 전에** 구글 예외 문자열이 사용자에게 간다.
+
+시트가 줄어드는 유일한 경로는 사람이 행을 지우는 것이고, 그러면 타이머가 든 row 가
+`lastRow` 를 넘는다. 즉 남 얘기가 아니다.
+
+```js
+  var scanCount = Math.max(0, lastRow - row + 1);
+  if (scanCount < 1) {
+    return respond({ ok:false, stale:true, row: row, found: "",
+                     error: "그 행이 더 이상 없어요 — 동기화 후 다시 시도해 주세요" });
+  }
+```
+
+그리고 **셀을 새로 읽을 필요가 없다.** `isVid` 판정용으로 이미 벌크로 읽어 둔
+`linkF[0][0]` 이 대상 행의 C/K 수식 그 자체다. 제목만 새로 읽으면 되므로 순 증가는 1회.
+
 ```js
 if (p.expectIdx || p.expectTitle) {
-  var f2 = sheet.getRange(row, startCol + COL.LINK).getFormula();
-  var curIdx   = (String(f2).match(/idx=(\d+)/) || [])[1] || "";
+  var curIdx   = (String(linkF[0][0]).match(/idx=(\d+)/) || [])[1] || "";   // ★재사용
   var curTitle = String(sheet.getRange(row, startCol + COL.TITLE).getValue()).trim();
   var okIdx   = !p.expectIdx   || curIdx   === String(p.expectIdx);
   var okTitle = !p.expectTitle || curTitle === String(p.expectTitle).trim();
