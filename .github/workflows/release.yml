@@ -78,6 +78,10 @@ jobs:
             dist/*.blockmap
             dist/latest*.yml
           if-no-files-found: ignore
+          # ★보존기간을 안 정하면 기본 90일이다. 아티팩트는 계정 단위 스토리지 쿼터를 먹고,
+          #   예전에 이 저장소가 쌓아둔 2GB 때문에 다른 저장소의 맥 빌드가 업로드에서 막힌 적이 있다.
+          #   릴리스 자산으로 옮겨지고 나면 아티팩트는 쓸모없으므로 하루만 둔다.
+          retention-days: 1
 
   release:
     name: Publish Release
@@ -94,5 +98,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
+          # 릴리스 제목을 여기서 정한다 — 예전엔 빌드 후 사람이 API 로 PATCH 해야 했다.
+          name: 작업 타이머 ${{ github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: false
+          # ★검증 전 빌드가 releases/latest 가 되면 안 된다.
+          #   앱의 업데이트 배너는 releases/latest 를 보므로, 그 순간 팀 전원에게 알림이 뜬다.
+          #   실기 확인 후 `gh release edit <태그> --prerelease=false` 로 승격한다.
+          prerelease: true
