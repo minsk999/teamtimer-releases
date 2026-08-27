@@ -1881,6 +1881,7 @@
 
   // 동기화 — Apps Script 읽기 API에서 내 영상작업 + 관리항목 가져오기
   let lastSyncOkAt = 0;     // 마지막 동기화 성공 시각
+  let lastSyncMs = 0;       // 마지막 동기화 왕복 시간(ms) — 느림 진단용
   let syncInFlight = false;         // 조용한 동기화 포함 중복 실행 방지
   let syncInFlightPromise = null;   // 진행 중인 동기화 — 겹친 호출은 이걸 그대로 돌려받는다
   let syncQueued = false;           // 진행 중에 새 요청이 들어옴 → 끝나고 한 번 더
@@ -1941,7 +1942,9 @@
         do {
           syncQueued = false;
           last = await runSyncOnce(!syncLoud);
-        } while (syncQueued && ++rounds < 4);   // 상한 — 폭주 방지
+          // ★상한 1회 추가. 예전 4회는 GAS 왕복을 최대 4배로 늘려 체감 지연을 키웠다.
+          //   합류한 요청의 쓰기 내용을 반영하는 데는 한 회차면 충분하다.
+        } while (syncQueued && ++rounds < 2);
         return last;
       } finally {
         syncInFlight = false;            // 어떤 경로로 끝나도 반드시 잠금 해제
@@ -1958,12 +1961,20 @@
   async function runSyncOnce(silent) {
     const myName = getMyName();
     try {
-      // 일시적 실패(Apps Script 콜드스타트 등 404/500) 대비 1회 자동 재시도
+      // 일시적 실패(Apps Script 콜드스타트 등 404/500) 대비 1회 자동 재시도.
+      // ★단 타임아웃 뒤에는 재시도하지 않는다 — 30초를 기다린 끝에 또 30초를 기다리게 되고
+      //   (총 62초) 그 사이 pill 은 계속 "동기화 중"이라 멈춘 것처럼 보인다.
+      const _t0 = performance.now();
       let res = await window.timerAPI.syncSheet();
-      if (!res || !res.ok) {
+      let tries = 1;
+      if (!res || (!res.ok && !res.timeout)) {
         await new Promise(r => setTimeout(r, 2000));
         res = await window.timerAPI.syncSheet();
+        tries = 2;
       }
+      const _el = Math.round(performance.now() - _t0);
+      console.log(`[sync] ${_el}ms (서버 ${res && res._ms != null ? res._ms + "ms" : "?"}, 시도 ${tries})`);
+      lastSyncMs = _el;
       if (!res || !res.ok) throw new Error(res && res.error || "응답 오류");
 
       allMembersData = res.members || [];
@@ -1972,7 +1983,9 @@
       if (!allMembersData.find(m => m.name === viewName)) viewName = myName;
       const cnt = applyView(viewName);
       lastSyncOkAt = Date.now(); // 포커스 프리싱크 기준 시각
-      if(!silent) toast(`동기화 완료 · 작업 ${cnt}건`);
+      if(!silent) toast(_el >= 8000
+        ? `동기화 완료 · 작업 ${cnt}건 (${(_el/1000).toFixed(1)}초 — 시트가 느려요)`
+        : `동기화 완료 · 작업 ${cnt}건`);
       return cnt;
     } catch (e) {
       if(!silent) toast("동기화 실패: " + (e.message || e));

@@ -350,15 +350,35 @@ async function fetchWithTimeout(url, options, ms) {
   }
 }
 
-ipcMain.handle('sync-sheet', async (event, opts) => {
+// ★본문까지 같은 타임아웃 안에서 읽는다.
+//   fetchWithTimeout 은 헤더가 도착하면 finally 에서 타이머를 꺼버려서, 그 뒤의 res.json() 은
+//   **타임아웃이 전혀 없다.** GAS 가 헤더만 먼저 주고 본문이 늘어지면 무한정 매달린다
+//   (동기화가 "동기화 중"에서 안 끝나는 경로).
+async function fetchJsonWithTimeout(url, options, ms) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms || 15000);
+  const t0 = Date.now();
   try {
-    const res = await fetchWithTimeout(WEBAPP_URL + '?action=read', { method: 'GET', redirect: 'follow' }, 30000);
-    if (!res.ok) return { ok: false, error: 'HTTP ' + res.status };
-    const json = await res.json();
-    return json; // { ok:true, members:[...] }
+    const res = await fetch(url, { ...(options || {}), signal: ctrl.signal });
+    const text = await res.text();          // ← 본문도 signal 아래
+    const ms2 = Date.now() - t0;
+    if (!res.ok) return { ok: false, error: 'HTTP ' + res.status + (text ? ' · ' + text.slice(0, 150) : ''), _ms: ms2 };
+    try { return { ...JSON.parse(text), _ms: ms2 }; }
+    catch (e) { return { ok: false, error: '응답 파싱 실패: ' + text.slice(0, 150), _ms: ms2 }; }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+ipcMain.handle('sync-sheet', async (event, opts) => {
+  const t0 = Date.now();
+  try {
+    // _ms 로 왕복 시간을 함께 돌려준다 — 느림의 원인이 GAS 인지 앱인지 가르는 유일한 근거다.
+    return await fetchJsonWithTimeout(WEBAPP_URL + '?action=read', { method: 'GET', redirect: 'follow' }, 30000);
   } catch (e) {
-    const msg = (e && e.name === 'AbortError') ? '응답 지연(타임아웃)' : String(e && e.message || e);
-    return { ok: false, error: msg };
+    const timeout = (e && e.name === 'AbortError');
+    const msg = timeout ? '응답 지연(타임아웃)' : String(e && e.message || e);
+    return { ok: false, error: msg, timeout, _ms: Date.now() - t0 };
   }
 });
 
