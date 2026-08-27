@@ -18,8 +18,17 @@ const GMAIL_CLIENT_ID = SECRETS.GMAIL_CLIENT_ID || '';
 const GMAIL_CLIENT_SECRET = SECRETS.GMAIL_CLIENT_SECRET || '';
 const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.modify';
 
-// 구글 시트 연동 — Apps Script 웹앱 URL (기존 배포 유지)
-const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzpYvgADNXn3POEe-XDsOVR9Q1AvH_xJ_d38vymNNkjdKCtjtEIiSJJVrpX61FA_6wGbg/exec';
+// ⚠️⚠️ 여기에 실제 웹앱 URL 을 다시 넣지 말 것. ⚠️⚠️
+//
+// _apptest 는 맥 크래시 진단용으로 만든 **앱 전체의 낡은 포크**다(렌더러가 본체와 169줄 다름).
+// 웹앱은 무인증이라 build-secrets 없이도 시트 읽기·쓰기가 전부 동작하고,
+// 아래 post-sheet 쓰기 핸들러도 살아 있다. 게다가 .github/workflows/apptest.yml 은
+// `apptest-*` 태그만 밀면 이 포크를 맥에서 빌드해 릴리스에 DMG 로 붙인다.
+// → 그 DMG 로 완료 체크·삭제를 눌러 보면 **팀의 실제 업무 시트가 바뀐다.**
+//   appId 만 달라 userData 는 분리돼 있지만 시트는 분리돼 있지 않다.
+//
+// 진단 목적이면 별도 테스트 시트로 웹앱을 새로 배포해 그 URL 을 쓸 것.
+const WEBAPP_URL = '';
 
 // 참고: 과거 '고용량 RAM 맥 V8 크래시 방지'용으로 넣었던
 // app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096') 는 제거함.

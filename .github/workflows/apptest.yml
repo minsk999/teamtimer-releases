@@ -22,3 +22,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: _apptest/dist/*.dmg
+          # ★prerelease 필수 — 없으면 이 진단 태그가 releases/latest 가 된다.
+          #   앱의 cmpVer 는 'apptest-3' 을 파싱 못 해 0 으로 보고 hasUpdate=false 를 내므로,
+          #   그 순간부터 팀 전원의 업데이트 배너가 오류 표시도 없이 영구히 죽는다.
+          prerelease: true

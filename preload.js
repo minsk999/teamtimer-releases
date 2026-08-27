@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('timerAPI', {
   // 구글 시트 동기화 (읽기)
   syncSheet: (config) => ipcRenderer.invoke('sync-sheet', config),
 
+  // 팀원 명단만 (가벼움) — 아직 이름을 안 고른 새 설치가 목록을 받는 유일한 경로
+  fetchMembers: () => ipcRenderer.invoke('fetch-members'),
+
   // 구글 시트 쓰기 (완료토글·메모수정·작업추가)
   postSheet: (payload) => ipcRenderer.invoke('post-sheet', payload),
 

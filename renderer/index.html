@@ -376,6 +376,12 @@
   }
   .overlay.show { display: flex; }
   @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  /* 퇴장 — closeModal 이 .show 를 유지한 채 .closing 을 얹는다(display:flex 가 남아야 보인다).
+     pointer-events:none 이 없으면 닫히는 160ms 동안 [저장]이 한 번 더 눌린다. */
+  .overlay.closing { animation: fadeOut 0.16s ease forwards; pointer-events: none; }
+  .overlay.closing .modal { animation: downOut 0.16s cubic-bezier(0.4, 0, 1, 1) forwards; }
+  @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes downOut { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(8px) scale(0.99); } }
 
   .modal {
     background: var(--surface); border-radius: 26px; width: 500px;
@@ -396,7 +402,7 @@
   .modal-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.035em; display: flex; align-items: center; gap: 0; }
   .modal-body { padding: 22px 28px 28px; }
 
-  .field { margin-bottom: 22px; }
+  .field { margin-bottom: 22px; transition: opacity 0.16s ease; }
   .field > label {
     display: block; font-size: 11px; font-weight: 700; color: var(--ink-3);
     letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 9px;
@@ -409,6 +415,14 @@
   .field input[type="text"]:focus { border-color: var(--ink); }
   .field .opt { font-weight: 500; color: var(--ink-3); text-transform: none; letter-spacing: 0; }
   .field .setting-desc { margin-top: -4px; }
+  /* ── 위계 2단 ────────────────────────────────────────────────
+     구분선 그룹당 `.field > label`(11px/700/uppercase)은 그룹 이름 하나뿐이고,
+     같은 그룹 안의 하위 항목은 .demoted 로 내려 항목 이름 어휘(13px/600, msl-label 과 동일)를 쓴다.
+     이게 없으면 '알람 방식'과 '상태 색상'이 같은 무게로 읽힌다. */
+  .field.demoted > label {
+    font-size: 13px; font-weight: 600; color: var(--ink);
+    letter-spacing: 0; text-transform: none; margin-bottom: 6px;
+  }
 
   /* 인트라넷 링크 불러오기 */
   .link-fetch-row { display: flex; gap: 8px; }
@@ -529,7 +543,20 @@
   .stat-line:hover { opacity: 0.7; }
 
   /* 일반 옵션 행 (토글) */
-  .opt-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; padding: 4px 0; }
+  /* 클릭 타깃은 실제로 행 전폭인데 hover 피드백이 없어 토글만 눌러야 하는 것처럼 보였다.
+     좌우로만 10px 넓히고 음수 마진으로 되돌려 텍스트 정렬·행 높이는 그대로 둔다(세로 변화 0). */
+  .opt-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer;
+    padding: 4px 10px; margin: 0 -10px; border-radius: 11px; transition: background 0.13s, opacity 0.16s ease; }
+  .opt-row[onclick]:hover { background: var(--bg-soft); }
+  /* 다크는 --bg-soft(#18181b)가 모달 배경 --surface(#161616)와 2~5/255 차이라 안 보인다.
+     --surface-2(#1e1e1e)는 8/255 로, 라이트의 체감(10/255)과 비슷하게 맞는다. */
+  .dark .opt-row[onclick]:hover { background: var(--surface-2); }
+  /* 흐려 둔(비활성) 행은 hover 도 끈다 — 안 그러면 40% 로 흐린 행이 활성 행과 똑같이
+     반응해 놓고 누르면 토스트로 튕긴다. ★pointer-events 로 막으면 안 된다: 그 안내가 떠야 한다. */
+  .opt-row.is-off:hover, .dark .opt-row.is-off:hover { background: transparent; }
+  /* ★margin shorthand 가 margin-top 을 0 으로 만들므로 이 규칙은 반드시 뒤에 와야 한다.
+     칩 다음에 오는 토글 행의 광학 여백 18px(= 14 + padding 4) 유지. */
+  #modal-settings .seg + .opt-row { margin-top: 14px; }
   .opt-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .opt-title { font-size: 14px; font-weight: 600; color: var(--ink); }
   .opt-desc { font-size: 12px; color: var(--ink-3); line-height: 1.45; }
@@ -546,7 +573,6 @@
   .key-cap.fixed:hover { border-color: var(--line); }
   #modal-keys { z-index: 120; } /* 설정 모달 위에 표시 */
   .mail-slider-row { margin-top: 14px; }
-  .mail-slider-row:first-child { margin-top: 12px; }
   .mail-slider-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
   .mail-slider-head .msl-label { font-size: 13px; font-weight: 600; color: var(--ink); }
   .mail-slider-head .msl-val { font-size: 13px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -614,9 +640,12 @@
   .mh-toggle { display: flex; align-items: center; gap: 7px; cursor: pointer; user-select: none; }
   .mh-toggle span { font-size: 11.5px; color: var(--ink-3); font-weight: 600; white-space: nowrap; }
   .mh-switch { position: relative; width: 36px; height: 21px; border-radius: 100px; background: var(--line); transition: background 0.2s; flex-shrink: 0; }
-  .mh-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.2s; }
+  .mh-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.2s, background 0.2s; }
   .mh-toggle.on .mh-switch { background: var(--ink); }
   .mh-toggle.on .mh-switch::after { transform: translateX(15px); }
+  /* 손잡이가 하드코딩 #fff 라 다크에서 켜면 대비가 1.42:1 이었다(흰 손잡이 위 밝은 트랙).
+     라이트는 --pill-text 가 #ffffff 라 한 픽셀도 안 바뀌고, 다크만 12.7:1 로 올라간다. */
+  .mh-toggle.on .mh-switch::after { background: var(--pill-text); }
   .mail-list { display: flex; flex-direction: column; gap: 3px; }
   .mail-item { display: flex; align-items: flex-start; gap: 11px; padding: 12px 13px; border-radius: 14px; cursor: pointer; transition: background 0.13s; border: 1px solid transparent; }
   .mail-item:hover { background: var(--surface-2); }
@@ -802,16 +831,30 @@
   .add-preset:hover { border-color: var(--ink-3); color: var(--ink); }
 
   /* 설정 — 구분선 & 세그먼트 */
-  .settings-divider { height: var(--hairline); background: var(--line); margin: 22px 0; }
+  .settings-divider { height: var(--hairline); background: var(--line); margin: 28px 0; }
   .seg { display: flex; gap: 6px; flex-wrap: wrap; }
   .seg-btn {
     border: 1.5px solid var(--line); background: var(--surface); border-radius: 100px;
-    padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+    padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
     color: var(--ink-2); transition: all 0.13s; letter-spacing: -0.01em;
   }
   .seg-btn:hover { border-color: var(--ink-3); }
   .seg-btn.on { background: var(--pill); border-color: var(--pill); color: var(--pill-text); }
+  /* ★.on 이 뒤에 오고 특이도가 같아서, 이 줄이 없으면 켜진 칩은 hover 변화가 0이다. */
+  .seg-btn.on:hover { opacity: 0.85; }
   .seg-btn.seg-custom { border-style: dashed; }
+  /* ── 다중 선택 칩 ──────────────────────────────────────────────
+     .toggle 은 마크업에 6곳 박혀 있었지만 규칙이 없어서, 여러 개를 켤 수 있는 칩과
+     하나만 고르는 칩이 픽셀 단위로 똑같이 생겼었다. 점으로 '체크됨'을 드러낸다.
+     ⚠ 폭 수지: 점 +13px(6px + gap 7px) − padding 회수 4px = **칩당 순 +9px**.
+       회수는 부분일 뿐 전체 폭은 늘었다. 가장 빠듯한 #seg-mail-kinds 여유가 한 자릿수 px 로
+       줄었으니, 이 칩 라벨을 늘리거나 padding 을 16px 로 되돌리면 440px 창에서 2줄이 된다. */
+  .seg-btn.toggle { display: inline-flex; align-items: center; gap: 7px; }
+  .seg-btn.toggle::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor; opacity: 0.28; transition: opacity 0.13s;
+  }
+  .seg-btn.toggle.on::before { opacity: 1; }
   .custom-sound-name {
     display: flex; align-items: center; gap: 7px; margin-top: 10px; padding: 9px 14px;
     background: var(--surface-2); border: var(--hairline) solid var(--line); border-radius: 10px;
@@ -1250,11 +1293,14 @@
 
 <!-- 설정 모달 -->
 <div class="overlay" id="modal-settings">
-  <div class="modal">  <div class="modal-inner">
+  <div class="modal">
     <div class="modal-head">
       <h2><span>설정</span><span class="app-ver" id="app-ver">v1.0.0</span><a class="update-badge" id="update-badge" href="#" style="display:none">업데이트 있음</a></h2>
       <button class="close-btn" onclick="closeModal('modal-settings')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
+    <!-- ★modal-head 는 스크롤 영역 밖이어야 한다 — 안에 두면 설정을 조금만 내려도
+         제목·버전·닫기 [X] 가 화면에서 사라진다(탈출구가 ESC 뿐인데 표시가 없다). -->
+    <div class="modal-inner">
     <div class="modal-body">
       <div class="field">
         <label>작업자</label>
@@ -1312,10 +1358,28 @@
         </div>
       </div>
 
+      <div class="field demoted">
+        <label>받을 메일 종류</label>
+        <p class="setting-desc">인트라넷 메일을 제목 말머리로 구분해요. 어느 쪽에도 안 맞는 메일은 항상 받아요.</p>
+        <div class="seg" id="seg-mail-kinds">
+          <button class="seg-btn toggle" data-val="req">업무 요청</button>
+          <button class="seg-btn toggle" data-val="comment">코멘트 알림</button>
+          <button class="seg-btn toggle" data-val="assign">담당자 배정</button>
+        </div>
+        <div class="opt-row" onclick="toggleMailHide()">
+          <div class="opt-text">
+            <span class="opt-title">목록에서도 숨기기</span>
+            <span class="opt-desc">꺼두면 알림만 안 와요. 켜면 목록·배지에서도 빠져요.</span>
+          </div>
+          <div class="mh-toggle" id="mail-hide-toggle"><div class="mh-switch"></div></div>
+        </div>
+      </div>
+
       <div class="settings-divider"></div>
 
       <div class="field">
-        <label>일반</label>
+        <label>일반 <span class="opt">즉시 적용</span></label>
+        <p class="setting-desc">앱 실행 방식과 링크·단축키를 정해요.</p>
         <div class="opt-row" onclick="toggleAutostart()">
           <div class="opt-text">
             <span class="opt-title">시작 시 자동 실행</span>
@@ -1363,7 +1427,7 @@
       <div class="settings-divider"></div>
 
       <div class="field">
-        <label>알람 방식</label>
+        <label>알람</label>
         <p class="setting-desc">알림과 소리를 함께 켤 수 있어요. 끄기를 누르면 모두 해제돼요.</p>
         <div class="seg" id="seg-mode">
           <button class="seg-btn toggle" data-val="notify">알림</button>
@@ -1372,7 +1436,7 @@
         </div>
       </div>
 
-      <div class="field" id="field-sound">
+      <div class="field demoted" id="field-sound">
         <label>알람 소리</label>
         <p class="setting-desc">버튼을 누르면 미리 들어볼 수 있어요. 직접 추가로 내 음원도 쓸 수 있어요.</p>
         <div class="seg" id="seg-sound">
@@ -1383,7 +1447,7 @@
         </div>
         <input type="file" id="custom-sound-input" accept="audio/*" style="display:none;">
         <div id="custom-sound-name" class="custom-sound-name" style="display:none;"></div>
-        <div class="mail-slider-row" style="margin-top:14px;">
+        <div class="mail-slider-row">
           <div class="mail-slider-head">
             <span class="msl-label">음량</span>
             <span class="msl-val" id="vol-val">80%</span>
@@ -1393,7 +1457,7 @@
         </div>
       </div>
 
-      <div class="field">
+      <div class="field demoted">
         <label>기본 알람 시점</label>
         <p class="setting-desc">새 작업을 추가할 때 기본으로 설정될 알람 시점이에요.</p>
         <div class="seg" id="seg-default-alarm">
@@ -1404,6 +1468,8 @@
           <button class="seg-btn" data-val="180">3시간</button>
         </div>
       </div>
+
+      <div class="settings-divider"></div>
 
       <div class="field">
         <label>상태 색상</label>
@@ -1815,11 +1881,20 @@
 
   // 동기화 — Apps Script 읽기 API에서 내 영상작업 + 관리항목 가져오기
   let lastSyncOkAt = 0;     // 마지막 동기화 성공 시각
-  let syncInFlight = false; // 조용한 동기화 포함 중복 실행 방지
+  let syncInFlight = false;         // 조용한 동기화 포함 중복 실행 방지
+  let syncInFlightPromise = null;   // 진행 중인 동기화 — 겹친 호출은 이걸 그대로 돌려받는다
+  let syncQueued = false;           // 진행 중에 새 요청이 들어옴 → 끝나고 한 번 더
+
+  // ⚠ 겹친 호출을 그냥 버리면(예전: `if (syncInFlight) return;`) `await doSync()` 가
+  //   아무것도 기다리지 않은 채 통과한다. 그 결과
+  //     ① 방금 추가한 작업이 진행 중이던 옛 응답에 덮여 최대 10분간 사라지고
+  //     ② 삭제 뒤 행번호 재조정이 무효가 되며
+  //     ③ 수동 요청(스페이스바·동기화 pill)이 아무 반응 없이 씹힌다.
+  //   → 진행 중인 회차를 돌려주고, 그 뒤에 한 번 더 돌려서 호출자가 방금 쓴 내용까지 반영한다.
+  //   (메일 쪽 loadMail 이 쓰던 "진행 중인 로딩에 합류" 패턴과 같은 방식)
   async function doSync(opts) {
     opts = opts || {};
-    const silent = !!opts.silent;
-    const pill = $("sync-pill");
+    let silent = !!opts.silent;
     const myName = getMyName();
     if (!myName) {
       if(!silent){ toast("설정에서 작업자를 먼저 선택해주세요"); openSettings(); }
@@ -1829,12 +1904,30 @@
       if(!silent) toast("앱(데스크톱)에서만 동기화돼요");
       return;
     }
-    if (syncInFlight) return; // 이미 동기화 중(조용한 호출 포함) → 중복 요청 무시
-    syncInFlight = true;
+    if (syncInFlight) { syncQueued = true; return syncInFlightPromise; }
 
-    // ⚠ 여기서부터 finally 전까지 절대 return 하지 말 것.
-    //   try 밖에서 빠져나가면 syncInFlight 가 true 로 남아 이후 모든 동기화가 막힌다.
-    //   (예전 버그: pill.classList.contains("syncing") 체크 후 return → 앱 재시작 전까지 먹통)
+    syncInFlight = true;
+    syncInFlightPromise = (async () => {
+      try {
+        let last, rounds = 0;
+        do {
+          syncQueued = false;
+          last = await runSyncOnce(silent);
+          silent = true;                 // 후속 회차는 조용히 (토스트·pill 중복 방지)
+        } while (syncQueued && ++rounds < 4);   // 상한 — 폭주 방지
+        return last;
+      } finally {
+        syncInFlight = false;            // 어떤 경로로 끝나도 반드시 잠금 해제
+        syncInFlightPromise = null;
+      }
+    })();
+    return syncInFlightPromise;
+  }
+
+  // 실제 1회 동기화. 잠금은 doSync 가 잡고 있으므로 여기서는 건드리지 않는다.
+  async function runSyncOnce(silent) {
+    const pill = $("sync-pill");
+    const myName = getMyName();
     let textEl, orig;
     if(!silent && pill){
       pill.classList.add("syncing");
@@ -1858,10 +1951,10 @@
       const cnt = applyView(viewName);
       lastSyncOkAt = Date.now(); // 포커스 프리싱크 기준 시각
       if(!silent) toast(`동기화 완료 · 작업 ${cnt}건`);
+      return cnt;
     } catch (e) {
       if(!silent) toast("동기화 실패: " + (e.message || e));
     } finally {
-      syncInFlight = false;   // 어떤 경로로 끝나도 반드시 잠금 해제
       if(!silent && pill){
         pill.classList.remove("syncing");
         if(textEl && orig !== undefined) textEl.textContent = orig;
@@ -1869,26 +1962,44 @@
     }
   }
 
+  // 시트 응답 1명분 → 화면용 작업 배열. applyView(보는 사람)와 refreshMyTasks(나) 둘 다 사용.
+  function mapVideoTasks(m) {
+    return ((m && m.video) || []).map(v => ({
+      id: v.row,
+      title: v.title,
+      deadline: deadlineFor(v.dueISO, v.requestLink || "", v.title),
+      type: "req",
+      done: !!v.done,
+      alarm: alarmFor(v.requestLink || "", v.title),
+      reqLink: v.requestLink || "",
+      planLink: v.planLink || "",
+      _row: v.row, _status: v.status || "", _memo: v.memo || "", _side: m.side
+    }));
+  }
+
+  // ⚠ 알람은 '보고 있는 보드'가 아니라 '내 보드'로 판정해야 한다.
+  //   tasks 는 Q/E 로 팀원 보드를 넘겨보는 순간 그 사람 것으로 통째 교체되므로,
+  //   그 상태로 checkAlarms 를 돌리면 (1) 내 알람이 판정조차 안 되고
+  //   (2) 남의 마감 알림이 내 데스크톱에 뜬다. → 내 몫을 따로 유지한다.
+  //   내 보드를 보고 있을 때는 tasks 를 그대로 가리켜(복사 아님) 낙관적 수정이 알람에 즉시 반영되게 한다.
+  let myTasks = [];
+  function refreshMyTasks() {
+    const me = getMyName();
+    if (viewName === me) { myTasks = tasks; return; }
+    myTasks = mapVideoTasks((allMembersData || []).find(x => x.name === me));
+  }
+
   // 현재 보는 사람(name) 기준으로 tasks/mgmt 매핑 + 렌더 (롤링)
   function applyView(name) {
     viewName = name;
     const m = (allMembersData || []).find(x => x.name === name);
     if (m) {
-      tasks = (m.video || []).map(v => ({
-        id: v.row,
-        title: v.title,
-        deadline: deadlineFor(v.dueISO, v.requestLink || "", v.title),
-        type: "req",
-        done: !!v.done,
-        alarm: alarmFor(v.requestLink || "", v.title),
-        reqLink: v.requestLink || "",
-        planLink: v.planLink || "",
-        _row: v.row, _status: v.status || "", _memo: v.memo || "", _side: m.side
-      }));
+      tasks = mapVideoTasks(m);
       mgmtItems = m.mgmt || [];
     } else {
       tasks = []; mgmtItems = [];
     }
+    refreshMyTasks();
     document.body.classList.toggle("readonly", name !== getMyName());
     // 데이터가 실제로 바뀐 렌더(첫 로드·동기화 반영·보드 전환)에만 등장 모션
     const _sig = name + "|" + JSON.stringify(m ? m.video : null) + "|" + JSON.stringify(m ? m.mgmt : null);
@@ -1910,7 +2021,21 @@
   function isReadonly(){ return viewName !== getMyName(); }
 
   // 모달
-  // 메일 (Gmail) — 다음 단계에서 구현. 지금은 자리만.
+  // ── 알람 설정 ──
+  // ★선언 위치 주의: 아래 메일 블록(캐시 복원 IIFE·필터 헬퍼)이 alarmSettings 를 읽으므로
+  //   반드시 그보다 먼저 선언돼야 한다. 설정 UI 쪽으로 내리면 TDZ ReferenceError 가 난다.
+  let alarmSettings = {
+    notify: true, sound: true, soundType: "ding", repeat: "1", defaultAlarm: "60",
+    volume: 0.8, customSoundData: null, customSoundName: "",
+    // 받을 메일 종류 — 키는 MAIL_KINDS 의 key. 기본은 셋 다 켜짐(기존 동작 유지).
+    // 값이 없거나 undefined 면 '켜짐'으로 본다(구버전 설정에서 올라와도 메일을 놓치지 않게).
+    mailKinds: { req: true, comment: true, assign: true },
+    // 필터 적용 범위: "notify" = 알림만 끄기(목록엔 남음) / "hide" = 목록·배지에서도 제외
+    mailFilterScope: "notify",
+  };
+  try { const _as = JSON.parse(localStorage.getItem("alarmSettings") || "null"); if (_as && typeof _as === "object") alarmSettings = { ...alarmSettings, ..._as }; } catch(e){}
+
+  // 메일 (Gmail)
   // 새 메일 알림: 카운트 증감이 아니라 '새로운 안읽음 메일 ID'가 생겼을 때만 1회 알림(중복 방지)
   let notifiedIds = new Set();
   try { const _a = JSON.parse(localStorage.getItem("notifiedMailIds") || "[]"); if(Array.isArray(_a)) notifiedIds = new Set(_a); } catch(e){}
@@ -1922,15 +2047,34 @@
   //   "업무 전달"   → 담당자 배정
   //   "코멘트 알림" → 코멘트 알림
   const MAIL_KINDS = [
-    { re: /코멘트\s*알림/, label: "코멘트 알림" },
-    { re: /업무\s*전달/,   label: "담당자 배정" },
-    { re: /업무\s*요청/,   label: "업무 요청" },
+    { key: "comment", re: /코멘트\s*알림/, label: "코멘트 알림" },
+    { key: "assign",  re: /업무\s*전달/,   label: "담당자 배정" },
+    { key: "req",     re: /업무\s*요청/,   label: "업무 요청" },
   ];
   function mailKind(text){
     const s = String(text || "");
     for(const k of MAIL_KINDS){ if(k.re.test(s)) return k; }
     return null;
   }
+
+  // ── 메일 종류별 필터 (설정 → 알람 → 받을 메일 종류) ──
+  // ★어느 분류에도 안 걸리는 메일은 **항상 통과**시킨다.
+  //   인트라넷이 제목 형식을 바꿔도 메일을 놓치지 않게 하는 안전장치다(안 오는 것보다 오는 게 낫다).
+  function mailKindKey(m){
+    const k = mailKind(m && (m.subject || m.fullSubject));
+    return k ? k.key : null;
+  }
+  // 값이 명시적으로 false 일 때만 끈 것으로 본다 — 구버전 설정에 키가 없어도 켜짐으로 동작한다.
+  function mailKindOn(key){
+    if(!key) return true;
+    const mk = alarmSettings.mailKinds || {};
+    return mk[key] !== false;
+  }
+  function mailNotifyOk(m){ return mailKindOn(mailKindKey(m)); }
+  // 목록·배지에서 뺄지는 '적용 범위'가 정한다. 기본(notify)은 알림만 끄고 목록엔 남긴다.
+  function mailVisible(m){ return alarmSettings.mailFilterScope === "hide" ? mailNotifyOk(m) : true; }
+  function visibleMail(){ return mailData.filter(mailVisible); }
+  function visibleUnreadCount(){ return visibleMail().filter(m => m.unread).length; }
   // 말머리를 뺀 '실제 제목'만 추림. 제목이 말머리뿐이면 요청자/본문요약으로 대체.
   function mailBodyText(m){
     if(!m) return "";
@@ -1961,11 +2105,17 @@
     window.timerAPI.notify(title, body, mailId); // 클릭 시 설정대로 열도록 id 전달
   }
   // 전체 목록(정밀) 기준으로 '아직 알리지 않은 안읽음'만 골라 알림 — 중복 방지의 핵심
+  //
+  // ★알림 필터는 반드시 **여기**서 건다(notifyNewMailFor 가 아니다). 이유 두 가지:
+  //   ① playAlarmSound() 가 notifyNewMailFor 바깥에 있어, 거기서 걸러도 소리는 그대로 난다.
+  //   ② notifiedIds 를 여기서 갱신하는데, 걸러진 메일까지 '알린 것'으로 기록해 버리면
+  //      나중에 그 종류를 다시 켜도 그 사이 쌓인 메일은 영영 알림이 오지 않는다.
+  //   → notifiedIds 에는 **알림 대상만** 넣는다. 그래야 필터를 되돌렸을 때 그때 한 번 알린다.
   function maybeNotifyNewMail(messages){
     if(!Array.isArray(messages)) return;
-    const unreadIds = messages.filter(m => m.unread).map(m => m.id);
-    const fresh = unreadIds.filter(id => !notifiedIds.has(id));
-    notifiedIds = new Set(unreadIds); // 현재 안읽음만 유지(읽음/삭제된 건 정리)
+    const allowedIds = messages.filter(m => m.unread && mailNotifyOk(m)).map(m => m.id);
+    const fresh = allowedIds.filter(id => !notifiedIds.has(id));
+    notifiedIds = new Set(allowedIds); // 알림 대상 안읽음만 유지(읽음/삭제/필터제외분 정리)
     saveNotifiedIds();
     if(fresh.length){
       if(alarmSettings.sound) playAlarmSound();
@@ -1978,10 +2128,14 @@
     else window.open(url, "_blank");
   }
 
+  // ★인자를 생략하면 현재 목록에서 직접 센다(필터 반영). 호출부가 6곳이라 각자 세게 두면
+  //   화면 배지와 트레이 점·Dock 배지가 어긋난다 — 세는 곳을 여기 하나로 모은다.
+  //   숫자를 넘기는 건 목록과 무관한 경우(연결 해제 시 0)뿐이다.
   function setMailBadge(n){
+    const count = (typeof n === "number") ? n : visibleUnreadCount();
     const b = $("mail-badge"); if(!b) return;
-    if(n > 0){
-      b.textContent = n > 99 ? "99+" : String(n);
+    if(count > 0){
+      b.textContent = count > 99 ? "99+" : String(count);
       b.hidden = false; b.style.display = "inline-flex";
       void b.offsetWidth; // 강제 reflow — 즉시 그려지게(리사이즈 전에도 표시)
     } else {
@@ -1989,13 +2143,13 @@
     }
     // 트레이/작업표시줄 빨간 점 (알림 자체는 maybeNotifyNewMail에서 ID 기준으로 처리)
     if(typeof window.timerAPI !== "undefined" && window.timerAPI.updateMailUnread){
-      window.timerAPI.updateMailUnread(n, { notify: !!alarmSettings.notify, sound: !!alarmSettings.sound });
+      window.timerAPI.updateMailUnread(count, { notify: !!alarmSettings.notify, sound: !!alarmSettings.sound });
     }
   }
   // ── 메일 화면 ──
   let mailMode = false, mailData = [], mailLatestFirst = true, mailLoading = false;
   // 캐시가 있으면 시작 시 즉시 배지/목록 데이터 복원 (백그라운드 갱신 전까지 빈 화면 방지)
-  (function(){ try { const c = loadMailCache(); if(c && Array.isArray(c.messages)){ mailData = c.messages; setMailBadge(c.unreadCount || 0); mailData.filter(m=>m.unread).forEach(m=> notifiedIds.add(m.id)); saveNotifiedIds(); lastBadgeCount = c.unreadCount || 0; } } catch(e){} })();
+  (function(){ try { const c = loadMailCache(); if(c && Array.isArray(c.messages)){ mailData = c.messages; setMailBadge(); mailData.filter(m=>m.unread && mailNotifyOk(m)).forEach(m=> notifiedIds.add(m.id)); saveNotifiedIds(); lastBadgeCount = c.unreadCount || 0; } } catch(e){} })();
 
   // 메일 새로고침 주기 단계값 — 5초만 예외적으로 촘촘하고, 10초부터는 10초 간격
   const POLL_STEPS = [5, 10, 20, 30, 40, 50, 60];
@@ -2122,7 +2276,7 @@
       const res = await window.timerAPI.gmailList({ max: mailSettings.fetchCount });
       if(res && res.ok){
         mailData = res.messages || [];
-        setMailBadge(res.unreadCount);
+        setMailBadge();   // 서버 카운트 대신 필터 반영된 목록에서 센다
         lastBadgeCount = res.unreadCount; // 정밀 값으로 폴링 기준 동기화(경량/정밀 불일치 방지)
         renderMailList();
         maybeNotifyNewMail(mailData); // 정밀 목록 기준 새 메일만 알림(중복 방지)
@@ -2168,23 +2322,28 @@
     const removed = mailData[idx];
     mailData.splice(idx, 1);              // 낙관적 제거
     renderMailList();
-    setMailBadge(mailData.filter(m => m.unread).length);
+    setMailBadge();
     if(typeof window.timerAPI === "undefined" || !window.timerAPI.gmailTrash){ toast("앱에서만 삭제돼요"); return; }
     const r = await window.timerAPI.gmailTrash(id);
     if(r && r.ok){ toast("메일을 휴지통으로 옮겼어요"); }
-    else { mailData.splice(idx, 0, removed); renderMailList(); setMailBadge(mailData.filter(m => m.unread).length); toast("삭제 실패 — 되돌렸어요"); }
+    else { mailData.splice(idx, 0, removed); renderMailList(); setMailBadge(); toast("삭제 실패 — 되돌렸어요"); }
   }
 
   function renderMailList(){
     const host = $("mail-list");
-    const unread = mailData.filter(m=>m.unread).length;
-    setMailCountText(mailData.length ? `${mailData.length}건 · 안읽음 ${unread}` : "0건");
+    // '목록에서도 숨기기'를 고른 경우에만 걸러진다. 캐시는 원본 mailData 로 저장한다 —
+    // 필터는 표시 단계에서만 적용해야 설정을 되돌렸을 때 메일이 되살아난다.
+    const shown = visibleMail();
+    const unread = shown.filter(m=>m.unread).length;
+    setMailCountText(shown.length ? `${shown.length}건 · 안읽음 ${unread}` : "0건");
     saveMailCache();
-    if(!mailData.length){
-      host.innerHTML = `<div class="mail-empty">업무요청 메일이 없어요</div>`;
+    if(!shown.length){
+      host.innerHTML = mailData.length
+        ? `<div class="mail-empty">받기로 한 종류의 메일이 없어요<div class="me-sub">설정 → 알람 → 받을 메일 종류에서 바꿀 수 있어요</div></div>`
+        : `<div class="mail-empty">업무요청 메일이 없어요</div>`;
       return;
     }
-    let list = mailData.slice().sort((a,b)=> b.ts - a.ts); // 기본 최신순(ON)
+    let list = shown.slice().sort((a,b)=> b.ts - a.ts); // 기본 최신순(ON)
     if(!mailLatestFirst){
       list.sort((a,b)=>{
         if(a.unread !== b.unread) return a.unread ? -1 : 1; // OFF: 안읽음 먼저
@@ -2213,7 +2372,7 @@
     // 낙관적: 읽음 처리 + 배지/목록 갱신
     if(m && m.unread){
       m.unread = false;
-      setMailBadge(mailData.filter(x=>x.unread).length);
+      setMailBadge();
       renderMailList();
     }
     window.timerAPI.gmailMarkRead(id); // 읽음 처리 (목록에 없어도 id로 처리, 이미 읽음이면 무해)
@@ -2249,7 +2408,7 @@
     resetCal("main");
     renderChips("chip-grid", ts=>{selDl=ts; showPrev(ts,"main");});
     renderAlarms();
-    $("modal-task").classList.add("show");
+    openModal("modal-task");
     setTimeout(()=>$("f-reqlink").focus(),100);
   }
   function openEdit(id) {
@@ -2273,7 +2432,7 @@
     })();
     renderChips("chip-grid", ts=>{selDl=ts; showPrev(ts,"main");});
     renderAlarms(); showPrev(t.deadline,"main");
-    $("modal-task").classList.add("show");
+    openModal("modal-task");
   }
 
   // 인트라넷 링크에서 정보 불러오기
@@ -2300,9 +2459,46 @@
     $("dl-prev-import").style.display="none"; $("custom-row-import").classList.remove("show");
     resetCal("import");
     renderChips("chip-grid-import", ts=>{selDlImport=ts; showPrev(ts,"import");});
-    $("modal-import").classList.add("show");
+    openModal("modal-import");
   }
-  function closeModal(id){ $(id).classList.remove("show"); if(typeof closeColorPicker==="function") closeColorPicker(); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
+  // 퇴장 모션 — 등장은 fade 0.2s + up 0.3s 인데 닫을 때는 0ms 하드컷이었다.
+  // .show 를 유지한 채 .closing 을 얹고(오버레이가 display:flex 로 남아야 애니메이션이 보인다),
+  // 끝나면 둘 다 뗀다. ★.closing 은 pointer-events:none 이라 그 사이 [저장]이 두 번 눌리지 않는다.
+  const MODAL_EXIT_MS = 160;
+  const modalExitTimers = {};   // id → 진행 중인 퇴장 타이머
+  function closeModal(id){
+    const el = $(id); if(!el) return;
+    if(typeof closeColorPicker==="function") closeColorPicker();
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if(modalExitTimers[id]){ clearTimeout(modalExitTimers[id]); modalExitTimers[id] = null; }
+    if(!el.classList.contains("show")){ el.classList.remove("closing"); return; }
+    if(reducedMotion()){ el.classList.remove("show"); el.classList.remove("closing"); return; }
+    el.classList.add("closing");
+    modalExitTimers[id] = setTimeout(() => {
+      modalExitTimers[id] = null;
+      // ★그 사이 다시 열렸으면 건드리지 않는다 — 아니면 방금 연 모달이 사라진다.
+      if(!el.classList.contains("closing")) return;
+      el.classList.remove("show"); el.classList.remove("closing");
+    }, MODAL_EXIT_MS);
+  }
+  // ★모달을 열 땐 반드시 이걸 쓴다. 퇴장 타이머를 취소하고 .closing 을 떼지 않으면
+  //   닫자마자 다시 여는 경로에서 (a) 새로 연 모달이 곧바로 사라지거나
+  //   (b) fadeOut(forwards) 이 남아 투명한 채로 열린다. 둘 다 실측으로 확인했다.
+  function openModal(id){
+    const el = $(id); if(!el) return;
+    if(modalExitTimers[id]){ clearTimeout(modalExitTimers[id]); modalExitTimers[id] = null; }
+    el.classList.remove("closing");
+    el.classList.add("show");
+  }
+  // ★"열려 있는가"는 반드시 이걸로 판정한다. 퇴장 애니메이션 중(.closing)에는
+  //   .show 가 160ms 더 남아 있는데, 그걸 열림으로 읽으면
+  //   ESC·설정 단축키가 그 사이 삼켜지고, 키 리피트(~30ms)에서는 손 뗄 때까지 안 풀린다.
+  function modalShown(el){
+    return !!(el && el.classList.contains("show") && !el.classList.contains("closing"));
+  }
+  function reducedMotion(){
+    try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch(e){ return false; }
+  }
 
   function toggleCustom(scope){ $(`custom-row-${scope}`).classList.toggle("show"); }
 
@@ -2333,7 +2529,7 @@
       if(st.sel&&cur.getTime()===st.sel)cls+=" sel";
       if(holiday||dow===0)cls+=" holiday";
       else if(dow===6)cls+=" sat";
-      const title=holiday?` title="${holiday}"`:"";
+      const title=holiday?` title="${esc(holiday)}"`:"";  // 공휴일 이름은 공공데이터 API 응답값
       h+=`<button type="button" class="${cls}"${title} onclick="calPick(event,'${scope}',${y},${mo},${d})">${d}${holiday?'<span class="hdot"></span>':''}</button>`;
     }
     h+=`</div>`; pop.innerHTML=h;
@@ -2403,17 +2599,20 @@
       // 시간 로컬 저장 (요청글 링크 키)
       taskTimes[timeKey(reqLink, title)] = hmStr; saveTaskTimes();
       // 낙관적 반영
+      const arr = tasks;
       const prev = { title:t.title, deadline:t.deadline, alarm:t.alarm, reqLink:t.reqLink, planLink:t.planLink };
       t.title=title; t.deadline=selDl; t.alarm=selAlarm; t.reqLink=reqLink; t.planLink=planLink;
       setTaskAlarm(reqLink, title, selAlarm); // 알람 시점 로컬 저장(동기화 후 유지)
-      firedAlarms.delete(t.id); // 마감/알람 변경 → 알람 재발화 허용
+      // 제목·링크가 바뀌면 키도 바뀌므로 옛 키와 새 키를 모두 푼다 (재발화 허용)
+      firedAlarms.delete(timeKey(prev.reqLink, prev.title));
+      firedAlarms.delete(timeKey(reqLink, title));
       render();
       const r = await window.timerAPI.postSheet({
         action:"updateTask", member:myName, row: t._row || t.id,
         title, url: reqLink, planLink, dueDate: ymdStr
       });
       if(r && r.ok){ toast("작업을 수정했어요"); await doSync({ silent:true }); }
-      else { Object.assign(t, prev); render(); toast("수정 실패 — 되돌렸어요"); } // 롤백
+      else { afterWriteFail(r, arr, () => Object.assign(t, prev), "수정 실패 — 되돌렸어요"); } // 롤백
     } else {
       if(!reqLink){toast("요청글 링크를 입력해주세요");return;}
       closeModal("modal-task");
@@ -2423,7 +2622,11 @@
       const d = new Date(selDl);
       const ymd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
       const type = reqLink ? "req" : "manual";
-      const temp = { id:`tmp_${Date.now()}`, title, deadline:selDl, type, done:false, alarm:selAlarm, reqLink, planLink, _temp:true }; // ① 즉시 표시
+      // ★임시 id 는 반드시 숫자다. 문자열이면 card() 의 onclick="openTaskReq(${t.id}, event)" 가
+      //   따옴표 없이 보간돼 클릭 시 ReferenceError 가 나고, tick 의 +card.dataset.id 가 NaN 이라
+      //   그 카드만 카운트다운이 멈춘다. 시트 행번호는 항상 양수라 음수와 충돌하지 않는다.
+      const arrAdd = tasks;
+      const temp = { id: -Date.now(), title, deadline:selDl, type, done:false, alarm:selAlarm, reqLink, planLink, _temp:true }; // ① 즉시 표시
       tasks.push(temp);
       setTaskAlarm(reqLink, title, selAlarm); // 알람 시점 로컬 저장(동기화 후 유지)
       render();
@@ -2436,8 +2639,10 @@
         saveTaskTimes();
         toast("작업을 추가했어요"); await doSync({ silent:true });
       } // ③ 행번호 reconcile
-      else if(r && r.duplicate){ tasks = tasks.filter(x=>x.id!==temp.id); render(); toast("이미 등록된 작업이에요"); }
-      else { tasks = tasks.filter(x=>x.id!==temp.id); render(); toast("추가 실패 — 되돌렸어요"); } // ④ 롤백
+      else {
+        const drop = () => { const i = arrAdd.indexOf(temp); if(i >= 0) arrAdd.splice(i, 1); };
+        afterWriteFail(r, arrAdd, drop, r && r.duplicate ? "이미 등록된 작업이에요" : "추가 실패 — 되돌렸어요"); // ④ 롤백
+      }
     }
   }
   function confirmImport() {
@@ -2445,19 +2650,47 @@
     tasks.push({id:Date.now(),title:"[더한섬닷컴] 5월 3주차 라이프 스타일 기획전 모션배너",deadline:selDlImport,type:"req",done:false,alarm:60,reqLink:"https://intranet.adef.co.kr/creative/view?idx=49334",planLink:"https://docs.google.com/presentation/d/imported"});
     closeModal("modal-import"); toast("인트라넷 작업을 가져왔어요"); render();
   }
+  // 롤백 유틸 — 되돌리는 사이에 동기화가 tasks 배열을 통째로 갈아끼웠을 수 있다.
+  // 그 상태에서 옛 배열에 splice 하면 화면에 없는 '유령' 객체를 고치거나
+  // 같은 data-id 카드가 두 장 생겨 FLIP 애니메이션까지 엉킨다. → 그 경우엔 서버 상태를 다시 받는다.
+  function rollbackTasks(arr, undo){
+    if (tasks === arr) { undo(); render(); }
+    else doSync({ silent:true });
+  }
+
+  // 쓰기 실패 후처리.
+  // ★타임아웃(r.timeout)은 되돌리지 않는다 — Apps Script 는 응답만 늦고 쓰기는 이미 커밋된
+  //   경우가 흔해서, 되돌리면 "삭제가 취소된 것처럼" 보였다가 다음 동기화에 다시 사라진다.
+  //   대신 사실대로 알리고 서버 상태를 받아 맞춘다.
+  function afterWriteFail(r, arr, undo, failMsg){
+    if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요"); doSync({ silent:true }); return; }
+    rollbackTasks(arr, undo);
+    toast(failMsg);
+  }
+  // 관리항목(mgmtItems)용 — 배열 교체 여부 대신 타임아웃만 가른다
+  function afterMgmtWriteFail(r, undo, failMsg){
+    if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요"); doSync({ silent:true }); return; }
+    undo(); renderMgmt(); toast(failMsg);
+  }
+
+  let delInFlight = false;   // 연타 방지 — 낡은 _row 로 두 번째 요청이 나가면 엉뚱한 행이 지워진다
   async function delTask(id){
-    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; }
+    if(delInFlight) return;
     const t = tasks.find(x=>x.id===id); if(!t) return;
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
-    const idx = tasks.indexOf(t);
-    tasks.splice(idx, 1); render();              // ① 즉시 제거
-    toast("작업을 삭제했어요");
-    const r = await window.timerAPI.postSheet({   // ② 시트 기록
-      action:"deleteTask", member:myName, row: t._row || t.id
-    });
-    if(r && r.ok){ await doSync({ silent:true }); } // ③ compaction으로 행이 당겨지므로 _row 재정렬
-    else { tasks.splice(idx, 0, t); render(); toast("삭제 실패 — 되돌렸어요"); } // 롤백
+    const arr = tasks, idx = tasks.indexOf(t);
+    delInFlight = true;
+    try {
+      tasks.splice(idx, 1); render();              // ① 즉시 제거
+      toast("작업을 삭제했어요");
+      const r = await window.timerAPI.postSheet({   // ② 시트 기록
+        action:"deleteTask", member:myName, row: t._row || t.id
+      });
+      if(r && r.ok){ await doSync({ silent:true }); } // ③ compaction으로 행이 당겨지므로 _row 재정렬
+      else { afterWriteFail(r, arr, () => arr.splice(idx, 0, t), "삭제 실패 — 되돌렸어요"); }
+    } finally { delInFlight = false; }
   }
   let doneCtx = null; // { id, toDone }
   function toggleDone(id){
@@ -2477,7 +2710,7 @@
     $("done-presets").innerHTML = presetHtml;
     const inp = $("done-input");
     inp.value = toDone ? "전달 완료" : "";
-    $("modal-done").classList.add("show");
+    openModal("modal-done");
     setTimeout(()=>{ inp.focus(); inp.select(); }, 30);
   }
   function confirmDoneFromInput(){
@@ -2491,6 +2724,7 @@
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
     const target = (forceDone === true) ? true : ctx.toDone; // '전달 완료'는 완료 상태 유지(진행중으로 안 감)
+    const arr = tasks;
     const prevDone = t.done, prevStatus = t._status; // 롤백용
     t.done = target; t._status = statusText;          // ① 낙관적 즉시 반영
     render();
@@ -2499,7 +2733,7 @@
       done: target ? "1" : "0", status: statusText
     });
     if(r && r.ok){ toast(forceDone === true ? "전달 완료로 보냈어요" : (target ? "완료 처리했어요" : "되돌렸어요")); }
-    else { t.done = prevDone; t._status = prevStatus; render(); toast("처리 실패 — 되돌렸어요"); } // ③ 롤백
+    else { afterWriteFail(r, arr, () => { t.done = prevDone; t._status = prevStatus; }, "처리 실패 — 되돌렸어요"); } // ③ 롤백
   }
   // 공용 확인 모달
   let confirmCb = null;
@@ -2508,7 +2742,7 @@
     $("confirm-msg").textContent = msg;
     $("confirm-ok").textContent = okLabel || "확인";
     confirmCb = cb;
-    $("modal-confirm").classList.add("show");
+    openModal("modal-confirm");
   }
   function doConfirm(){ closeModal("modal-confirm"); const cb = confirmCb; confirmCb = null; if(cb) cb(); }
 
@@ -2550,7 +2784,7 @@
     $("time-edit").value = `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
     $("custom-row-edit").classList.remove("show");
     $("cal-pop-edit").classList.remove("show");
-    $("modal-time").classList.add("show");
+    openModal("modal-time");
   }
   // 날짜+시간 확정: 날짜는 시트, 시간은 로컬. (프리셋·저장 버튼 공통)
   async function commitDue(dateStr, timeStr){
@@ -2564,14 +2798,15 @@
     closeModal("modal-time");
 
     taskTimes[timeKey(t.reqLink, t.title)] = timeStr; saveTaskTimes(); // 시간 로컬 저장
+    const arr = tasks;
     const prevTs = t.deadline;
-    t.deadline = newTs; firedAlarms.delete(t.id); render();             // 낙관적 + 알람 재발화 허용
+    t.deadline = newTs; firedAlarms.delete(timeKey(t.reqLink, t.title)); render(); // 낙관적 + 알람 재발화 허용
 
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
     const r = await window.timerAPI.postSheet({ action:"updateDue", member:myName, row: t._row || t.id, dueDate: dateStr });
     if(r && r.ok){ toast("마감을 변경했어요"); }
-    else { t.deadline = prevTs; render(); toast("변경 실패 — 되돌렸어요"); }
+    else { afterWriteFail(r, arr, () => { t.deadline = prevTs; }, "변경 실패 — 되돌렸어요"); }
   }
   function saveDueEdit(){
     if(!selDlEdit){ toast("마감 시간을 선택해주세요"); return; }
@@ -2602,9 +2837,9 @@
   }
 
   // ── 설정 (프리셋 + 알람) ──
+  // ⚠ alarmSettings 선언은 **메일 블록 위**로 옮겼다. 시작 시 메일 캐시 복원 IIFE 가
+  //   메일 종류 필터(alarmSettings.mailKinds)를 참조하는데, 여기 두면 TDZ ReferenceError 가 난다.
   let draftPresets = [];
-  let alarmSettings = { notify: true, sound: true, soundType: "ding", repeat: "1", defaultAlarm: "60", volume: 0.8, customSoundData: null, customSoundName: "" };
-  try { const _as = JSON.parse(localStorage.getItem("alarmSettings") || "null"); if (_as && typeof _as === "object") alarmSettings = { ...alarmSettings, ..._as }; } catch(e){}
   function saveAlarmAndPresets(){
     try {
       localStorage.setItem("alarmSettings", JSON.stringify(alarmSettings)); // 커스텀 음원(dataURL) 포함 영속화
@@ -2644,12 +2879,25 @@
     if (t) t.textContent = getMyName() || "— 선택 —";
   }
 
+  // 시트에서 팀원 명단만 새로 받아 반영. 실패해도 조용히 넘어간다(캐시·폴백으로 계속 동작).
+  // ★특히 아직 이름을 안 고른 새 설치에서는 이게 명단을 받는 유일한 경로다 — doSync 는 이름이
+  //   없으면 네트워크를 타기 전에 반환하기 때문이다.
+  async function refreshMemberNames(){
+    if (typeof window.timerAPI === "undefined" || !window.timerAPI.fetchMembers) return;
+    try {
+      const r = await window.timerAPI.fetchMembers();
+      if (r && r.ok && Array.isArray(r.members) && r.members.length) applyMemberNames(r.members);
+    } catch(e){}
+  }
+
   function openSettings() {
+    refreshMemberNames();      // 🤖자동화 시트 A열 순서를 설정 열 때마다 최신화
     syncNameTrigger();
     $("name-pop").classList.remove("show");
     $("name-trigger").classList.remove("open");
     draftPresets = JSON.parse(JSON.stringify(PRESETS));
-    draftAlarm = { ...alarmSettings };
+    // mailKinds 는 객체라 얕은 복사로는 공유된다 → 따로 복제해야 [취소]가 진짜 취소가 된다
+    draftAlarm = { ...alarmSettings, mailKinds: { ...(alarmSettings.mailKinds || {}) } };
     renderPresetList();
     syncSegments();
     renderGmailConn();
@@ -2657,7 +2905,9 @@
     renderAutostart();
     renderLinkProfile();
     renderStatusColors();
-    $("modal-settings").classList.add("show");
+    openModal("modal-settings");
+    // ★show 를 붙인 뒤에 해야 한다 — display:none 인 동안은 scrollTop 대입이 무시된다.
+    const _in = $("modal-settings").querySelector(".modal-inner"); if(_in) _in.scrollTop = 0;
   }
 
   // ── 단축키 커스터마이징 팝업 ──
@@ -2667,7 +2917,7 @@
   function openKeysModal(){
     keyCaptureId = null;
     renderKeysList();
-    $("modal-keys").classList.add("show");
+    openModal("modal-keys");
   }
   function renderKeysList(){
     const host = $("keys-list"); if(!host) return;
@@ -2703,7 +2953,7 @@
   // 캡처 전용 리스너 (capture 단계에서 가로채 전역 단축키보다 먼저 처리)
   window.addEventListener("keydown", (e) => {
     if(keyCaptureId === null) return;
-    if(!$("modal-keys").classList.contains("show")){ keyCaptureId = null; return; }
+    if(!modalShown($("modal-keys"))){ keyCaptureId = null; return; }
     e.preventDefault(); e.stopPropagation();
     if(e.key === "Escape"){ keyCaptureId = null; renderKeysList(); return; } // 취소
     if(e.metaKey || e.ctrlKey || e.altKey) return; // 조합키 무시(계속 대기)
@@ -2806,6 +3056,12 @@
     cpickRender();
   }
   function closeColorPicker(){ const p=$("cpick"); if(p) p.style.display="none"; cpickKey=null; }
+  // 피커는 position:fixed 인데 좌표를 열 때 한 번만 계산한다 → 설정창을 휠로 굴리면
+  // 트리거 버튼만 멀어지고 피커가 화면에 고아로 남는다. 툴팁이 쓰는 방식과 동일하게 처리.
+  document.addEventListener("scroll", () => {
+    const p = $("cpick");
+    if (p && p.style.display !== "none") closeColorPicker();
+  }, true);
   // SV 영역 드래그
   function cpickSVDrag(e){
     const sv = $("cpick-sv"); const rect = sv.getBoundingClientRect();
@@ -2894,7 +3150,8 @@
     const t = $("autostart-toggle"); if(t) t.classList.toggle("on", getAutostartPref());
     const mt = $("autostart-min-toggle"); if(mt) mt.classList.toggle("on", getAutostartMinPref());
     // 자동 실행이 꺼져 있으면 "트레이로 시작" 옵션은 흐리게(비활성 느낌)
-    const mr = $("autostart-min-row"); if(mr){ mr.style.opacity = getAutostartPref() ? "1" : "0.4"; }
+    const mr = $("autostart-min-row");
+    if(mr){ const _on = getAutostartPref(); mr.style.opacity = _on ? "1" : "0.4"; mr.classList.toggle("is-off", !_on); }
   }
   function applyAutostartMin(){
     if(typeof window.timerAPI !== "undefined" && window.timerAPI.setAutostartMinimized)
@@ -2967,8 +3224,15 @@
     // 알람 방식 (다중)
     setToggle("seg-mode", "notify", draftAlarm.notify);
     setToggle("seg-mode", "sound", draftAlarm.sound);
+    // 끄기도 상태다 — 없으면 "아직 안 골랐다"와 "전부 껐다"가 같은 화면이 된다
+    setToggle("seg-mode", "off", !draftAlarm.notify && !draftAlarm.sound);
     setSeg("seg-sound", draftAlarm.soundType);
     setSeg("seg-default-alarm", draftAlarm.defaultAlarm);
+    // 받을 메일 종류 (다중) + 적용 범위 (단일)
+    const _mk = draftAlarm.mailKinds || {};
+    MAIL_KINDS.forEach(k => setToggle("seg-mail-kinds", k.key, _mk[k.key] !== false));
+    const _ht = $("mail-hide-toggle");
+    if(_ht) _ht.classList.toggle("on", draftAlarm.mailFilterScope === "hide");
     // 음량 슬라이더 동기화
     const vs = $("vol-slider"), vv = $("vol-val");
     if(vs){ const pct = Math.round((draftAlarm.volume ?? 0.8) * 100); vs.value = pct; if(vv) vv.textContent = pct + "%"; }
@@ -3002,6 +3266,15 @@
     toast("음원을 삭제했어요");
   }
 
+  // 받을 메일 종류 — '목록에서도 숨기기' 토글.
+  // 자동실행 토글과 달리 즉시 적용하지 않고 draftAlarm 에만 담는다 —
+  // 바로 위 종류 칩들과 같은 [저장]/[취소] 흐름을 타야 하기 때문이다.
+  function toggleMailHide(){
+    draftAlarm.mailFilterScope = (draftAlarm.mailFilterScope === "hide") ? "notify" : "hide";
+    const t = $("mail-hide-toggle");
+    if(t) t.classList.toggle("on", draftAlarm.mailFilterScope === "hide");
+  }
+
   function setToggle(segId, val, on) {
     const btn = document.querySelector(`#${segId} .seg-btn[data-val="${val}"]`);
     if (btn) btn.classList.toggle("on", !!on);
@@ -3012,7 +3285,6 @@
     });
   }
   function updateAlarmFieldStates() {
-    const allOff = !draftAlarm.notify && !draftAlarm.sound;
     $("field-sound").classList.toggle("disabled", !draftAlarm.sound);
   }
 
@@ -3028,12 +3300,24 @@
       if (val === "off") {
         draftAlarm.notify = false; draftAlarm.sound = false;
         setToggle("seg-mode","notify",false); setToggle("seg-mode","sound",false);
+        setToggle("seg-mode","off",true);
       } else {
         // 알림/소리 토글
         draftAlarm[val] = !draftAlarm[val];
         btn.classList.toggle("on", draftAlarm[val]);
+        setToggle("seg-mode","off", !draftAlarm.notify && !draftAlarm.sound);
       }
       updateAlarmFieldStates();
+      return;
+    }
+
+    if (seg.id === "seg-mail-kinds") {
+      // ★draftAlarm 은 alarmSettings 의 얕은 복사라 mailKinds 객체가 공유된다.
+      //   그대로 고치면 [취소]로 닫아도 이미 반영돼 버리므로, 고치기 전에 반드시 복제한다.
+      const mk = draftAlarm.mailKinds = { ...(draftAlarm.mailKinds || {}) };
+      const nowOn = mk[val] !== false;
+      mk[val] = !nowOn;
+      btn.classList.toggle("on", mk[val]);
       return;
     }
 
@@ -3110,7 +3394,7 @@
     // 설정창이 열려 있으면 편집 중 값(draft), 닫혀 있으면 저장된 값 사용
     // (실제 알람은 설정창이 닫힌 상태에서 울리므로 — 이전엔 draft만 참조해 커스텀 소리가 누락되던 문제 수정)
     const _m = $("modal-settings");
-    const src = (_m && _m.classList.contains("show") && typeof draftAlarm === "object" && draftAlarm) ? draftAlarm : alarmSettings;
+    const src = (modalShown(_m) && typeof draftAlarm === "object" && draftAlarm) ? draftAlarm : alarmSettings;
     const v = Math.max(0, Math.min(2, typeof vol === "number" ? vol : (src.volume ?? 0.8)));
     if (type === "custom") {
       const data = src.customSoundData;
@@ -3206,11 +3490,14 @@
     draftPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
     renderPresetList();
     // 알람 방식/소리/반복/기본시점 + 커스텀 음원 제거 (드래프트 → 저장 시 적용)
-    draftAlarm = { notify: true, sound: true, soundType: "ding", repeat: "1", defaultAlarm: "60", volume: 0.8, customSoundData: null, customSoundName: "" };
+    draftAlarm = { notify: true, sound: true, soundType: "ding", repeat: "1", defaultAlarm: "60", volume: 0.8, customSoundData: null, customSoundName: "",
+                   mailKinds: { req: true, comment: true, assign: true }, mailFilterScope: "notify" };
     const inp = $("custom-sound-input"); if(inp) inp.value = "";
     syncSegments();
     // 메일 새로고침 주기 / 불러올 메일 수 (즉시 적용)
-    mailSettings = { pollSec: 10, fetchCount: 100 };
+    // ★openMode 는 보존한다 — 초기화 원칙이 "작업자·메일 연동·단축키는 그대로 둔다"인데
+    //   객체를 통째로 갈아치우면 "메일을 누르면" 설정이 말없이 Gmail 로 되돌아간다.
+    mailSettings = { pollSec: 10, fetchCount: 100, openMode: mailSettings.openMode || "gmail" };
     saveMailSettings(); syncMailSliders(); restartMailPoll();
     // 시작 시 자동 실행 끄기 (즉시 적용)
     localStorage.setItem("autostart", "0");
@@ -3233,8 +3520,11 @@
       p.time = nt; // 1111 등도 정규화해서 저장
     }
     PRESETS = JSON.parse(JSON.stringify(draftPresets));
-    alarmSettings = { ...draftAlarm };
+    alarmSettings = { ...draftAlarm, mailKinds: { ...(draftAlarm.mailKinds || {}) } };
     saveAlarmAndPresets(); // 재시작 후에도 유지(커스텀 음원 포함)
+    // 메일 종류 필터가 바뀌었을 수 있으므로 목록·배지를 즉시 다시 반영한다
+    // (동기화·폴링은 그대로 돈다 — 필터는 표시/알림 단계에서만 걸린다)
+    renderMailList(); setMailBadge();
     closeModal("modal-settings");
     toast("설정을 저장했어요");
   }
@@ -3266,18 +3556,22 @@
   // ── 타이머 알람 발화 ──
   // 작업별 'N분 전' 시점에 도달하면 알림(메인 프로세스 → 트레이 상태에서도 옴) + 소리.
   // 이미 지난 알람(앱 시작 시 과거분)은 울리지 않게 표시만 한다.
+  // ⚠ 키는 반드시 timeKey(안정 키)다. 행 번호(t.id)로 잡으면
+  //   좌/우 단이 행 번호를 공유하고 삭제 compaction 으로도 번호가 밀려,
+  //   남의 작업이 남긴 번호 때문에 내 작업이 벙어리가 된다.
   const firedAlarms = new Set();
   function checkAlarms(){
     if(typeof window.timerAPI === "undefined") return;        // 앱에서만
     if(!alarmSettings.notify && !alarmSettings.sound) return;  // 알람 꺼짐
     const now = Date.now();
-    tasks.forEach(t => {
+    myTasks.forEach(t => {                                    // ★보는 보드가 아니라 내 보드
       if(t.done || t.alarm == null) return;
-      if(firedAlarms.has(t.id)) return;
+      const key = timeKey(t.reqLink, t.title);
+      if(firedAlarms.has(key)) return;
       const offset = Number(t.alarm) || 0;                    // 분
       const alarmAt = t.deadline - offset * 60000;
       if(now >= alarmAt){
-        firedAlarms.add(t.id);
+        firedAlarms.add(key);
         if(now - alarmAt < 90000) fireAlarm(t, offset);       // 방금 도달한 것만 울림
       }
     });
@@ -3350,7 +3644,7 @@
     payload[col === "b" ? "memoB" : "memoC"] = "";
     const r = await window.timerAPI.postSheet(payload);   // ② 백그라운드 기록
     if(r && r.ok){ toast("관리 항목을 삭제했어요"); }       // ③ 결과 알림
-    else { m[col] = prev; renderMgmt(); toast("삭제 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
+    else { afterMgmtWriteFail(r, () => { m[col] = prev; }, "삭제 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
   }
 
   function editMgmt(row, col){
@@ -3392,7 +3686,7 @@
     payload[col === "b" ? "memoB" : "memoC"] = val;
     const r = await window.timerAPI.postSheet(payload);   // ② 백그라운드 기록
     if(r && r.ok){ toast("저장했어요"); }                   // ③ 결과 알림
-    else { m[col] = prev; renderMgmt(); toast("저장 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
+    else { afterMgmtWriteFail(r, () => { m[col] = prev; }, "저장 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
   }
 
   // ── 관리 항목 추가 (addMemo) ──
@@ -3417,7 +3711,7 @@
     renderMgmt();
     const r = await window.timerAPI.postSheet({ action:"addMemo", targetMember:myName, text:val });  // ② 기록
     if(r && r.ok){ toast("관리 항목을 추가했어요"); await doSync({ silent:true }); }  // ③ 행번호 reconcile
-    else { mgmtItems = mgmtItems.filter(x => x !== temp); renderMgmt(); toast("추가 실패 — 되돌렸어요"); }
+    else { afterMgmtWriteFail(r, () => { mgmtItems = mgmtItems.filter(x => x !== temp); }, "추가 실패 — 되돌렸어요"); }
   }
 
   // 관리 항목 섹션 HTML. B·C를 각각 별개 항목으로 분리, 시트 순서 그대로.
@@ -3523,13 +3817,16 @@
     const compact = window.innerWidth <= 400;
     const tag=t.type==="req"?'<span class="chip-tag req sub-extra">인트라넷</span>':'<span class="chip-tag sub-extra">직접추가</span>';
     const alarm=t.alarm?`<span class="meta-text sub-extra">${IC.bell}${t.alarm>=60?(t.alarm/60)+"시간":t.alarm+"분"} 전</span>`:"";
-    const reqBtn=t.reqLink?`<a class="link-mini" href="${t.reqLink}" target="_blank" title="요청글 링크" onclick="event.stopPropagation()">${IC.link}</a>`:"";
-    const planBtn=t.planLink?`<a class="link-mini" href="${t.planLink}" target="_blank" title="기획안 링크" onclick="event.stopPropagation()">${IC.deck}</a>`:"";
+    // ★제목·링크는 시트에서 온 값이다(팀원 7명이 직접 편집). esc() 없이 넣으면
+    //   'A<B' 같은 평범한 제목이 태그로 파싱돼 카드 레이아웃이 무너지고 마감·링크가 제목 안으로 빨려 들어간다.
+    //   같은 파일의 다른 렌더러(메일 목록·관리항목·프로필)는 전부 esc() 를 거친다 — 여기만 빠져 있었다.
+    const reqBtn=t.reqLink?`<a class="link-mini" href="${esc(t.reqLink)}" target="_blank" title="요청글 링크" onclick="event.stopPropagation()">${IC.link}</a>`:"";
+    const planBtn=t.planLink?`<a class="link-mini" href="${esc(t.planLink)}" target="_blank" title="기획안 링크" onclick="event.stopPropagation()">${IC.deck}</a>`:"";
     const links=(reqBtn||planBtn)?`<span class="link-group">${reqBtn}${planBtn}</span>`:"";
     return `<div class="task ${u} ${t.done?'done':''}" data-id="${t.id}" onclick="openTaskReq(${t.id}, event)" style="cursor:pointer">
       <div class="check ${t.done?'on':''}" onclick="toggleDone(${t.id})">${IC.check}</div>
       <div class="task-main">
-        <div class="task-title">${t.title}</div>
+        <div class="task-title">${esc(t.title)}</div>
         <div class="task-sub">${tag}<span class="meta-text meta-deadline" title="마감 시간 설정" onclick="event.stopPropagation(); openTimeEdit(${t.id})" style="cursor:pointer">${fmtDl(t.deadline, compact)}</span>${alarm}${links}</div>
       </div>
       <div class="count ${u}"><div class="t">${t.done?"":cd.t}</div></div>
@@ -3553,7 +3850,9 @@
   let toastTimer;
   function toast(msg) {
     const el=$("toast");
-    el.innerHTML=`${IC.check} ${msg}`; el.classList.add("show");
+    // msg 에는 서버 error 문자열(최대 150자)이 그대로 실려 오는 경로가 여럿 있다 → esc() 필수.
+    // IC.check 는 코드에 박힌 SVG 라 그대로 둔다.
+    el.innerHTML=`${IC.check} ${esc(msg)}`; el.classList.add("show");
     clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),2200);
   }
 
@@ -3676,7 +3975,7 @@
     if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return true; // 입력 중
     if (mgmtAdding) return true; // 관리항목 추가 입력 모드
     for (const id of ["modal-done","modal-task","modal-import","modal-settings","modal-confirm","modal-time","modal-keys"]) {
-      const el = $(id); if (el && el.classList.contains("show")) return true; // 팝업/모달 열림
+      if (modalShown($(id))) return true; // 팝업/모달 열림
     }
     return false;
   }
@@ -3714,7 +4013,7 @@
 
   // 전역 단축키 — 입력/모달/캘린더 중에는 비활성(타이핑 충돌 방지)
   const MODAL_IDS = ["modal-done","modal-task","modal-import","modal-settings","modal-confirm","modal-time","modal-keys"];
-  function anyModalOpen(){ return MODAL_IDS.some(id => { const el=$(id); return el && el.classList.contains("show"); }); }
+  function anyModalOpen(){ return MODAL_IDS.some(id => modalShown($(id))); }
   function closeTopModal(){ MODAL_IDS.forEach(id => { const el=$(id); if(el && el.classList.contains("show")) closeModal(id); }); }
   function backToMyBoard(){ const mine=getMyName(); if(mine && viewName!==mine) applyView(mine); }
 
@@ -3753,7 +4052,7 @@
     // 설정 단축키를 다시 누르면 설정 닫기 (입력 중이 아닐 때 — isEditingNow 가드보다 먼저 처리)
     if (!inField && !e.metaKey && !e.ctrlKey && !e.altKey) {
       const m = $("modal-settings");
-      if (m && m.classList.contains("show") && e.key.toLowerCase() === keymap["settings"]) {
+      if (modalShown(m) && e.key.toLowerCase() === keymap["settings"]) {
         e.preventDefault(); closeModal("modal-settings"); return;
       }
     }

@@ -362,28 +362,54 @@ ipcMain.handle('sync-sheet', async (event, opts) => {
   }
 });
 
-// 쓰기 패스스루 (완료토글·메모수정·작업추가 — 다음 단계에서 사용)
+// 팀원 명단만 조회 (action=members — 업무현황 시트를 안 읽어 매우 가볍다)
+//
+// ⚠ 이게 없으면 **새로 설치한 사람은 자기 이름을 고를 수 없다.**
+//   명단 갱신이 doSync 안(renderer 의 applyMemberNames)에만 있는데, doSync 는 이름이 없으면
+//   네트워크를 타기 전에 반환한다 → "명단을 받으려면 이름이 필요하고, 이름을 고르려면 명단이 필요"한 순환.
+//   그래서 소스에 박힌 폴백 7명만 보이고, 🤖자동화 시트 A열을 고쳐도 반영되지 않았다.
+//   인트라넷 딸깍(popup.js refreshMembers)은 이미 이 액션을 쓰고 있다 — 앱만 안 쓰고 있었다.
+ipcMain.handle('fetch-members', async () => {
+  try {
+    const res = await fetchWithTimeout(WEBAPP_URL + '?action=members', { method: 'GET', redirect: 'follow' }, 15000);
+    if (!res.ok) return { ok: false, error: 'HTTP ' + res.status };
+    const json = await res.json();
+    return json; // { ok:true, members:[...] }
+  } catch (e) {
+    const msg = (e && e.name === 'AbortError') ? '응답 지연(타임아웃)' : String(e && e.message || e);
+    return { ok: false, error: msg };
+  }
+});
+
+// 쓰기 패스스루 (완료토글·메모수정·작업추가)
 // payload: { action, ...params } → application/x-www-form-urlencoded 로 POST
+//
+// ⚠ 타임아웃이 없으면 한 건이 매달릴 때 undici 기본값(약 5분)까지 UI가 잡혀 있고,
+//   완료항목 일괄정리처럼 N건을 직렬로 돌리는 경로는 그게 그대로 누적된다. → 20초 상한.
+// ⚠ 타임아웃은 { timeout:true } 로 구분해서 돌려준다. 렌더러가 이걸 롤백으로 처리하면 안 된다 —
+//   Apps Script 는 응답만 늦고 쓰기는 이미 커밋된 경우가 흔해서, 되돌리면
+//   "삭제가 취소된 것처럼" 보였다가 다음 동기화에 다시 사라진다.
 ipcMain.handle('post-sheet', async (event, payload) => {
   try {
     const body = Object.keys(payload || {})
       .map(k => encodeURIComponent(k) + '=' + encodeURIComponent(payload[k] == null ? '' : payload[k]))
       .join('&');
-    console.log('[post-sheet] body:', body);
-    const res = await fetch(WEBAPP_URL, {
+    if (isDev) console.log('[post-sheet] action:', (payload && payload.action) || '(insert)');
+    const res = await fetchWithTimeout(WEBAPP_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body,
       redirect: 'follow',
-    });
+    }, 20000);
     const text = await res.text();
-    console.log('[post-sheet] status:', res.status, 'resp:', text.slice(0, 300));
+    if (isDev) console.log('[post-sheet] status:', res.status, 'resp:', text.slice(0, 300));
     if (!res.ok) {
       return { ok: false, error: 'HTTP ' + res.status + (text ? ' · ' + text.slice(0, 150) : '') };
     }
     try { return JSON.parse(text); }
     catch (e) { return { ok: false, error: '응답 파싱 실패: ' + text.slice(0, 150) }; }
   } catch (e) {
+    if (e && e.name === 'AbortError') return { ok: false, timeout: true, error: '응답 지연(타임아웃)' };
     return { ok: false, error: String(e && e.message || e) };
   }
 });
@@ -448,12 +474,35 @@ async function refreshAccess(refreshToken) {
 }
 
 // 유효한 access_token 확보 (만료 시 자동 갱신)
+//
+// ⚠ 여기서 '영구 실패'와 '일시 실패'를 갈라야 한다. 안 그러면 앱이 10초마다(메일 폴링 주기)
+//   똑같은 실패를 무한 반복하면서 UI 는 계속 '연결됨'으로 표시한다.
+//   실제로 겪은 두 경우:
+//   ① build-secrets.js 가 없어 client_id 가 빈 값 → "Could not determine client ID from request."
+//   ② 사용자가 구글에서 앱 권한을 해제 → invalid_grant
+//   둘 다 재시도로는 절대 풀리지 않는다. 토큰을 정리해 '연결 안 됨'으로 떨어뜨려야
+//   사용자가 다시 연결할 수 있고 로그 폭주도 멈춘다.
 async function getValidAccessToken() {
+  // 빌드 비밀값이 없으면 아예 시도하지 않는다 (개발 체크아웃·CI 시크릿 누락)
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) throw new Error('not-connected');
   const t = readTokens();
   if (!t || !t.refresh_token) throw new Error('not-connected');
   if (t.access_token && t.expiry_date && Date.now() < t.expiry_date) return t.access_token;
   // 갱신
-  const r = await refreshAccess(t.refresh_token);
+  let r;
+  try {
+    r = await refreshAccess(t.refresh_token);
+  } catch (e) {
+    const msg = String((e && e.message) || e);
+    // ★invalid_grant 만 토큰을 지운다 = "사용자가 권한을 해제했거나 토큰이 폐기됨"(재시도로 안 풀림).
+    //   invalid_client 류(잘못된 client_id)는 **빌드 쪽 문제**다 — 그걸로 토큰을 지우면
+    //   시크릿이 잘못 들어간 배포 한 번에 팀 전원이 재로그인해야 한다. 지우지 않는다.
+    if (/invalid_grant/i.test(msg)) {
+      clearTokens();
+      throw new Error('not-connected');
+    }
+    throw e;                               // 네트워크·빌드 문제 등은 그대로 올린다(토큰 보존)
+  }
   t.access_token = r.access_token;
   t.expiry_date = Date.now() + (r.expires_in || 3600) * 1000 - 60000; // 1분 버퍼
   writeTokens(t);
@@ -574,6 +623,9 @@ ipcMain.handle('check-update', async () => {
 });
 
 ipcMain.handle('gmail-status', () => {
+  // 비밀값이 없으면 토큰이 남아 있어도 '연결됨'이라고 하면 안 된다 —
+  // UI 는 연결됐다고 하는데 모든 요청이 실패하는 상태가 된다(개발 체크아웃에서 실제로 겪음).
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) return { connected: false, email: null, noSecrets: true };
   const t = readTokens();
   return { connected: !!(t && t.refresh_token), email: t ? t.email : null };
 });
@@ -702,11 +754,17 @@ async function gmailListMessages(accessToken, max) {
   const ids = (listData.messages || []).map(m => m.id);
 
   // 안읽음 ID 집합 (메일별 재조회 없이 읽음 상태 갱신)
+  //
+  // ⚠ 실패를 `|| []` 로 삼키면 안 된다. 그 순간 '안읽음이 하나도 없다'로 해석돼
+  //   전 메일이 읽음 처리되고 → 배지 0 → notifiedIds 가 통째로 비워지고 →
+  //   다음 폴링에 전부 '새 메일'로 되살아나 알림이 헛울린다.
+  //   조회 자체가 실패한 것과 '안읽음이 없는 것'은 다르다. 실패는 실패로 올린다.
   const unreadData = await gmailGet(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(baseQ + ' is:unread')}&maxResults=${max || 100}`,
     accessToken
   );
-  const unreadSet = new Set(((unreadData && unreadData.messages) || []).map(m => m.id));
+  if (!unreadData) throw new Error('안읽음 조회 실패');
+  const unreadSet = new Set((unreadData.messages || []).map(m => m.id));
 
   // 캐시에 없는 새 메일만 상세 조회
   const newIds = ids.filter(id => !gmailMetaCache.has(id));
