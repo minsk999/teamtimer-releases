@@ -45,9 +45,35 @@ row 기반 쓰기 4종에 `expectTitle` 추가. 값은 **타이머가 그 행에
 | 액션 | 지금 | 추가 |
 |---|---|---|
 | `toggleDone` | `row`, `done`, `status` | `expectTitle: t.title` |
-| `deleteTask` | `row` | `expectTitle: t.title` |
+| `deleteTask` | `row` | **`expectIdx`** (아래 참조) |
 | `updateDue` | `row`, `dueDate` | `expectTitle: t.title` |
 | `updateTask` | `row`, `title`(**새 제목**), `url`, … | `expectTitle: prev.title` |
+
+### ★`deleteTask` 만 지문이 다르다 — 제목은 유일하지 않다
+
+같은 광고주 반복 요청이 흔해서 **제목이 완전히 겹칠 수 있다.**
+그러면 한 칸 밀린 행이 지문 검사를 그대로 통과한다.
+다른 셋은 통과해도 사람이 되돌릴 수 있지만 `deleteTask` 는 아니다.
+
+요청글 링크의 `idx` 는 게시글당 유일하고, 이미 HYPERLINK 수식으로 시트에 있고,
+`doRead` 가 `requestLink` 로 돌려주고 있고, 서버의 `dupCheck` 가 이미 같은
+방식으로 뽑아 쓴다(`:1099`). 되돌릴 수 없는 액션 하나에만 비용을 더 쓴다.
+
+```js
+// deleteTask 전용 — isVideo 가드 뒤
+if (p.expectIdx != null && String(p.expectIdx) !== "") {
+  var f2 = sheet.getRange(row, startCol + COL.LINK).getFormula();
+  var curIdx = (String(f2).match(/idx=(\d+)/) || [])[1] || "";
+  if (curIdx !== String(p.expectIdx)) {
+    return respond({ ok: false, stale: true, row: row, found: curIdx,
+                     error: "행이 밀렸어요 — 동기화 후 다시 시도해 주세요" });
+  }
+}
+```
+
+⚠️ **미해결**: 요청글 링크에 `idx=` 가 없는 행(손으로 추가·옛 형식)이 있으면
+`expectIdx` 가 빈 값이 되어 검사를 건너뛴다. 그 상태로 4단계(필수화)에 가면
+**그 행들만 영구히 삭제 불가**가 된다. 진단에서 개수를 세는 중 — 있으면 폴백 필요.
 
 ⚠️ `updateTask` 만 주의. `title` 은 **바꿀 새 제목**이라 지문으로 못 쓴다.
 반드시 편집 전 원본(`prev.title`)을 실어야 한다.
@@ -83,7 +109,8 @@ if (p.expectTitle != null && String(p.expectTitle) !== "") {
 stale 수신
   → 낙관적 UI 롤백 (행이 틀렸으니 적용된 게 없다)
   → doSync({ silent:true })   // 행 번호 갱신
-  → toast("목록이 바뀌어서 다시 불러왔어요")
+  → toast(found ? `'${expect}' 자리에 '${found}'가 있어요` : "그 자리가 비어 있어요")
+     (found 는 20자로 자른다. 「행이 밀렸어요」보다 상황이 바로 이해된다)
 ```
 
 **자동 재시도는 하지 않는다.** 동기화 후 그 작업이 어디로 갔는지(혹은 사라졌는지)
