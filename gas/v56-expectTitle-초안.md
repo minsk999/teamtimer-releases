@@ -69,31 +69,49 @@ row 기반 쓰기 4종에 `expectTitle` 추가. 값은 **타이머가 그 행에
 | `updateDue` | `row`, `dueDate` | `expectTitle: t.title` |
 | `updateTask` | `row`, `title`(**새 제목**), `url`, … | `expectTitle: prev.title` |
 
-### ★`deleteTask` 만 지문이 다르다 — 제목은 유일하지 않다
+### ★`deleteTask` 만 지문이 둘이다 — 어느 하나로도 부족하다 (2026-08-27 실측)
 
-같은 광고주 반복 요청이 흔해서 **제목이 완전히 겹칠 수 있다.**
-그러면 한 칸 밀린 행이 지문 검사를 그대로 통과한다.
-다른 셋은 통과해도 사람이 되돌릴 수 있지만 `deleteTask` 는 아니다.
+실데이터를 재보니 idx·제목 둘 다 **팀원 간에는** 대량 중복이었다(각 20개).
+하나의 요청글이 여러 명에게 배정되는 정상 동작이다. 지문 검사는
+`getRange(row, startCol + COL.LINK)` — **그 팀원 칸의 그 행 하나**만 읽으므로 무해하다.
 
-요청글 링크의 `idx` 는 게시글당 유일하고, 이미 HYPERLINK 수식으로 시트에 있고,
-`doRead` 가 `requestLink` 로 돌려주고 있고, 서버의 `dupCheck` 가 이미 같은
-방식으로 뽑아 쓴다(`:1099`). 되돌릴 수 없는 액션 하나에만 비용을 더 쓴다.
+```
+영상작업 88건 · idx 추출 성공 88건 (커버리지 100%)
+같은 팀원 칸 안 idx 중복 : 0건
+같은 팀원 칸 안 제목 중복: 0건
+1행 밀림이 지문을 통과하는 '인접 행 동일': idx 0건 / 제목 0건
+```
+
+둘 다 지금은 안전하다. 문제는 **실패 조건이 서로 반대**라는 것이다.
+
+| | 다른 게시글, 같은 제목<br>(반복 요청) | 같은 게시글, 여러 행<br>("2종"·"3건") |
+|---|---|---|
+| `expectTitle` | ❌ 통과시킴 | ✅ 잡음 |
+| `expectIdx` | ✅ 잡음 | ❌ 통과시킴 |
+
+실제로 `'[숨고] 8/10주차 영상 제작 요청(2종)'`, `'[종근당] … AI 영상 3종 …'` 같은
+제목이 있다. 한 사람이 두 행으로 쪼개 관리하면 **idx 가 같아진다.**
+
+**되돌릴 수 없는 유일한 액션이니 둘 다 요구한다.** 비용은 셀 읽기 하나.
 
 ```js
-// deleteTask 전용 — isVideo 가드 뒤
-if (p.expectIdx != null && String(p.expectIdx) !== "") {
+if (p.expectIdx || p.expectTitle) {
   var f2 = sheet.getRange(row, startCol + COL.LINK).getFormula();
-  var curIdx = (String(f2).match(/idx=(\d+)/) || [])[1] || "";
-  if (curIdx !== String(p.expectIdx)) {
-    return respond({ ok: false, stale: true, row: row, found: curIdx,
+  var curIdx   = (String(f2).match(/idx=(\d+)/) || [])[1] || "";
+  var curTitle = String(sheet.getRange(row, startCol + COL.TITLE).getValue()).trim();
+  var okIdx   = !p.expectIdx   || curIdx   === String(p.expectIdx);
+  var okTitle = !p.expectTitle || curTitle === String(p.expectTitle).trim();
+  if (!okIdx || !okTitle) {
+    return respond({ ok:false, stale:true, row: row, found: curTitle, foundIdx: curIdx,
                      error: "행이 밀렸어요 — 동기화 후 다시 시도해 주세요" });
   }
 }
 ```
 
-⚠️ **미해결**: 요청글 링크에 `idx=` 가 없는 행(손으로 추가·옛 형식)이 있으면
-`expectIdx` 가 빈 값이 되어 검사를 건너뛴다. 그 상태로 4단계(필수화)에 가면
-**그 행들만 영구히 삭제 불가**가 된다. 진단에서 개수를 세는 중 — 있으면 폴백 필요.
+나머지 3종은 `expectTitle` 단독으로 충분하다 — 잘못 적용돼도 사람이 되돌릴 수 있다.
+
+⚠️ **필수화(4단계)는 `expectIdx` 만.** 제목은 사람이 시트에서 직접 고칠 수 있어서,
+타이머가 마지막 동기화 이후 수정된 제목을 들고 있으면 정상 삭제가 stale 로 막힌다.
 
 ⚠️ `updateTask` 만 주의. `title` 은 **바꿀 새 제목**이라 지문으로 못 쓴다.
 반드시 편집 전 원본(`prev.title`)을 실어야 한다.
