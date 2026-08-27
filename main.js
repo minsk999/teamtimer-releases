@@ -631,6 +631,10 @@ ipcMain.handle('gmail-status', () => {
 });
 
 ipcMain.handle('gmail-login', async () => {
+  // ★비밀값이 없으면 브라우저를 열지 않는다. 열면 client_id 가 빈 채로 나가서
+  //   구글이 "Missing required parameter: client_id" 오류 페이지를 띄운다 —
+  //   사용자는 자기 계정 문제로 오해한다. (개발 체크아웃·CI 시크릿 누락에서 실제로 겪음)
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET) return { ok: false, error: 'no-secrets' };
   try {
     const r = await startGmailLogin();
     console.log('[gmail] 연결됨:', r.email);
