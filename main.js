@@ -88,6 +88,213 @@ async function fetchLatestRelease() {
   return { ok: true, current: cur, latest, hasUpdate, url: `https://minsk999.github.io/${GITHUB_REPO}/` };
 }
 
+// ═════════════════════════════════════════════════════════════════════
+//  자동 업데이트
+// ═════════════════════════════════════════════════════════════════════
+//
+// Windows : electron-updater(NSIS). 무서명이어도 정상 동작한다.
+//
+// macOS   : Squirrel.Mac 은 **구조적으로 불가능**하다. 새 .app 이 "지금 실행 중인 앱의
+//           designated requirement" 를 만족해야 하는데, ad-hoc 서명(`--sign -`)에는 서명 주체가
+//           없어 DR 이 `cdhash H"<그 바이너리 해시>"` 가 된다. 새 버전은 정의상 다른 바이너리라
+//           **논리적으로 항상 불일치**다. 설정으로 우회할 수 없다.
+//           → 아래 자체 업데이터를 쓴다(다운로드·검증·전개). 교체는 MAC_AUTO_APPLY 로 잠가 뒀다.
+//
+// ★다운로드는 반드시 앱이 직접 한다. 브라우저에 맡기면 Windows 는 MotW,
+//   macOS 는 com.apple.quarantine 이 붙어 SmartScreen/Gatekeeper 가 발동한다.
+//   앱이 받으면 둘 다 안 붙는다 — 맥의 "손상되었기 때문에 열 수 없습니다" 가 사라지는 이유다.
+
+const UPDATE_HOSTS = new Set([
+  'api.github.com', 'github.com', 'objects.githubusercontent.com',
+  'release-assets.githubusercontent.com', 'codeload.github.com',
+]);
+// 리다이렉트를 따라가다 허용 목록 밖으로 나가면 중단한다.
+// (호스트 검사를 최초 URL 에만 걸면 리다이렉트로 우회된다)
+function assertUpdateHost(u) {
+  let h;
+  try { h = new URL(u).hostname; } catch (e) { throw new Error('bad-url'); }
+  if (!UPDATE_HOSTS.has(h)) throw new Error('host-not-allowed: ' + h);
+}
+// 경로·파일명에 쓰는 버전 문자열 정화 (경로 탈출 차단)
+function safeVer(v) { return String(v || '').replace(/[^0-9A-Za-z._-]/g, '').slice(0, 32) || 'update'; }
+
+// ── Windows: electron-updater ────────────────────────────────────────
+let _eu = null;              // electron-updater 인스턴스 (지연 로딩)
+let _euWired = false;
+let euDownloaded = false;    // 설치 가능한 파일이 실제로 준비됐는가
+function updaterSupported() {
+  // 개발 모드에서는 app-update.yml 이 없어 autoUpdater 가 예외를 던진다.
+  return process.platform === 'win32' && app.isPackaged;
+}
+function sendUpd(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try { mainWindow.webContents.send('updater:event', payload); } catch (e) {}
+  }
+}
+function getEU() {
+  if (_eu || !updaterSupported()) return _eu;
+  try {
+    _eu = require('electron-updater').autoUpdater;
+  } catch (e) { _eu = null; return null; }
+  if (!_euWired) {
+    _euWired = true;
+    _eu.autoDownload = false;          // 사용자가 [받기] 를 눌러야 받는다
+    // ★종료할 때 몰래 설치하지 않는다. 이 앱의 NSIS 는 oneClick:false(마법사형)라,
+    //   켜 두면 사용자가 트레이에서 앱을 끈 순간 설치 마법사가 예고 없이 튀어나온다.
+    //   설치는 사용자가 [지금 재시작] 을 눌렀을 때만 한다.
+    _eu.autoInstallOnAppQuit = false;
+    _eu.allowPrerelease = false;       // prerelease 는 검증용이라 팀에 배포하지 않는다
+    _eu.logger = null;
+    _eu.on('update-available', (i) => sendUpd({ type: 'available', version: i && i.version }));
+    _eu.on('update-not-available', () => sendUpd({ type: 'none' }));
+    _eu.on('download-progress', (p) => sendUpd({ type: 'progress', percent: Math.round(p.percent || 0) }));
+    _eu.on('update-downloaded', () => { euDownloaded = true; });
+    _eu.on('update-downloaded', (i) => sendUpd({ type: 'ready', version: i && i.version }));
+    _eu.on('error', (e) => sendUpd({ type: 'error', error: String((e && e.message) || e) }));
+  }
+  return _eu;
+}
+
+// ── macOS: 자체 업데이터 ─────────────────────────────────────────────
+//
+// ⚠️ MAC_AUTO_APPLY 는 **의도적으로 false 다.** 실행 중인 .app 을 스스로 교체하려면
+//    macOS 13+ 의 App Management(TCC) 권한을 통과해야 하는데 아직 실기로 확인하지 못했다.
+//    확인 방법(반나절): 앱이 실행 중인 상태에서
+//        mv /Applications/TeamTimer.app /Applications/.tt-bak.app && mv 되돌리기
+//    를 **터미널과 앱 자신** 양쪽에서 해 본다(TCC 는 호출 주체를 본다).
+//    `Operation not permitted` 가 나오면 자체 교체는 불가 → Apple Developer($99/년)로 가야 한다.
+//    통과하면 이 값을 true 로 바꾸고 P4~P9(교체·셀프테스트·롤백)를 붙인다.
+//    ★검증 전에 켜지 말 것. 이 프로젝트의 장기 장애 2건이 모두 맥 번들 문제였다.
+// 시작 시 1회 확인만으로는 상주 앱에 업데이트가 도달하지 않는다 —
+// 몇 주씩 안 끄는 사람이 있어서, 6시간마다 조용히 다시 본다.
+async function pushUpdateCheck() {
+  try {
+    const r = await fetchLatestRelease();
+    if (r && r.ok && r.hasUpdate) sendUpd({ type: 'banner', ...r });
+  } catch (e) {}
+}
+function startUpdatePolling() {
+  setInterval(pushUpdateCheck, 6 * 60 * 60 * 1000);
+}
+
+const MAC_AUTO_APPLY = false;
+
+const macUpd = { state: 'idle', pct: 0, msg: '', err: '', staged: '', ver: '' };
+let macUpdBusy = false;
+function setMacUpd(patch) {
+  Object.assign(macUpd, patch);
+  sendUpd({ type: 'mac', ...macUpd });
+}
+
+// 이번 플랫폼/아키텍처에 맞는 zip 자산을 릴리스에서 고른다.
+// ★자산 URL·해시는 **여기서 정한다.** 렌더러가 준 값을 믿으면 임의 바이너리를 받게 된다.
+function pickMacAsset(release) {
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  const list = (release && release.assets) || [];
+  const hit = list.find(a => /\.zip$/i.test(a.name) && a.name.indexOf(arch) !== -1);
+  if (!hit) return null;
+  return { name: hit.name, url: hit.browser_download_url, size: hit.size, digest: hit.digest || '' };
+}
+
+async function macDownloadAndStage(asset, version) {
+  const os = require('os');
+  const crypto = require('crypto');
+  const { execFile } = require('child_process');
+  assertUpdateHost(asset.url);
+
+  const dir = path.join(app.getPath('userData'), 'updates');
+  fs.mkdirSync(dir, { recursive: true });
+  // 지난 중단분 청소 — 안 지우면 시도할 때마다 수백 MB 가 쌓인다.
+  // ★.part 파일뿐 아니라 지난 버전의 stage-* 디렉터리도 지운다(한 벌이 통째로 앱 크기다).
+  const keepStage = 'stage-' + safeVer(version);
+  for (const f of fs.readdirSync(dir)) {
+    if (/\.part-/.test(f)) { try { fs.unlinkSync(path.join(dir, f)); } catch (e) {} }
+    else if (f.startsWith('stage-') && f !== keepStage) {
+      try { fs.rmSync(path.join(dir, f), { recursive: true, force: true }); } catch (e) {}
+    }
+  }
+
+  setMacUpd({ state: 'download', pct: 0, msg: '새 버전을 받는 중이에요', err: '', ver: version });
+  // 멎은 연결을 감지한다 — 없으면 macUpdBusy 가 안 풀려 재시도 자체가 막힌다.
+  const ctrl = new AbortController();
+  let stall = setTimeout(() => ctrl.abort(), 30000);       // 응답 헤더까지 30초
+  const res = await fetch(asset.url,
+    { redirect: 'follow', signal: ctrl.signal, headers: { 'User-Agent': 'teamtimer' } });
+  assertUpdateHost(res.url);                       // ★리다이렉트 도착지도 검사
+  if (!res.ok) { clearTimeout(stall); throw new Error('다운로드 실패 (HTTP ' + res.status + ')'); }
+
+  const total = Number(res.headers.get('content-length') || asset.size || 0);
+  const tmp = path.join(dir, safeVer(version) + '.zip.part-' + crypto.randomBytes(4).toString('hex'));
+  const hash = crypto.createHash('sha256');
+  let got = 0, lastPct = -1;
+  const out = fs.createWriteStream(tmp);
+  // ★생성 직후에 붙여야 한다. 루프 뒤에 붙이면 그 사이의 디스크 오류가
+  //   리스너 없는 'error' 가 되어 메인 프로세스 미처리 예외로 터진다.
+  const writeFailed = new Promise((_, rej) => out.once('error', rej));
+  try {
+    await Promise.race([writeFailed, (async () => {
+      for await (const chunk of res.body) {
+        clearTimeout(stall);
+        stall = setTimeout(() => ctrl.abort(), 60000);     // 60초 무진전이면 끊는다
+        hash.update(chunk);
+        got += chunk.length;
+        // ★반환값이 false 면 버퍼가 찼다는 뜻 — drain 을 기다려야 힙에 고이지 않는다
+        if (!out.write(chunk)) await new Promise(r => out.once('drain', r));
+        if (total) {
+          const p = Math.round(got * 100 / total);
+          if (p !== lastPct) { lastPct = p; setMacUpd({ pct: p }); }
+        }
+      }
+    })()]);
+    await new Promise((r, j) => { out.end(); out.once('finish', r); out.once('error', j); });
+  } catch (e) {
+    clearTimeout(stall);
+    try { out.destroy(); } catch (e2) {}
+    try { fs.unlinkSync(tmp); } catch (e2) {}
+    throw (e && e.name === 'AbortError') ? new Error('연결이 끊겼어요 — 다시 시도해 주세요') : e;
+  }
+  clearTimeout(stall);
+  if (total && got !== total) { try { fs.unlinkSync(tmp); } catch (e) {} throw new Error(`전송이 중간에 끊겼어요 (${got}/${total})`); }
+
+  // 무결성 — GitHub 릴리스 응답의 digest 를 그대로 쓴다. 별도 해시 배포가 필요 없다.
+  setMacUpd({ state: 'verify', msg: '파일을 확인하는 중이에요' });
+  const want = String(asset.digest || '').toLowerCase();
+  const have = 'sha256:' + hash.digest('hex');
+  if (!want.startsWith('sha256:')) throw new Error('검증용 해시가 없어요');
+  if (have !== want) { try { fs.unlinkSync(tmp); } catch (e) {} throw new Error('파일 검증에 실패했어요 — 다시 시도해 주세요'); }
+
+  // ★전개는 반드시 ditto 다. zip 모듈로 풀면 심볼릭 링크와 실행 비트를 잃어
+  //   번들의 ad-hoc 서명이 무효가 되고 arm64 에서 'killed: 9' 가 난다.
+  setMacUpd({ state: 'extract', msg: '압축을 푸는 중이에요' });
+  const stage = path.join(dir, 'stage-' + safeVer(version));
+  fs.rmSync(stage, { recursive: true, force: true });
+  fs.mkdirSync(stage, { recursive: true });
+  await new Promise((resolve, reject) => {
+    execFile('/usr/bin/ditto', ['-x', '-k', tmp, stage], (err, so, se) => {
+      if (err) reject(new Error('압축 해제 실패: ' + String(se || err).slice(0, 200)));
+      else resolve();
+    });
+  });
+  try { fs.unlinkSync(tmp); } catch (e) {}
+
+  // 전개 정합성 — 여기서 걸러야 다음 단계로 못 넘어간다
+  const appDir = fs.readdirSync(stage).find(n => n.endsWith('.app'));
+  if (!appDir) throw new Error('받은 파일의 구조가 예상과 달라요');
+  const appPath = path.join(stage, appDir);
+
+  // ★zip 왕복을 거친 뒤 ad-hoc 서명이 살아 있는지 확인한다.
+  //   깨진 번들을 응용 프로그램 폴더에 넣으면 Apple Silicon 이 악성코드로 보고
+  //   조용히 지워 버린다(과거 실제로 겪음). 여기서 막는 편이 훨씬 싸다.
+  await new Promise((resolve, reject) => {
+    execFile('/usr/bin/codesign', ['--verify', '--deep', '--strict', appPath], (err, so, se) => {
+      if (err) reject(new Error('서명 검증에 실패했어요 — 설치하면 안 됩니다: ' + String(se || err).slice(0, 160)));
+      else resolve();
+    });
+  });
+
+  return appPath;
+}
+
 
 // 부팅 자동 실행으로 켜졌는지 판별 (윈도우: 로그인 항목 인자 / 맥: wasOpenedAtLogin)
 function wasOpenedAtLogin() {
@@ -186,6 +393,8 @@ function createTray() {
 
   const menu = Menu.buildFromTemplate([
     { label: '작업 타이머 열기', click: () => { mainWindow.show(); } },
+    // 상주 앱이라 창을 몇 주씩 안 여는 사람이 있다 — 수동 진입점을 하나 둔다
+    { label: '업데이트 확인', click: () => { mainWindow.show(); pushUpdateCheck(); } },
     { type: 'separator' },
     { label: '종료', click: () => { isQuitting = true; app.quit(); } },
   ]);
@@ -222,6 +431,7 @@ if (!gotTheLock) {
 app.whenReady().then(() => {
   createWindow();
   createTray();
+  startUpdatePolling();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -280,7 +490,13 @@ function sendMaxState() {
 }
 
 // 외부 링크 열기
+// ★스킴을 반드시 거른다. 여기로 오는 값의 상당수는 시트에서 읽어 온 요청글 링크인데,
+//   시트는 팀 밖에서도 편집될 수 있다. file:/ms-msdt:/javascript: 같은 게 섞여 들어오면
+//   shell.openExternal 이 그대로 OS 핸들러에 넘긴다.
 ipcMain.handle('open-external', (event, url) => {
+  let p;
+  try { p = new URL(String(url)).protocol; } catch (e) { return false; }
+  if (p !== 'http:' && p !== 'https:' && p !== 'mailto:') return false;
   openUrl(url);
   return true;
 });
@@ -640,6 +856,110 @@ ipcMain.handle('app-version', () => app.getVersion());
 ipcMain.handle('check-update', async () => {
   try { return await fetchLatestRelease(); }
   catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
+// ── 자동 업데이트 IPC ────────────────────────────────────────────────
+// 렌더러는 "지금 이 플랫폼에서 무엇이 가능한지"만 물어보고, URL·해시는 받지 않는다.
+ipcMain.handle('updater-mode', () => {
+  if (updaterSupported()) return { mode: 'win', canApply: true };
+  if (process.platform === 'darwin' && app.isPackaged) {
+    return { mode: 'mac', canApply: MAC_AUTO_APPLY };   // 교체는 아직 잠겨 있다
+  }
+  return { mode: 'none', canApply: false };   // 개발 모드 등 → 배너만
+});
+
+ipcMain.handle('updater-check', async () => {
+  try {
+    if (updaterSupported()) {
+      const u = getEU();
+      if (!u) return { ok: false, error: 'updater-unavailable' };
+      const r = await u.checkForUpdates();
+      const v = r && r.updateInfo && r.updateInfo.version;
+      const has = !!(v && cmpVer(v, app.getVersion()) > 0);
+      // ★응답 모양은 기존 check-update(fetchLatestRelease) 와 같아야 한다.
+      //   렌더러의 applyUpdateUI 가 latest/url 을 읽기 때문이다.
+      return { ok: true, hasUpdate: has, version: v, latest: v,
+               current: app.getVersion(), url: `https://minsk999.github.io/${GITHUB_REPO}/` };
+    }
+    // 맥은 릴리스 API 를 직접 본다 (latest-mac.yml 은 Squirrel 용이라 쓰지 않는다)
+    const r = await fetchLatestRelease();
+    return r;
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+ipcMain.handle('updater-download', async () => {
+  try {
+    if (updaterSupported()) {
+      const u = getEU(); if (!u) return { ok: false, error: 'updater-unavailable' };
+      // ★checkForUpdates() 를 먼저 부르지 않으면 downloadUpdate() 가 한 바이트도 받지 않고
+      //   "Please check update first" 로 즉시 거부한다(AppUpdater.js 의 updateInfoAndProvider 가드).
+      //   배너는 옛 경로(fetchLatestRelease)로 떠 있어서, 이걸 빠뜨리면 [받기] 가 항상 실패한다.
+      if (!u.updateInfoAndProvider) {
+        const c = await u.checkForUpdates();
+        if (!c || !c.updateInfo) return { ok: false, error: '업데이트 정보를 찾지 못했어요' };
+      }
+      // await 해야 실패를 성공으로 보고하지 않는다. 진행률은 그대로 이벤트로 흘러간다.
+      await u.downloadUpdate();
+      return { ok: true };
+    }
+    if (process.platform !== 'darwin') return { ok: false, error: 'unsupported' };
+    if (macUpdBusy) return { ok: false, error: 'busy' };
+    macUpdBusy = true;
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 15000);
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+        { signal: ctrl.signal, headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'teamtimer' } });
+      clearTimeout(t);
+      if (!res.ok) throw new Error('릴리스 조회 실패 (HTTP ' + res.status + ')');
+      const rel = await res.json();
+      const version = String(rel.tag_name || '').replace(/^v/, '');
+      if (!version) throw new Error('릴리스 정보를 읽지 못했어요');
+      if (cmpVer(version, app.getVersion()) <= 0) { setMacUpd({ state: 'idle', msg: '' }); return { ok: true, upToDate: true }; }
+      const asset = pickMacAsset(rel);
+      if (!asset) throw new Error(`이 릴리스에 ${process.arch} 용 파일이 없어요`);
+      const staged = await macDownloadAndStage(asset, version);
+      if (MAC_AUTO_APPLY) {
+        // 여기에 P4~P9(교체·셀프테스트·롤백)가 들어간다. TCC 실측 전까지 도달하지 않는다.
+        setMacUpd({ state: 'armed', pct: 100, msg: '적용 준비가 끝났어요', staged });
+      } else {
+        setMacUpd({ state: 'ready', pct: 100, msg: '새 버전을 받았어요 — 응용 프로그램 폴더로 옮겨 주세요', staged });
+      }
+      return { ok: true, staged, version };
+    } finally { macUpdBusy = false; }
+  } catch (e) {
+    const m = String((e && e.message) || e);
+    setMacUpd({ state: 'error', err: m.slice(0, 300), msg: '' });
+    return { ok: false, error: m };
+  }
+});
+
+// 받아둔 것을 Finder 로 열어 준다 (맥, 수동 교체 단계)
+ipcMain.handle('updater-reveal', () => {
+  if (!macUpd.staged) return { ok: false, error: 'not-staged' };
+  try { shell.showItemInFolder(macUpd.staged); return { ok: true }; }
+  catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+});
+
+// 재시작해서 적용 (Windows)
+ipcMain.handle('updater-install', () => {
+  if (!updaterSupported()) return { ok: false, error: 'unsupported' };
+  const u = getEU(); if (!u) return { ok: false, error: 'updater-unavailable' };
+  // 다 받기 전에 부르면 electron-updater 가 조용히 아무것도 안 하고 돌아온다.
+  if (!euDownloaded) return { ok: false, error: 'not-downloaded' };
+  setImmediate(() => {
+    // ★isQuitting 을 미리 세우면 안 된다. 설치가 실패했을 때 true 로 굳어서
+    //   그 뒤로는 창을 닫을 때마다 앱이 통째로 죽는다(트레이 상주가 깨진다).
+    isQuitting = true;
+    try {
+      // isSilent=true — oneClick:false 라 false 로 두면 NSIS 마법사(설치 위치 선택까지)가
+      // 뜬 뒤 앱이 먼저 죽는다. /S 로 기존 경로에 덮어쓰고 --force-run 으로 다시 켠다.
+      u.quitAndInstall(true, true);
+    } catch (e) { isQuitting = false; sendUpd({ type: 'error', error: String((e && e.message) || e) }); return; }
+    // quitAndInstall 이 설치기를 못 띄우면 app.quit() 까지 못 간다 → 잠금을 되돌린다.
+    setTimeout(() => { isQuitting = false; }, 4000);
+  });
+  return { ok: true };
 });
 
 ipcMain.handle('gmail-status', () => {

@@ -38,6 +38,14 @@ contextBridge.exposeInMainWorld('timerAPI', {
   fetchHolidays: (year) => ipcRenderer.invoke('fetch-holidays', year),
   appVersion: () => ipcRenderer.invoke('app-version'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
+
+  // 자동 업데이트 — 렌더러는 '무엇이 가능한지'만 묻고 URL·해시는 다루지 않는다
+  updaterMode:     () => ipcRenderer.invoke('updater-mode'),
+  updaterCheck:    () => ipcRenderer.invoke('updater-check'),
+  updaterDownload: () => ipcRenderer.invoke('updater-download'),
+  updaterReveal:   () => ipcRenderer.invoke('updater-reveal'),
+  updaterInstall:  () => ipcRenderer.invoke('updater-install'),
+  onUpdaterEvent:  (cb) => ipcRenderer.on('updater:event', (e, p) => cb(p)),
   gmailLogin: () => ipcRenderer.invoke('gmail-login'),
   gmailLogout: () => ipcRenderer.invoke('gmail-logout'),
   gmailList: (opts) => ipcRenderer.invoke('gmail-list', opts),

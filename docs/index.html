@@ -341,7 +341,7 @@
               <li><span class="t">받은 <b>.dmg를 더블클릭</b>해서 열어요.</span></li>
               <li><span class="t">앱 아이콘을 <b>응용 프로그램(Applications) 폴더로 드래그</b>해요.</span></li>
               <li><span class="t">앱은 Apple 서명이 없어 처음엔 차단돼요. <b>터미널(Terminal)</b>을 열고 아래 한 줄을 실행해 “격리” 표시를 제거하세요.</span>
-                <div class="cmdbox"><code>xattr -cr "/Applications/작업 타이머.app"</code><button class="cmdcopy" type="button">복사</button></div>
+                <div class="cmdbox"><code>xattr -cr "/Applications/TeamTimer.app"</code><button class="cmdcopy" type="button">복사</button></div>
               </li>
               <li><span class="t">이제 앱을 <b>더블클릭</b>하면 정상 실행돼요. (한 번만 하면 이후엔 그냥 열려요)</span></li>
             </ol>
@@ -633,7 +633,7 @@
             <div class="cmdbox"><code>open dist</code><button class="cmdcopy" type="button">복사</button></div>
             <div class="note"><span class="ic">i</span><span><code>dist/</code>에 <b>x64</b>(인텔)·<b>arm64</b>(애플실리콘) dmg가 각각 생겨요. 유니버설 병합이 일부 Mac에서 실행 문제를 일으켜, <b>아키텍처별로 분리</b>해 빌드해요.</span></div>
             <div class="note warn"><span class="ic">!</span><span><b>첫 실행 (서명 안 된 앱)</b> — 받는 사람은 응용 프로그램 폴더로 옮긴 뒤 <b>터미널</b>에서 아래 한 줄을 실행하면 열려요. 인텔·애플실리콘 모두 동일해요. (한 번만 하면 이후엔 그냥 열려요)</span></div>
-            <div class="cmdbox"><code>xattr -cr "/Applications/작업 타이머.app"</code><button class="cmdcopy" type="button">복사</button></div>
+            <div class="cmdbox"><code>xattr -cr "/Applications/TeamTimer.app"</code><button class="cmdcopy" type="button">복사</button></div>
           </div>
         </div>
       </section>
@@ -652,7 +652,7 @@
         </div>
         <div class="card">
           <h3 style="margin-top:0">설치할 때 경고가 떠요</h3>
-          <p style="font-size:14.5px; color:var(--ink-2)">사내 배포용이라 코드 서명을 하지 않았어요. <b>Windows</b>는 SmartScreen에서 <b>추가 정보 → 실행</b>. <b>macOS</b>는 응용 프로그램으로 옮긴 뒤 <b>터미널</b>에서 <code>xattr -cr "/Applications/작업 타이머.app"</code>를 한 번 실행하면 돼요. 안전합니다.</p>
+          <p style="font-size:14.5px; color:var(--ink-2)">사내 배포용이라 코드 서명을 하지 않았어요. <b>Windows</b>는 SmartScreen에서 <b>추가 정보 → 실행</b>. <b>macOS</b>는 응용 프로그램으로 옮긴 뒤 <b>터미널</b>에서 <code>xattr -cr "/Applications/TeamTimer.app"</code>를 한 번 실행하면 돼요. 안전합니다.</p>
         </div>
         <div class="card">
           <h3 style="margin-top:0">업데이트는 어떻게 하나요</h3>

@@ -1584,30 +1584,107 @@
   // 설정 상단 버전을 package.json 버전과 자동 동기화하고,
   // GitHub 릴리스에 새 버전이 있으면 배지(설정)와 배너(상단)로 안내한다.
   // 업데이트 UI 표시(배지+배너) — 시작 확인과 트레이 '업데이트 확인'이 공유.
+  // ── 자동 업데이트 ────────────────────────────────────────────────
+  // 플랫폼마다 할 수 있는 게 다르다.
+  //   win  : 앱 안에서 받고 재시작까지 (electron-updater)
+  //   mac  : 앱 안에서 받고 검증·전개까지. 교체는 아직 잠겨 있어 폴더를 열어 준다
+  //   none : 개발 모드 등 → 예전처럼 설명서로 보낸다
+  let updMode = { mode: "none", canApply: false };
+  let updState = "idle";          // idle | downloading | ready | error
+  let updPct = 0;
+  let updDocsUrl = "";
+  let updLatest = "";
+
+  function ubBtn(){ return document.querySelector("#update-banner .ub-btn"); }
+  function paintUpdater(latest) {
+    if (latest) updLatest = latest;
+    const btn = ubBtn(), txt = $("ub-text"), badge = $("update-badge");
+    // ★배지도 같이 칠한다. 배너를 [다음에] 로 닫아 버리면 배지가 유일한 창구다.
+    const setBadge = (s) => { if (badge) badge.textContent = s; };
+    if (updState === "downloading") {
+      const s = updPct ? updPct + "%" : "받는 중";
+      if (btn) btn.textContent = s;
+      setBadge("업데이트 " + s);
+      return;
+    }
+    if (updState === "ready") {
+      const win = updMode.mode === "win";
+      if (btn) btn.textContent = win ? "지금 재시작" : "폴더 열기";
+      if (txt) txt.textContent = win
+        ? "새 버전을 받았어요 — 재시작하면 적용돼요"
+        : "새 버전을 받았어요 — 응용 프로그램 폴더로 옮겨 주세요";
+      setBadge(win ? "재시작해 적용" : "받은 폴더 열기");
+      return;
+    }
+    if (updState === "error") {
+      if (btn) btn.textContent = "다시 시도";
+      setBadge("업데이트 다시 시도");
+      return;
+    }
+    if (btn) btn.textContent = "받기";
+    if (txt && updLatest) txt.textContent = "새 버전 v" + updLatest + "이 나왔어요";
+    if (updLatest) setBadge("v" + updLatest + " 업데이트");
+  }
+
+  async function onUpdateClick(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (updState === "downloading") return;                       // 받는 중엔 무시
+    if (updMode.mode === "none") {                                 // 예전 동작 — 설명서로
+      if (window.timerAPI && window.timerAPI.openExternal && updDocsUrl) window.timerAPI.openExternal(updDocsUrl);
+      return;
+    }
+    if (updState === "ready") {
+      if (updMode.mode === "win") {
+        // ★확인 없이 앱을 죽이면 안 된다. 편집 중이던 내용이 그대로 날아간다.
+        openConfirm("지금 재시작할까요?", "앱을 껐다 켜면서 새 버전을 설치해요. 저장 안 한 편집은 사라져요.",
+          "재시작", async () => {
+            const res = await window.timerAPI.updaterInstall();
+            if (!res || !res.ok) { updState = "error"; paintUpdater(); toast("설치를 시작하지 못했어요"); }
+          });
+      } else {
+        const res = await window.timerAPI.updaterReveal();
+        if (!res || !res.ok) toast("받아둔 파일을 찾지 못했어요 — 다시 받아 주세요");
+      }
+      return;
+    }
+    updState = "downloading"; updPct = 0; paintUpdater();
+    const r = await window.timerAPI.updaterDownload();
+    // win 은 진행률·완료가 이벤트로 오므로 여기서 상태를 확정하지 않는다.
+    if (updMode.mode !== "win") {
+      if (r && r.upToDate) { updState = "idle"; toast("이미 최신 버전이에요"); }   // ★ready 로 올리면 죽은 버튼이 된다
+      else if (r && r.ok) { updState = "ready"; }
+      else { updState = "error"; toast("업데이트 실패: " + ((r && r.error) || "")); }
+      paintUpdater();
+    } else if (r && !r.ok) {
+      updState = "error"; paintUpdater(); toast("업데이트 실패: " + (r.error || ""));
+    }
+  }
+
   function applyUpdateUI(r) {
     if (!r || !r.ok || !r.hasUpdate) return;
-    const openUpdate = (e) => {
-      if (e) e.preventDefault();
-      if (window.timerAPI && window.timerAPI.openExternal) window.timerAPI.openExternal(r.url);
-    };
-    // 설정 배지
+    updDocsUrl = r.url || "";
+    updLatest = r.latest || "";
+    const openUpdate = onUpdateClick;
+    // 설정 배지 — 배너를 닫아도 여기로는 계속 들어올 수 있다
     const badge = document.getElementById("update-badge");
     if (badge) {
       badge.style.display = "inline-flex";
-      badge.textContent = "v" + r.latest + " 업데이트";
       badge.onclick = openUpdate; // 중복 등록 방지(onclick 덮어쓰기)
     }
     // 상단 배너 (이번 세션에서 닫았으면 다시 안 띄움)
     const banner = document.getElementById("update-banner");
     if (banner && sessionStorage.getItem("updateBannerClosed") !== r.latest) {
-      const txt = document.getElementById("ub-text");
-      if (txt) txt.textContent = "새 버전 v" + r.latest + "이 나왔어요";
+      banner.style.display = "";          // ★인라인 none 이 박혀 있으면 클래스로 못 되살린다
       banner.classList.remove("hide");
       banner.classList.add("show"); // 슬라이드 다운 등장
-      banner.onclick = openUpdate;
+      // ★배너 전체가 아니라 버튼에만 붙인다. 전체에 붙이면 텍스트를 잘못 눌러도
+      //   ready 상태에서 확인 없이 앱이 즉시 죽는다.
+      banner.onclick = null;
+      const btn = ubBtn(); if (btn) btn.onclick = openUpdate;
       const later = document.getElementById("ub-later");
       if (later) later.onclick = (e) => {
         e.stopPropagation();
+        // 받는 중·설치 대기 중엔 닫아도 배지로 상태가 이어진다(paintUpdater 가 배지를 칠한다)
         // 슬라이드 업으로 닫기 → 애니메이션 끝나면 완전히 숨김
         banner.classList.remove("show");
         banner.classList.add("hide");
@@ -1616,10 +1693,31 @@
         sessionStorage.setItem("updateBannerClosed", r.latest);
       };
     }
+    paintUpdater(r.latest);
   }
 
   (async function initVersionAndUpdate() {
     if (typeof window.timerAPI === "undefined") return;
+    // 0) 이 플랫폼에서 무엇이 가능한지 먼저 확인 (win / mac / none)
+    try {
+      if (window.timerAPI.updaterMode) updMode = await window.timerAPI.updaterMode() || updMode;
+    } catch(e){}
+    // 메인에서 오는 진행률·완료·오류를 받는다
+    try {
+      if (window.timerAPI.onUpdaterEvent) window.timerAPI.onUpdaterEvent((p) => {
+        if (!p) return;
+        if (p.type === "banner") { applyUpdateUI(p); return; }   // 6시간 주기 점검 결과
+        if (p.type === "progress") { updState = "downloading"; updPct = p.percent || 0; paintUpdater(); }
+        else if (p.type === "ready") { updState = "ready"; paintUpdater(); }
+        else if (p.type === "error") { updState = "error"; paintUpdater(); toast("업데이트 실패: " + (p.error || "")); }
+        else if (p.type === "mac") {
+          if (p.state === "download" || p.state === "verify" || p.state === "extract") {
+            updState = "downloading"; updPct = p.pct || 0; paintUpdater();
+          } else if (p.state === "ready" || p.state === "armed") { updState = "ready"; paintUpdater(); }
+          else if (p.state === "error") { updState = "error"; paintUpdater(); }
+        }
+      });
+    } catch(e){}
     // 1) 버전 표시 (하드코딩 제거 — 이제 매 버전 자동 반영)
     try {
       if (window.timerAPI.appVersion) {

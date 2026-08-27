@@ -111,6 +111,32 @@ Intel 맥은 이 상태도 관대하게 통과하므로, **Intel에서 잘 된�
 - "열려 있는가" 판정은 **`modalShown(el)`** 로. `.show` 만 보면 퇴장 중 160ms 를 열림으로 읽어
   ESC·단축키가 삼켜진다(키 리피트에서는 손 뗄 때까지 안 풀림).
 
+## 자동 업데이트
+
+**Windows** = electron-updater(NSIS). **macOS** = 자체 구현(릴리스 API 직접 조회 → sha256 검증 → ditto 전개).
+맥은 Squirrel.Mac 을 못 쓴다 — ad-hoc 서명은 서명 주체가 없어 designated requirement 가 `cdhash H"..."` 가
+되고, 새 빌드는 정의상 다른 바이너리라 **논리적으로 항상 실패**한다. 설정 문제가 아니다.
+
+⚠️ **`downloadUpdate()` 앞에 `checkForUpdates()` 가 반드시 있어야 한다.**
+없으면 한 바이트도 안 받고 `Please check update first` 로 즉시 거부한다
+(`AppUpdater.js` 의 `updateInfoAndProvider` 가드). 배너는 옛 경로(`fetchLatestRelease`)로 뜨기 때문에
+이걸 빠뜨리면 **[받기] 가 항상 실패하는데 겉보기엔 멀쩡하다.** 실측으로 밟았다(2026-08-27).
+
+⚠️ **`autoInstallOnAppQuit` 는 반드시 false.** 이 앱의 NSIS 는 `oneClick:false`(마법사형)라,
+켜 두면 사용자가 트레이에서 앱을 끈 순간 설치 마법사가 예고 없이 튀어나온다. 실측으로 밟았다.
+
+⚠️ **`quitAndInstall` 은 `(true, true)`.** 첫 인자가 false 면 마법사가 뜬 뒤 앱이 먼저 죽는다.
+그리고 `isQuitting = true` 를 **미리 세우면 안 된다** — 설치가 실패하면 true 로 굳어 트레이 상주가 깨진다.
+
+- `MAC_AUTO_APPLY = false` — 맥의 자기 교체는 **App Management TCC 실측 전까지 켜지 말 것**.
+  실측 방법: 앱을 켜 둔 채 `mv /Applications/TeamTimer.app /Applications/.tt-bak.app` 를
+  터미널과 앱 자신에서 각각. `Operation not permitted` 가 나오면 Developer ID($99)가 필요하다.
+- 릴리스 자산의 `digest: sha256:...` 필드를 그대로 쓴다 → 해시를 따로 배포할 필요가 없다.
+- 전개는 **반드시 `ditto -x -k`**. `unzip`/zip 모듈은 심볼릭 링크·실행 비트를 잃어
+  ad-hoc 서명이 깨지고 arm64 에서 `killed: 9` 가 난다.
+- 버전 올릴 땐 **`npm run bump 1.0.28`** — package.json 과 docs/index.html 을 같이 고친다.
+  CI 에 태그↔package.json 버전 일치 가드가 있어 어긋나면 빌드가 실패한다.
+
 ## GAS (구글 앱스스크립트)
 현재 **v53**. 시트: `영상팀 업무현황` (탭: `🎬업무현황`, `🤖자동화` 등)
 - **진실원천은 Apps Script 편집기의 코드.** 저장된 옛 파일 기준으로 작업 금지
