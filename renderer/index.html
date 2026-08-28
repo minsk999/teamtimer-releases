@@ -510,7 +510,11 @@
   .update-banner .ub-later { background:transparent;
     border:var(--hairline) solid color-mix(in srgb, var(--pill-text) 40%, transparent); }
   .update-banner .ub-later:hover { background:color-mix(in srgb, var(--pill-text) 12%, transparent); }
-  .update-banner.no-later .ub-later { display:none; }                          /* ready 에서는 재시작 유도를 흐리지 않는다 */
+  /* ★.no-later(ready 에서 [다음에] 숨기기)는 폐기했다. 둘을 동시에 만들었다 —
+     ① [다음에] 는 테두리가 있어 26→28px 이라, 숨기면 배너가 46→44px 로 **전이 없이** 튄다.
+        타이틀바·본문이 통째로 2px 점프한다(실측).
+     ② ready 배너를 닫을 방법이 사라져 45px 이 세션 끝까지 남는다. 720px 창에서 이건 크다.
+     재시작 유도는 문구와 버튼 라벨로 충분하다. */
   @media (prefers-reduced-motion: reduce) {
     .update-banner-wrap, .update-banner-wrap.open,
     .update-banner, .update-banner-wrap.open .update-banner { transition: none; }
@@ -1626,15 +1630,28 @@
   // ★downloading 고착 감시. onUpdateClick 이 받는 중 클릭을 통째로 막기 때문에,
   //   update-downloaded 이벤트가 한 번이라도 유실되면 배지·배너가 세션 끝까지 죽는다.
   let updWatchdog = null;
+  let updBusy = false;          // updaterDownload 요청이 살아 있는 동안 true
   function updWatchStart(){                       // 진행률이 올 때마다 다시 건다
     clearTimeout(updWatchdog);
     updWatchdog = setTimeout(() => {
       if (updState !== "downloading") return;
-      updState = "error"; paintUpdater();
-      toast("업데이트가 멈춘 것 같아요 — 다시 시도해 주세요");
+      // ★[다시 시도]를 권하지 않는다. electron-updater 는 downloadPromise 가 살아 있으면
+      //   새로 받지 않고 멈춘 그 promise 를 그대로 돌려준다(AppUpdater.js) — 눌러도 아무 일이 없다.
+      updState = "stalled"; paintUpdater(); openUpdBanner();
+      toast("업데이트가 멈춘 것 같아요 — 앱을 껐다 켜 주세요");
     }, 90000);
   }
   function updWatchStop(){ clearTimeout(updWatchdog); updWatchdog = null; }
+
+  // 내부 토큰이 그대로 토스트에 나가면 사용자는 읽을 수 없다
+  function updErrText(e){
+    const t = String(e || "");
+    if (t === "busy") return "이미 받는 중이에요";
+    if (t === "not-downloaded") return "아직 다 받지 못했어요";
+    if (t === "unsupported" || t === "updater-unavailable") return "이 버전에서는 앱 안에서 받을 수 없어요";
+    if (/host-not-allowed|bad-url/.test(t)) return "받을 주소가 올바르지 않아요";
+    return t ? ("업데이트 실패: " + t.slice(0, 60)) : "업데이트에 실패했어요";
+  }
 
   // 배너 열고 닫기 — 높이 슬롯 클래스 하나로 끝. display 조작도 animationend 의존도 없다
   const UB_DISMISS_KEY = "updateBannerClosed";
@@ -1670,6 +1687,9 @@
                    : "새 버전을 받았어요 — 폴더로 옮겨 주세요";   // ★긴 문구는 440px 에서 2줄이 돼 배너가 11.67px 튄다
       sBtn   = win ? "지금 재시작" : "폴더 열기";
       sBadge = win ? "재시작해 적용" : "받은 폴더 열기";
+    } else if (updState === "stalled") {
+      // 재시도가 실제로 동작하지 않는 상태다. 되는 방법만 말한다.
+      sTxt = "업데이트가 멈췄어요 — 앱을 껐다 켜 주세요"; sBtn = "확인"; sBadge = "앱 재실행 필요";
     } else if (updState === "error") {
       sTxt = "업데이트를 받지 못했어요"; sBtn = "다시 시도"; sBadge = "업데이트 다시 시도";
     } else {
@@ -1680,16 +1700,20 @@
     if (txt)   txt.textContent   = sTxt;
     if (btn)   btn.textContent   = sBtn;
     if (badge) badge.textContent = sBadge;
-    if (banner) banner.classList.toggle("no-later", updState === "ready");
+    // ★상태에 따라 버튼을 숨기지 않는다 — 배너 높이가 전이 없이 튀고, 닫을 방법도 사라진다
   }
 
   async function onUpdateClick(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
-    if (updState === "downloading") { toast("받는 중이에요"); return; }   // ★무반응과 정상 대기를 구분해 준다
+    if (updState === "stalled") { toast("앱을 껐다 켜면 다시 받을 수 있어요"); return; }
+    // ★상태가 아니라 '요청 중' 플래그로 막는다. 워치독이 error 로 바꾼 뒤에도
+    //   원래 요청은 살아 있어서, 상태만 보면 두 번째 요청이 나가 mac 은 'busy' 로 튕긴다.
+    if (updBusy) { toast("받는 중이에요"); return; }
     if (updMode.mode === "none") {                                 // 예전 동작 — 설명서로
       if (window.timerAPI && window.timerAPI.openExternal && updDocsUrl) window.timerAPI.openExternal(updDocsUrl);
       return;
     }
+    if (updState === "stalled") { closeUpdBanner(); return; }
     if (updState === "ready") {
       if (updMode.mode === "win") {
         // ★확인 없이 앱을 죽이면 안 된다. 편집 중이던 내용이 그대로 날아간다.
@@ -1705,22 +1729,30 @@
       return;
     }
     updState = "downloading"; updPct = 0; paintUpdater(); updWatchStart();
-    const r = await window.timerAPI.updaterDownload();
+    updBusy = true;
+    let r;
+    try { r = await window.timerAPI.updaterDownload(); }
+    finally { updBusy = false; }
     // win 은 진행률·완료가 이벤트로 오므로 여기서 상태를 확정하지 않는다(워치독이 유실을 잡는다).
     if (updMode.mode !== "win") {
       updWatchStop();
-      if (r && r.upToDate) { updState = "idle"; paintUpdater(); toast("이미 최신 버전이에요"); }   // ★ready 로 올리면 죽은 버튼이 된다
+      if (r && r.upToDate) { updState = "idle"; updLatest = ""; paintUpdater(); closeUpdBanner(); toast("이미 최신 버전이에요"); }
       else if (r && r.ok) { updState = "ready"; announceUpdateReady(); }
-      else { updState = "error"; paintUpdater(); toast("업데이트 실패: " + ((r && r.error) || "")); }
+      else { updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(r && r.error)); }
     } else if (r && !r.ok) {
       updWatchStop();
-      updState = "error"; paintUpdater(); toast("업데이트 실패: " + (r.error || ""));
+      updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(r.error));
     }
   }
 
   function applyUpdateUI(r) {
     if (!r || !r.ok || !r.hasUpdate) return;
     updDocsUrl = r.url || "";
+    // ★더 새로운 버전이 나왔으면 이전 시도의 상태를 버린다.
+    //   안 그러면 새 버전 알림이 "업데이트를 받지 못했어요" 문구를 달고 열린다.
+    if (r.latest && r.latest !== updLatest && updState !== "downloading") {
+      updState = "idle"; updPct = 0;
+    }
     updLatest = r.latest || "";
     // 설정 배지 — 배너를 닫아도 여기로는 계속 들어올 수 있다
     const badge = document.getElementById("update-badge");
@@ -1738,7 +1770,9 @@
       sessionStorage.setItem(UB_DISMISS_KEY, updLatest);
     };
     paintUpdater(r.latest);                               // ★문구를 먼저 채우고
-    if (sessionStorage.getItem(UB_DISMISS_KEY) !== r.latest) openUpdBanner();   // 그 다음에 연다
+    // ★force = 사용자가 트레이에서 직접 '업데이트 확인'을 누른 경우. 억제를 무시한다.
+    //   error 도 무시한다 — 실패를 알리는 유일한 창구가 2초짜리 토스트뿐이면 안 된다.
+    if (r.force || updState === "error" || sessionStorage.getItem(UB_DISMISS_KEY) !== r.latest) openUpdBanner();
   }
 
   (async function initVersionAndUpdate() {
@@ -1751,15 +1785,18 @@
     try {
       if (window.timerAPI.onUpdaterEvent) window.timerAPI.onUpdaterEvent((p) => {
         if (!p) return;
-        if (p.type === "banner") { applyUpdateUI(p); return; }   // 6시간 주기 점검 결과
+        if (p.type === "banner") { applyUpdateUI(p); return; }   // 주기 점검 · 트레이 수동 확인
+        // 트레이에서 직접 눌렀을 때만 온다. 조용하면 눌러도 아무 일 없는 것처럼 보인다.
+        if (p.type === "upToDate")   { toast("최신 버전을 쓰고 계세요"); return; }
+        if (p.type === "checkFailed"){ toast("업데이트 확인에 실패했어요 — 잠시 뒤 다시 시도해 주세요"); return; }
         if (p.type === "progress") { updState = "downloading"; updPct = p.percent || 0; paintUpdater(); updWatchStart(); }
         else if (p.type === "ready") { updState = "ready"; announceUpdateReady(); }
-        else if (p.type === "error") { updWatchStop(); updState = "error"; paintUpdater(); toast("업데이트 실패: " + (p.error || "")); }
+        else if (p.type === "error") { updWatchStop(); updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(p.error)); }
         else if (p.type === "mac") {
           if (p.state === "download" || p.state === "verify" || p.state === "extract") {
             updState = "downloading"; updPct = p.pct || 0; paintUpdater(); updWatchStart();
           } else if (p.state === "ready" || p.state === "armed") { updState = "ready"; announceUpdateReady(); }
-          else if (p.state === "error") { updWatchStop(); updState = "error"; paintUpdater(); }
+          else if (p.state === "error") { updWatchStop(); updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(p.err)); }
         }
       });
     } catch(e){}

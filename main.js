@@ -167,14 +167,19 @@ function getEU() {
 //    ★검증 전에 켜지 말 것. 이 프로젝트의 장기 장애 2건이 모두 맥 번들 문제였다.
 // 시작 시 1회 확인만으로는 상주 앱에 업데이트가 도달하지 않는다 —
 // 몇 주씩 안 끄는 사람이 있어서, 6시간마다 조용히 다시 본다.
-async function pushUpdateCheck() {
+// force=true 는 사용자가 트레이에서 직접 '업데이트 확인'을 누른 경우다.
+// 배너를 [다음에] 로 닫아 뒀더라도 그때는 반드시 다시 띄운다 —
+// 직접 누른 메뉴가 아무 반응도 없으면 고장으로 읽힌다.
+async function pushUpdateCheck(force) {
   try {
     const r = await fetchLatestRelease();
-    if (r && r.ok && r.hasUpdate) sendUpd({ type: 'banner', ...r });
-  } catch (e) {}
+    if (!r || !r.ok) { if (force) sendUpd({ type: 'checkFailed' }); return; }
+    if (r.hasUpdate) sendUpd({ type: 'banner', force: !!force, ...r });
+    else if (force) sendUpd({ type: 'upToDate', current: r.current });
+  } catch (e) { if (force) sendUpd({ type: 'checkFailed' }); }
 }
 function startUpdatePolling() {
-  setInterval(pushUpdateCheck, 6 * 60 * 60 * 1000);
+  setInterval(() => pushUpdateCheck(false), 6 * 60 * 60 * 1000);
 }
 
 const MAC_AUTO_APPLY = false;
@@ -394,7 +399,7 @@ function createTray() {
   const menu = Menu.buildFromTemplate([
     { label: '작업 타이머 열기', click: () => { mainWindow.show(); } },
     // 상주 앱이라 창을 몇 주씩 안 여는 사람이 있다 — 수동 진입점을 하나 둔다
-    { label: '업데이트 확인', click: () => { mainWindow.show(); pushUpdateCheck(); } },
+    { label: '업데이트 확인', click: () => { mainWindow.show(); pushUpdateCheck(true); } },
     { type: 'separator' },
     { label: '종료', click: () => { isQuitting = true; app.quit(); } },
   ]);
