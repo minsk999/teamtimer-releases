@@ -571,7 +571,12 @@
   .key-cap.capturing { border-color: var(--ink); background: var(--surface); color: var(--ink-3); text-transform: none; font-weight: 600; animation: pulse 0.9s ease-in-out infinite; }
   .key-cap.fixed { text-transform: none; color: var(--ink-3); cursor: default; min-width: 64px; }
   .key-cap.fixed:hover { border-color: var(--line); }
-  #modal-keys { z-index: 120; } /* 설정 모달 위에 표시 */
+  /* ★설정 모달 위에 떠야 하는 것들.
+     오버레이는 전부 z-index:100 이라 DOM 순서로 겹침이 정해지는데,
+     #modal-settings 가 가장 뒤(1295줄)라 그 뒤에 열리는 모달이 통째로 가려진다.
+     "무반응"으로 보이지만 실제로는 설정창 뒤에서 열려 있는 것이다(실사용 제보 2회). */
+  #modal-keys,
+  #modal-confirm { z-index: 120; }
   .mail-slider-row { margin-top: 14px; }
   .mail-slider-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 9px; }
   .mail-slider-head .msl-label { font-size: 13px; font-weight: 600; color: var(--ink); }
