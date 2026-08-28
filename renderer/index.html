@@ -761,6 +761,9 @@
     max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .done-presets { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  /* 프리셋이 4개면 440px 창에서 3+1 로 깨져 마지막 하나가 혼자 남는다.
+     알약이 제 글자만큼만 넓은 이 디자인을 유지한 채 2+2 로 맞추는 스페이서. */
+  .preset-break { flex-basis: 100%; height: 0; margin: 0; }
   .preset-pill {
     padding: 10px 16px; border: 1.5px solid var(--line); border-radius: 100px;
     background: var(--surface-2); color: var(--ink); font-family: inherit;
@@ -2886,9 +2889,14 @@
     doneCtx = { id, toDone };
     $("done-title").textContent = toDone ? "완료 처리" : "되돌리기";
     $("done-sub").textContent = t.title || "";
-    const presets = toDone ? ["전달 완료","수정 전달 완료","담당 제작 완료"] : ["수정 진행","베리 진행"];
+    const presets = toDone ? ["전달 완료","수정 전달 완료","베리 전달 완료","담당 제작 완료"] : ["수정 진행","베리 진행"];
     let presetHtml = presets
-      .map(p => `<button class="preset-pill" onclick="confirmDone('${p}')">${esc(p)}</button>`).join("");
+      .map((p, i) => {
+        const btn = `<button class="preset-pill" onclick="confirmDone('${p}')">${esc(p)}</button>`;
+        // 4개 이상일 때만 2개씩 끊는다 (되돌리기 팝업은 3개라 한 줄 유지)
+        return (presets.length >= 4 && i % 2 === 1 && i !== presets.length - 1)
+          ? btn + `<span class="preset-break"></span>` : btn;
+      }).join("");
     if(!toDone){
       // 되돌리기 팝업에만: 완료 상태를 유지한 채 '전달 완료'로 보내는 검은 버튼 (진행중으로 안 감)
       presetHtml += `<button class="preset-pill preset-pill-dark" onclick="confirmDone('전달 완료', true)">전달 완료</button>`;
