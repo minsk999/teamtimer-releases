@@ -94,6 +94,43 @@ jobs:
             rm -rf "$RT"
           done
 
+      # ★파일 이름의 아키텍처와 실제 바이너리가 맞는지 본다.
+      #   build.mac.target 에 arch 배열이 있으면 --prepackaged 호출마다 x64·arm64 자산을
+      #   둘 다 같은 앱으로 만들어, 마지막 호출이 반대편 이름을 덮어쓴다.
+      #   v1.0.12~1.0.28 의 -x64.dmg/zip 안에 arm64 바이너리가 들어 있었다(실측).
+      #   사람 눈으로는 파일명만 보고 넘어가므로 반드시 기계가 잡아야 한다.
+      - name: Verify mac artifact architectures
+        if: matrix.os == 'macos-latest'
+        run: |
+          set -e
+          fail=0
+          check() {  # $1=경로(.app)  $2=기대 arch  $3=출처 표시
+            GOT=$(lipo -archs "$1/Contents/MacOS/TeamTimer" 2>/dev/null || echo "?")
+            if [ "$GOT" = "$2" ]; then
+              echo "  OK    $3  →  $GOT"
+            else
+              echo "  ❌ 불일치 $3  이름=$2  실제=$GOT"; fail=1
+            fi
+          }
+          for A in x64 arm64; do
+            EXP=$A; [ "$A" = "x64" ] && EXP=x86_64
+            for Z in dist/*-$A.zip; do
+              [ -f "$Z" ] || continue
+              RT=$(mktemp -d); ditto -x -k "$Z" "$RT"
+              APP=$(find "$RT" -maxdepth 1 -name '*.app' | head -1)
+              check "$APP" "$EXP" "$(basename "$Z")"; rm -rf "$RT"
+            done
+            for D in dist/*-$A.dmg; do
+              [ -f "$D" ] || continue
+              MP=$(mktemp -d)
+              hdiutil attach "$D" -nobrowse -readonly -mountpoint "$MP" > /dev/null
+              APP=$(find "$MP" -maxdepth 1 -name '*.app' | head -1)
+              check "$APP" "$EXP" "$(basename "$D")"
+              hdiutil detach "$MP" > /dev/null; rm -rf "$MP"
+            done
+          done
+          [ "$fail" = "0" ] || { echo "::error::자산 이름과 실제 아키텍처가 다릅니다"; exit 1; }
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:

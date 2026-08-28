@@ -45,21 +45,10 @@
       "build/trayDotTemplate@2x.png"
     ],
     "mac": {
+      "_comment_target": "★arch 배열 넣지 말 것. build:mac 은 --prepackaged 로 앱을 하나씩 지정하는데, arch 배열이 있으면 매 호출이 x64·arm64 자산을 둘 다 그 하나의 앱으로 만들어 마지막 호출이 반대편 이름까지 덮어쓴다 (v1.0.12~1.0.28 의 -x64.dmg/zip 안에 arm64 바이너리가 들어 있었다). 비워 두면 CLI 의 --x64/--arm64 가 결정한다.",
       "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
+        "dmg",
+        "zip"
       ],
       "artifactName": "TeamTimer-${version}-${arch}.${ext}",
       "icon": "build/icon.icns",
