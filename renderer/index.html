@@ -483,20 +483,38 @@
 
   .app-ver { font-size: 11.5px; font-weight: 500; color: var(--ink-3); letter-spacing: 0; margin-left: 8px; }
   /* 업데이트 배지 (설정 버전 우측, 빨강) — flex로 텍스트 수직 중앙 */
-  .update-badge { display:inline-flex; align-items:center; justify-content:center; margin-left:8px; padding:0 10px; height:20px; border-radius:20px; background:#ff3b30; color:#fff; font-size:11px; font-weight:700; line-height:1; letter-spacing:0; text-decoration:none; cursor:pointer; transition:background .15s, transform .15s; }
-  .update-badge:hover { background:#e63329; transform:translateY(-1px); }
+  .update-badge { display:inline-flex; align-items:center; justify-content:center; margin-left:8px; padding:0 10px; height:20px; border-radius:20px; background:var(--red); color:#fff; font-size:11px; font-weight:700; line-height:1; letter-spacing:0; text-decoration:none; cursor:pointer; transition:filter .15s, transform .15s; }
+  .update-badge:hover { filter:brightness(0.92); transform:translateY(-1px); }
   /* 업데이트 배너 (앱 최상단, 가로 전체) */
-  /* 업데이트 배너 (앱 최상단) — 블랙, 슬라이드 다운 애니메이션 */
-  .update-banner { display:none; align-items:center; gap:10px; padding:9px 16px; background:#111; color:#fff; font-size:13px; font-weight:600; cursor:pointer; flex-shrink:0; overflow:hidden; }
-  .update-banner.show { display:flex; animation: bannerSlideDown .4s cubic-bezier(.22,1,.36,1) both; }
-  .update-banner.hide { display:flex; animation: bannerSlideUp .32s cubic-bezier(.4,0,1,1) both; }
-  @keyframes bannerSlideDown { from{ transform:translateY(-100%); } to{ transform:translateY(0); } }
-  @keyframes bannerSlideUp { from{ transform:translateY(0); } to{ transform:translateY(-100%); } }
-  .update-banner .ub-text { flex:1; }
-  .update-banner .ub-btn { background:rgba(255,255,255,.18); padding:4px 12px; border-radius:7px; font-size:12px; font-weight:500; transition:background .15s; }
-  .update-banner .ub-btn:hover { background:rgba(255,255,255,.28); }
-  .update-banner .ub-later { background:transparent; border:0.5px solid rgba(255,255,255,.4); padding:4px 12px; border-radius:7px; font-size:12px; font-weight:500; transition:background .15s; }
-  .update-banner .ub-later:hover { background:rgba(255,255,255,.12); }
+  /* ★높이 슬롯. display:none↔flex 토글은 배너 높이(약 45px)를 0프레임에 밀어 넣고
+     배너만 따로 400ms 슬라이드해서, 레이아웃과 배너가 아예 따로 놀았다(=툭툭 끊김).
+     래퍼의 grid-template-rows 를 0fr↔1fr 로 굴려 타이틀바·본문이 배너와 같은 속도로 움직인다. */
+  .update-banner-wrap { display:grid; grid-template-rows:0fr; flex-shrink:0;
+    transition: grid-template-rows .2s cubic-bezier(0.4,0,1,1); }              /* 퇴장 — 모달 퇴장(382행)과 같은 이징 */
+  .update-banner-wrap.open { grid-template-rows:1fr;
+    transition: grid-template-rows .32s cubic-bezier(0.16,1,0.3,1); }          /* 등장 — 앱의 주 등장 이징(4곳) */
+  /* ★그리드 아이템에는 패딩을 두지 않는다. 0fr 은 minmax(auto,0fr) 이라 트랙 최소값이
+     min-content 인데, 패딩은 min-height:0 으로도 안 줄어들어 18px 이 남는다(실측). */
+  .update-banner { background:var(--pill); color:var(--pill-text); font-size:13px; font-weight:600;
+    min-height:0; overflow:hidden;                                             /* 둘 다 있어야 0fr 에서 접힌다 */
+    opacity:0; transition: opacity .16s ease; }
+  .update-banner .ub-row { display:flex; align-items:center; gap:10px; padding:9px 16px; }
+  .update-banner-wrap.open .update-banner { opacity:1; transition: opacity .2s ease .08s; }
+  .update-banner .ub-text { flex:1; min-width:0; }                             /* min-width:0 없으면 축소가 안 먹는다 */
+  .update-banner .ub-btn, .update-banner .ub-later { flex-shrink:0; white-space:nowrap; cursor:pointer;
+    padding:4px 12px; border-radius:7px; font-size:12px; font-weight:500; transition:background .15s; }
+  /* min-width 80px = 최장 라벨 '지금 재시작'(실측 78.53px) 기준. 받기/7%/100%/폴더 열기가 모두 같은 상자 안에서 바뀐다 */
+  .update-banner .ub-btn { min-width:80px; text-align:center; font-variant-numeric:tabular-nums;
+    background:color-mix(in srgb, var(--pill-text) 18%, transparent); }
+  .update-banner .ub-btn:hover { background:color-mix(in srgb, var(--pill-text) 28%, transparent); }
+  .update-banner .ub-later { background:transparent;
+    border:var(--hairline) solid color-mix(in srgb, var(--pill-text) 40%, transparent); }
+  .update-banner .ub-later:hover { background:color-mix(in srgb, var(--pill-text) 12%, transparent); }
+  .update-banner.no-later .ub-later { display:none; }                          /* ready 에서는 재시작 유도를 흐리지 않는다 */
+  @media (prefers-reduced-motion: reduce) {
+    .update-banner-wrap, .update-banner-wrap.open,
+    .update-banner, .update-banner-wrap.open .update-banner { transition: none; }
+  }
 
   /* 커스텀 툴팁 */
   .tooltip {
@@ -985,10 +1003,14 @@
 </head>
 <body>
 <div class="app">
-<div class="update-banner" id="update-banner">
-  <span class="ub-text" id="ub-text">새 버전이 있어요</span>
-  <span class="ub-btn">받기</span>
-  <span class="ub-later" id="ub-later">다음에</span>
+<div class="update-banner-wrap" id="update-banner-wrap">
+  <div class="update-banner" id="update-banner">
+    <div class="ub-row">
+      <span class="ub-text" id="ub-text">새 버전이 있어요</span>
+      <span class="ub-btn">받기</span>
+      <span class="ub-later" id="ub-later">다음에</span>
+    </div>
+  </div>
 </div>
 
   <!-- 타이틀바 -->
@@ -1600,40 +1622,70 @@
   let updDocsUrl = "";
   let updLatest = "";
 
+  // ── 업데이트 UI 헬퍼 ─────────────────────────────────────────────
+  // ★downloading 고착 감시. onUpdateClick 이 받는 중 클릭을 통째로 막기 때문에,
+  //   update-downloaded 이벤트가 한 번이라도 유실되면 배지·배너가 세션 끝까지 죽는다.
+  let updWatchdog = null;
+  function updWatchStart(){                       // 진행률이 올 때마다 다시 건다
+    clearTimeout(updWatchdog);
+    updWatchdog = setTimeout(() => {
+      if (updState !== "downloading") return;
+      updState = "error"; paintUpdater();
+      toast("업데이트가 멈춘 것 같아요 — 다시 시도해 주세요");
+    }, 90000);
+  }
+  function updWatchStop(){ clearTimeout(updWatchdog); updWatchdog = null; }
+
+  // 배너 열고 닫기 — 높이 슬롯 클래스 하나로 끝. display 조작도 animationend 의존도 없다
+  const UB_DISMISS_KEY = "updateBannerClosed";
+  function ubWrap(){ return document.getElementById("update-banner-wrap"); }
+  function openUpdBanner(){ const w = ubWrap(); if (w) w.classList.add("open"); }
+  function closeUpdBanner(){ const w = ubWrap(); if (w) w.classList.remove("open"); }
+
+  // ★다 받아 놓고도 메인 창에 아무 흔적이 없던 문제.
+  //   배지는 설정 모달 <h2> 안에만 있어 설정을 열어야 보인다.
+  //   ready 는 [다음에] 로 닫아 뒀더라도 억제를 풀고 다시 알린다.
+  function announceUpdateReady(){
+    updWatchStop();
+    sessionStorage.removeItem(UB_DISMISS_KEY);
+    const b = ubBtn(); if (b && !b.onclick) b.onclick = onUpdateClick;   // 닫은 회차에 미바인딩이면 죽은 버튼이 된다
+    paintUpdater();                                                     // 문구를 먼저 채우고
+    openUpdBanner();                                                    // 그 다음에 연다
+  }
+
   function ubBtn(){ return document.querySelector("#update-banner .ub-btn"); }
   function paintUpdater(latest) {
     if (latest) updLatest = latest;
-    const btn = ubBtn(), txt = $("ub-text"), badge = $("update-badge");
+    const btn = ubBtn(), txt = $("ub-text"), badge = $("update-badge"), banner = $("update-banner");
+    const win = updMode.mode === "win";
     // ★배지도 같이 칠한다. 배너를 [다음에] 로 닫아 버리면 배지가 유일한 창구다.
-    const setBadge = (s) => { if (badge) badge.textContent = s; };
+    // ★분기마다 early return 하면 ub-text 가 직전 상태의 문구를 달고 남는다.
+    //   실제로 ready→error 에서 "재시작하면 적용돼요" 옆에 [다시 시도] 가 붙었다. 매번 셋 다 쓴다.
+    let sTxt, sBtn, sBadge;
     if (updState === "downloading") {
       const s = updPct ? updPct + "%" : "받는 중";
-      if (btn) btn.textContent = s;
-      setBadge("업데이트 " + s);
-      return;
+      sTxt = "새 버전을 받고 있어요"; sBtn = s; sBadge = "업데이트 " + s;
+    } else if (updState === "ready") {
+      sTxt   = win ? "새 버전을 받았어요 — 재시작하면 적용돼요"
+                   : "새 버전을 받았어요 — 폴더로 옮겨 주세요";   // ★긴 문구는 440px 에서 2줄이 돼 배너가 11.67px 튄다
+      sBtn   = win ? "지금 재시작" : "폴더 열기";
+      sBadge = win ? "재시작해 적용" : "받은 폴더 열기";
+    } else if (updState === "error") {
+      sTxt = "업데이트를 받지 못했어요"; sBtn = "다시 시도"; sBadge = "업데이트 다시 시도";
+    } else {
+      sTxt   = updLatest ? "새 버전 v" + updLatest + "이 나왔어요" : "새 버전이 있어요";
+      sBtn   = "받기";
+      sBadge = updLatest ? "v" + updLatest + " 업데이트" : "업데이트 있음";
     }
-    if (updState === "ready") {
-      const win = updMode.mode === "win";
-      if (btn) btn.textContent = win ? "지금 재시작" : "폴더 열기";
-      if (txt) txt.textContent = win
-        ? "새 버전을 받았어요 — 재시작하면 적용돼요"
-        : "새 버전을 받았어요 — 응용 프로그램 폴더로 옮겨 주세요";
-      setBadge(win ? "재시작해 적용" : "받은 폴더 열기");
-      return;
-    }
-    if (updState === "error") {
-      if (btn) btn.textContent = "다시 시도";
-      setBadge("업데이트 다시 시도");
-      return;
-    }
-    if (btn) btn.textContent = "받기";
-    if (txt && updLatest) txt.textContent = "새 버전 v" + updLatest + "이 나왔어요";
-    if (updLatest) setBadge("v" + updLatest + " 업데이트");
+    if (txt)   txt.textContent   = sTxt;
+    if (btn)   btn.textContent   = sBtn;
+    if (badge) badge.textContent = sBadge;
+    if (banner) banner.classList.toggle("no-later", updState === "ready");
   }
 
   async function onUpdateClick(e) {
     if (e) { e.preventDefault(); e.stopPropagation(); }
-    if (updState === "downloading") return;                       // 받는 중엔 무시
+    if (updState === "downloading") { toast("받는 중이에요"); return; }   // ★무반응과 정상 대기를 구분해 준다
     if (updMode.mode === "none") {                                 // 예전 동작 — 설명서로
       if (window.timerAPI && window.timerAPI.openExternal && updDocsUrl) window.timerAPI.openExternal(updDocsUrl);
       return;
@@ -1652,15 +1704,16 @@
       }
       return;
     }
-    updState = "downloading"; updPct = 0; paintUpdater();
+    updState = "downloading"; updPct = 0; paintUpdater(); updWatchStart();
     const r = await window.timerAPI.updaterDownload();
-    // win 은 진행률·완료가 이벤트로 오므로 여기서 상태를 확정하지 않는다.
+    // win 은 진행률·완료가 이벤트로 오므로 여기서 상태를 확정하지 않는다(워치독이 유실을 잡는다).
     if (updMode.mode !== "win") {
-      if (r && r.upToDate) { updState = "idle"; toast("이미 최신 버전이에요"); }   // ★ready 로 올리면 죽은 버튼이 된다
-      else if (r && r.ok) { updState = "ready"; }
-      else { updState = "error"; toast("업데이트 실패: " + ((r && r.error) || "")); }
-      paintUpdater();
+      updWatchStop();
+      if (r && r.upToDate) { updState = "idle"; paintUpdater(); toast("이미 최신 버전이에요"); }   // ★ready 로 올리면 죽은 버튼이 된다
+      else if (r && r.ok) { updState = "ready"; announceUpdateReady(); }
+      else { updState = "error"; paintUpdater(); toast("업데이트 실패: " + ((r && r.error) || "")); }
     } else if (r && !r.ok) {
+      updWatchStop();
       updState = "error"; paintUpdater(); toast("업데이트 실패: " + (r.error || ""));
     }
   }
@@ -1669,36 +1722,23 @@
     if (!r || !r.ok || !r.hasUpdate) return;
     updDocsUrl = r.url || "";
     updLatest = r.latest || "";
-    const openUpdate = onUpdateClick;
     // 설정 배지 — 배너를 닫아도 여기로는 계속 들어올 수 있다
     const badge = document.getElementById("update-badge");
-    if (badge) {
-      badge.style.display = "inline-flex";
-      badge.onclick = openUpdate; // 중복 등록 방지(onclick 덮어쓰기)
-    }
-    // 상단 배너 (이번 세션에서 닫았으면 다시 안 띄움)
+    if (badge) { badge.style.display = "inline-flex"; badge.onclick = onUpdateClick; }  // 중복 등록 방지(onclick 덮어쓰기)
+    // ★핸들러는 배너를 띄우든 말든 항상 붙인다.
+    //   예전엔 억제된 회차에 아예 바인딩이 안 돼, ready 로 다시 열렸을 때 죽은 버튼이 됐다.
     const banner = document.getElementById("update-banner");
-    if (banner && sessionStorage.getItem("updateBannerClosed") !== r.latest) {
-      banner.style.display = "";          // ★인라인 none 이 박혀 있으면 클래스로 못 되살린다
-      banner.classList.remove("hide");
-      banner.classList.add("show"); // 슬라이드 다운 등장
-      // ★배너 전체가 아니라 버튼에만 붙인다. 전체에 붙이면 텍스트를 잘못 눌러도
-      //   ready 상태에서 확인 없이 앱이 즉시 죽는다.
-      banner.onclick = null;
-      const btn = ubBtn(); if (btn) btn.onclick = openUpdate;
-      const later = document.getElementById("ub-later");
-      if (later) later.onclick = (e) => {
-        e.stopPropagation();
-        // 받는 중·설치 대기 중엔 닫아도 배지로 상태가 이어진다(paintUpdater 가 배지를 칠한다)
-        // 슬라이드 업으로 닫기 → 애니메이션 끝나면 완전히 숨김
-        banner.classList.remove("show");
-        banner.classList.add("hide");
-        const done = () => { banner.classList.remove("hide"); banner.style.display = "none"; banner.removeEventListener("animationend", done); };
-        banner.addEventListener("animationend", done);
-        sessionStorage.setItem("updateBannerClosed", r.latest);
-      };
-    }
-    paintUpdater(r.latest);
+    if (banner) banner.onclick = null;   // ★버튼에만 붙인다. 전체에 붙이면 ready 에서 오클릭으로 앱이 즉시 죽는다
+    const btn = ubBtn(); if (btn) btn.onclick = onUpdateClick;
+    const later = document.getElementById("ub-later");
+    if (later) later.onclick = (e) => {
+      e.stopPropagation();
+      // 받는 중·설치 대기 중엔 닫아도 배지로 상태가 이어진다(paintUpdater 가 배지를 칠한다)
+      closeUpdBanner();                                   // 슬롯이 닫히는 것으로 끝. animationend 콜백 불필요
+      sessionStorage.setItem(UB_DISMISS_KEY, updLatest);
+    };
+    paintUpdater(r.latest);                               // ★문구를 먼저 채우고
+    if (sessionStorage.getItem(UB_DISMISS_KEY) !== r.latest) openUpdBanner();   // 그 다음에 연다
   }
 
   (async function initVersionAndUpdate() {
@@ -1712,14 +1752,14 @@
       if (window.timerAPI.onUpdaterEvent) window.timerAPI.onUpdaterEvent((p) => {
         if (!p) return;
         if (p.type === "banner") { applyUpdateUI(p); return; }   // 6시간 주기 점검 결과
-        if (p.type === "progress") { updState = "downloading"; updPct = p.percent || 0; paintUpdater(); }
-        else if (p.type === "ready") { updState = "ready"; paintUpdater(); }
-        else if (p.type === "error") { updState = "error"; paintUpdater(); toast("업데이트 실패: " + (p.error || "")); }
+        if (p.type === "progress") { updState = "downloading"; updPct = p.percent || 0; paintUpdater(); updWatchStart(); }
+        else if (p.type === "ready") { updState = "ready"; announceUpdateReady(); }
+        else if (p.type === "error") { updWatchStop(); updState = "error"; paintUpdater(); toast("업데이트 실패: " + (p.error || "")); }
         else if (p.type === "mac") {
           if (p.state === "download" || p.state === "verify" || p.state === "extract") {
-            updState = "downloading"; updPct = p.pct || 0; paintUpdater();
-          } else if (p.state === "ready" || p.state === "armed") { updState = "ready"; paintUpdater(); }
-          else if (p.state === "error") { updState = "error"; paintUpdater(); }
+            updState = "downloading"; updPct = p.pct || 0; paintUpdater(); updWatchStart();
+          } else if (p.state === "ready" || p.state === "armed") { updState = "ready"; announceUpdateReady(); }
+          else if (p.state === "error") { updWatchStop(); updState = "error"; paintUpdater(); }
         }
       });
     } catch(e){}
