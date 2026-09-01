@@ -4,8 +4,8 @@
 
 ## 프로젝트
 ADEF 영상팀 업무 타이머. Electron 데스크탑 앱 + 구글시트 동기화 + Gmail 메일탭.
-BrowserWindow 440×720. **런타임 npm 의존성 0개** (순수 JS + Electron).
-Windows·macOS 모두 정상 작동 중 (2026-08 기준, 맥 3대 검증 완료).
+BrowserWindow 440×720. 런타임 의존성은 **`electron-updater` 하나뿐**(자동 업데이트용). 나머지는 순수 JS.
+Windows 정상. ⚠️ **맥은 v1.0.27~1.0.30 이 실기 미검증**이다(`TODO.md` D-2).
 
 사용자: 구민석(영상팀 팀장). 한국어, 두괄식·간결 선호. 픽셀 디테일에 민감.
 팀원 7명: 구민석·한영채·주지현·박나진·김본희·구정현·박지수.
@@ -22,7 +22,9 @@ build/                  아이콘 (icon.icns/ico/png, tray*, trayTemplate*)
 build-secrets.example.js  비밀값 템플릿
 docs/index.html         GitHub Pages 설명서 = 다운로드 페이지
 docs/intranet-ddalkkak-extension.zip   딸깍 크롬 확장 배포본
-AppsScript_읽기API.gs   ⚠️ **폐기된 1단계 사본** — 현행 v53 과 계약이 다르다. 붙여넣지 말 것(파일 상단 경고 참조)
+AppsScript_읽기API.gs   ⚠️ **폐기된 1단계 사본** — 현행과 계약이 다르다. 붙여넣지 말 것(파일 상단 경고 참조)
+gas/                    GAS **참조 사본** + v56 지문 설계 초안 (정본은 intranet-ttalkak/server/)
+bump-version.js         `npm run bump 1.0.31` — package.json + docs 버전 동시 갱신
 _mintest/ _apptest/     과거 진단용. ⚠️ **무해하지 않다** — 아래 참조
 .github/workflows/release.yml   v* 태그 → macOS+Windows 빌드 → Releases
 ```
