@@ -336,6 +336,12 @@
     transition: all 0.13s; background: var(--surface);
   }
   .check:hover { border-color: var(--green); }
+  /* 눌림 피드백 — 카드에서 유일하게 :active 가 없던 조작 요소다.
+     완료 체크는 모달을 띄우는데(toggleDone → modal-done) 누른 순간 아무 변화가 없어
+     시트 왕복 중 '눌렸나?' 싶어 두 번 누르는 경로가 여기뿐이다.
+     .check 의 transition: all 0.13s 를 그대로 타므로 새 전이를 만들지 않는다. */
+  .check:active { transform: scale(0.9); }
+  @media (prefers-reduced-motion: reduce) { .check:active { transform: none; } }
   .check svg { width: 14px; height: 14px; stroke: #fff; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
   .check.on { background: var(--green); border-color: var(--green); }
   .check.on svg { opacity: 1; }
@@ -474,6 +480,16 @@
   }
   .modal-inner::-webkit-scrollbar { width: 0; height: 0; display: none; }
   @keyframes up { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  /* ★모션 최소화 대응이 여기서 끊겨 있었다. 파일 안 8곳(테마·메일 아이콘·업데이트 배너·통계줄·
+     페인 트랙 등)은 대응돼 있는데, 정작 화면을 가장 크게 흔드는 모달 등장(.overlay 의 fade,
+     .modal 의 up), 새 카드(.task.card-new 의 cardIn), 토스트 슬라이드가 빠져 있다.
+     퇴장은 closeModal() 이 reducedMotion() 으로 이미 막고 있으므로(2716행 계열) 등장만 맞춘다.
+     ★.overlay.closing 은 일부러 빼둔다 — fadeOut 은 forwards 로 오버레이를 실제로 사라지게
+       만드는 애니메이션이라, 여기서 끄면 JS 가드가 실패한 경로에서 오버레이가 남는다. */
+  @media (prefers-reduced-motion: reduce) {
+    .overlay, .modal, .task.card-new { animation: none; }
+    .toast { transition: opacity 0.2s linear; }
+  }
   .modal-head { padding: 26px 28px 0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   .modal-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.035em; display: flex; align-items: center; gap: 0; }
   .modal-body { padding: 22px 28px 28px; }
