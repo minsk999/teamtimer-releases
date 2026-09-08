@@ -317,7 +317,13 @@
     background: var(--surface); border: var(--hairline) solid var(--line); border-radius: 20px;
     border-left: 4px solid var(--line);
     padding: 18px 19px; margin-bottom: 12px; display: flex; align-items: center; gap: 18px;
-    transition: border-color 0.13s, box-shadow 0.13s, transform 0.13s, padding 0.3s ease, gap 0.3s ease;
+    /* border-left-color·background-color 만 0.4s — 좌측 바와 면은 '상태'를 나르므로
+       .count .t 의 color 0.4s(345행)와 같은 시계로 바뀌어야 한 몸으로 읽힌다.
+       hover 로 바뀌는 나머지 세 변(308행이 top/right/bottom 만 건드린다)은 0.13s 그대로다.
+       0.4s 는 body(73행)의 테마 전이와도 같은 값이라 새 시계를 만들지 않는다.
+       ★뒤에 쓴 longhand 가 앞의 border-color 를 이기므로 왼쪽 변만 분리된다 — 목록을
+         알파벳순으로 정리하면 조용히 0.13s 로 되돌아간다. */
+    transition: border-color 0.13s, border-left-color 0.4s ease, box-shadow 0.13s, transform 0.13s, padding 0.3s ease, gap 0.3s ease, background-color 0.4s ease;
   }
   @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } } /* 끝 상태 미지정 → 완료 카드도 자기 불투명도로 도착 */
   .task.card-new { animation: cardIn 0.4s cubic-bezier(0.16,1,0.3,1) backwards; } /* 새로 추가된 카드만 등장 모션 (재렌더 전체 깜빡임 제거) */
@@ -402,6 +408,15 @@
   .task.red { border-left-color: var(--st-urgent); }
   .task.orange { border-left-color: var(--st-today); }
   .task.green { border-left-color: var(--st-soon); }
+  .task.over { border-left-color: var(--st-urgent); }
+  /* 마감 지남 — 완료(opacity:.45, '면을 빼낸다')와 반대로 '면을 더한다'.
+     --red-bg 는 라이트 #fff0f0 / 다크 #2a1515 로 양쪽 다 이미 정의돼 있다(26·47행).
+     :not(.done) 필수 — 완료했는데 마감일만 지난 카드까지 붉게 물들면 완료가 급해 보인다.
+     전이는 .task 원본 목록(303행)의 background-color 0.4s 가 태운다(여기서 중복 선언하지 않는다).
+     ★배경만 바꾸고 border-color 는 건드리지 않는다 — .task.over:not(.done) 은 특이도 (0,3,1)
+       이라 .task:hover (0,2,1) 를 이겨, 여기서 테두리를 칠하면 over 카드만 hover 테두리
+       피드백이 죽는다. */
+  .task.over:not(.done) { background: var(--red-bg); }
 
   /* ── 빈 상태 ── */
   .empty { text-align: center; padding: 60px 20px; color: var(--ink-3); }
@@ -3865,8 +3880,12 @@
     toast("설정을 저장했어요");
   }
 
+  // ★반환값이 .task / .count 의 클래스로 그대로 쓰인다. "over" 를 추가하면 네 곳이 같이 바뀌어야 한다 —
+  //   ① tick() 의 classList.remove 목록 ② updateStats() 의 집계 ③ .task.over / .count.over CSS
+  //   ④ tick() 의 '지남' 라벨 생성. 하나라도 빠지면 지난 카드가 색을 잃거나 '여유 있음'으로 세어진다.
   function urgency(ts) {
     const left=ts-Date.now();
+    if(left<0) return "over";          // 마감 넘김 — 3시간 남은 작업과 같은 칸·같은 빨강에 두지 않는다
     if(left<3*3600000) return "red";
     const eod=new Date(); eod.setHours(23,59,59,999);
     if(ts<=eod.getTime()) return "orange";
@@ -3875,7 +3894,14 @@
   function cdText(ts) {
     const compact = window.innerWidth <= 400;
     let left=ts-Date.now();
-    if(left<0){ left=-left; const h=Math.floor(left/3600000),m=Math.floor((left%3600000)/60000); return {t:`+${h}:${String(m).padStart(2,"0")}`,l:""}; }
+    if(left<0){
+      left=-left;
+      const days=Math.floor(left/86400000),h=Math.floor((left%86400000)/3600000),m=Math.floor((left%3600000)/60000);
+      // 미래 쪽엔 이미 있던 일 단위 분기가 음수에만 없어 사흘 지난 건이 +74:12 로 나왔다.
+      // 최장 '+29d 23h' = 8자, 15px 모노로 약 68px < .count min-width 78px(≤560px).
+      if(days>0) return {t:`+${days}d ${h}h`,l:"지남"};
+      return {t:`+${h}:${String(m).padStart(2,"0")}`,l:"지남"};
+    }
     const days=Math.floor(left/86400000),h=Math.floor((left%86400000)/3600000),m=Math.floor((left%3600000)/60000),s=Math.floor((left%60000)/1000);
     if(days>0) return {t:`${days}d ${h}h`,l:""};
     // 매우 좁을 땐 초 제거 (시:분만)
