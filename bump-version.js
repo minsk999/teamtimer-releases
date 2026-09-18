@@ -35,13 +35,20 @@ fs.writeFileSync(pkgPath, pkgRaw.replace(verLine, `"version": "${next}"`));
 const docsPath = path.join(root, 'docs', 'index.html');
 let docs = fs.readFileSync(docsPath, 'utf8');
 const before = docs;
-docs = docs.split(prev).join(next);
-const hits = before.split(prev).length - 1;
+// ★변경 내역(changelog) 절은 건드리지 않는다 — 옛 항목의 "v1.0.30" 까지 새 버전으로
+//   바뀌어 지난 릴리스 노트가 통째로 이름을 갈아입던 사고가 있었다(v1.0.28 → .29 → .30).
+//   새 버전의 항목은 bump 뒤에 손으로 추가한다.
+const clStart = docs.indexOf('<section id="changelog">');
+const clEnd = clStart >= 0 ? docs.indexOf('</section>', clStart) : -1;
+if (clStart < 0 || clEnd < 0) { console.error('docs/index.html 에서 changelog 절을 찾지 못했습니다'); process.exit(1); }
+const head = docs.slice(0, clStart), cl = docs.slice(clStart, clEnd), tail = docs.slice(clEnd);
+docs = head.split(prev).join(next) + cl + tail.split(prev).join(next);
+const hits = (head.split(prev).length - 1) + (tail.split(prev).length - 1);
 fs.writeFileSync(docsPath, docs);
 
 console.log(`${prev} → ${next}`);
 console.log(`  package.json  version 1곳`);
-console.log(`  docs/index.html  ${hits}곳`);
+console.log(`  docs/index.html  ${hits}곳 (changelog 절 제외 — 새 항목은 손으로)`);
 console.log('');
 console.log('다음 단계:');
 console.log(`  git add -A && git commit -m "v${next}"`);

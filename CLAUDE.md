@@ -174,6 +174,20 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 뷰포트가 `0x0` 이면 폭이 0 이라 텍스트가 한 글자씩 줄바꿈돼 높이가 허수로 나온다.
 측정 전에 `resize_window` 로 **440×720 을 명시**하고, `visibilityState` 도 함께 찍을 것.
 
+## 업무시간만 세기 (v1.0.31, 2026-09-18)
+팀원 제안으로 넣은 **개인 옵션**. 설정 「남은 시간」 그룹. 저장 `localStorage.workHours = {on,start,end,labels}`, 기본 off.
+- 계산은 index.html 안의 순수 함수: hmToMin·isOffDay·bizLeft·nextBizStart·holidayLabel·pauseLabel·**urgencyAt·cdTextAt**
+  (+ parseWorkHours/makeCfg). 기존 `urgency(ts)`/`cdText(ts)` 는 이 위의 얇은 래퍼 — 호출처(tick·updateStats·card) 무변경.
+- **규칙 B**(사용자 확정): 마감일 이전은 업무일의 [start,end) 만, 마감 당일은 쉬는 날이어도 세고 창을 마감 시각까지.
+  주황 = 다음 업무일 시작 전 마감 **AND** (오늘 마감 OR 잔여 < 하루폭) — 'Nd Nh' 와 주황이 한 카드에 안 나오게 숫자 형식과 같은 기준.
+- 표식은 `.count .l` 슬롯 재사용, **카드별 판정**: 업무 전·업무 후·주말·공휴일 이름(6자 이상은 '공휴일'). 지난 카드는 옵션과 무관하게 **'초과'**.
+  「설명 표시」를 끄면 초과 포함 전부 숨김(옵션 켠 사람만 가능). 완료 카드는 tick 이 건너뛰어 무관.
+- ★공휴일 이름은 KASI API(외부)에서 온다 — `card()` 에서 반드시 `esc(cd.l)`. `tick()` 은 textContent 라 안전.
+- **테스트: `npm test`** — `test/loader.js` 가 index.html 에서 함수 블록을 추출해 125벡터(`test/workhours.test.js`)를 돌린다.
+  규칙을 바꾸면 기대값을 **손 검산**으로 갱신할 것(함수 출력으로 만들지 말 것). 설계 기록·시안은 `_audit/`(git 제외).
+- 설정 UI 는 드래프트→[저장] 부류(프리셋·알람과 같음). 검증 두 가지(형식·끝>시작)는 saveSettings 의 프리셋 검증 바로 뒤에서, 실패 시 저장 중단·모달 유지.
+- ⚠️ `bump-version.js` 는 설명서의 **변경 내역 절을 건드리지 않는다**(옛 항목 이름까지 갈아 버리던 사고, 09-18 수정). 새 버전 항목은 손으로 추가.
+
 ## GAS (구글 앱스스크립트)
 배포본 **v60** (2026-09-18). v55~v60 에 들어간 것: READ_ROWS 클램프 · 쓰기 경로도 `readGrid` · action 화이트리스트 ·
 **쓰기 락**(LockService 8초, 못 잡으면 `{ok:false, busy:true}` — 핸들러 진입 전 반환이라 쓰기가 확실히 안 일어난 것) ·

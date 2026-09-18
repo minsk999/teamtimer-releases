@@ -244,7 +244,7 @@
       <span class="logo"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6"/></svg></span>
       작업 타이머
     </div>
-    <span class="ver">v1.0.30</span>
+    <span class="ver">v1.0.31</span>
     <span class="spacer"></span>
     <button class="theme-btn" id="theme" aria-label="테마 전환">
       <svg id="theme-ic" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -299,10 +299,10 @@
         <div class="pane on" data-pane="win">
           <div class="card dlcard">
             <div class="dlinfo">
-              <div class="dltitle">Windows · 작업 타이머 <span class="ver">v1.0.30</span></div>
+              <div class="dltitle">Windows · 작업 타이머 <span class="ver">v1.0.31</span></div>
               <div class="dlmeta">Windows 데스크톱 앱 설치 파일</div>
             </div>
-            <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.30/TeamTimer-Setup-1.0.30.exe" download>
+            <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.31/TeamTimer-Setup-1.0.31.exe" download>
               <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
               <span>다운로드 <span class="sz">EXE</span></span>
             </a>
@@ -320,15 +320,15 @@
         <div class="pane" data-pane="mac">
           <div class="card dlcard">
             <div class="dlinfo">
-              <div class="dltitle">macOS · 작업 타이머 <span class="ver">v1.0.30</span></div>
+              <div class="dltitle">macOS · 작업 타이머 <span class="ver">v1.0.31</span></div>
               <div class="dlmeta">본인 Mac 칩에 맞는 버전을 받으세요. (<b>사과 메뉴 → 이 Mac에 관하여</b>에서 확인)</div>
             </div>
             <div class="dlbtns">
-              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.30/TeamTimer-1.0.30-arm64.dmg" download>
+              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.31/TeamTimer-1.0.31-arm64.dmg" download>
                 <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
                 <span>Apple Silicon <span class="sz">DMG</span></span>
               </a>
-              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.30/TeamTimer-1.0.30-x64.dmg" download>
+              <a class="dlbtn" href="https://github.com/minsk999/teamtimer-releases/releases/download/v1.0.31/TeamTimer-1.0.31-x64.dmg" download>
                 <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
                 <span>Intel <span class="sz">DMG</span></span>
               </a>
@@ -422,7 +422,7 @@
         <h3>상단 통계 색의 의미</h3>
         <div class="card">
           <div class="dots">
-            <div class="dot-row"><span class="dot r"></span><span><b>마감 임박</b> - 마감이 코앞이거나 이미 지난 작업</span></div>
+            <div class="dot-row"><span class="dot r"></span><span><b>마감 임박</b> - 마감이 3시간 안이거나 이미 지난 작업 (지난 카드는 붉은 바탕에 <b>초과</b>로 표시돼요)</span></div>
             <div class="dot-row"><span class="dot o"></span><span><b>오늘 마감</b> - 오늘 안에 끝내야 하는 작업</span></div>
             <div class="dot-row"><span class="dot g"></span><span><b>여유 있음</b> - 아직 시간이 넉넉한 작업</span></div>
           </div>
@@ -523,7 +523,11 @@
             <p style="font-size:14.5px; color:var(--ink-2)">링크를 열 <b>Chrome 프로필(계정)</b>을 고르면, 메일·요청글·기획안·시트 등 <b>모든 링크</b>가 그 프로필로 열려요. 회사 계정으로 지정해두면 편해요. 다른 프로필 로그인은 건드리지 않아요.</p>
           </div>
         </div>
-        <div class="note"><span class="ic">i</span><span>“링크 열기”는 <b>Chrome 전용</b>이에요. 기본값은 “기본 브라우저”이고, Chrome이 없으면 자동으로 기본 브라우저로 열려요.</span></div>
+        <div class="card" style="margin-top:14px">
+            <h3 style="margin-top:0">업무시간만 세기</h3>
+            <p style="font-size:14.5px; color:var(--ink-2)">설정 → <b>남은 시간</b>에서 켜면 <b>주말·공휴일·퇴근 후 시간을 빼고</b> 남은 시간을 세요. 업무시간은 기본 <b>09:00–18:00</b>이고 바꿀 수 있어요. 마감 당일엔 퇴근 뒤에도 마감 시각까지 세요. 숫자가 멈춰 있을 땐 카드에 <b>업무 전 · 업무 후 · 주말 · 추석</b> 같은 이유가 작게 붙고, <b>설명 표시</b>를 끄면 글자 없이 숫자와 색만 보여요. 각자 PC 의 설정이고 기본은 꺼짐이라, 켠 사람과 끈 사람은 같은 작업의 색과 숫자가 다를 수 있어요 — 마감 시각·순서·알람은 모두 같아요.</p>
+          </div>
+          <div class="note"><span class="ic">i</span><span>“링크 열기”는 <b>Chrome 전용</b>이에요. 기본값은 “기본 브라우저”이고, Chrome이 없으면 자동으로 기본 브라우저로 열려요.</span></div>
       </section>
 
       <!-- 9 -->
@@ -668,7 +672,25 @@
         <div class="card">
           <div class="changelog">
             <details class="cl-entry current" open>
-              <summary class="cl-head"><span class="cl-ver">v1.0.30</span><span class="cl-date">2026-08-27</span><span class="cl-badge">최신</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <summary class="cl-head"><span class="cl-ver">v1.0.31</span><span class="cl-date">2026-09-18</span><span class="cl-badge">최신</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul>
+                <li><b>업무시간만 세기 (새 설정)</b> — 설정 → <b>남은 시간</b>에서 켜면 주말·공휴일·퇴근 후 시간을 빼고 남은 시간을 세요. 업무시간은 기본 <b>09:00–18:00</b>이고 바꿀 수 있어요. 마감 당일엔 퇴근 뒤에도 마감 시각까지 세요. 숫자가 멈춰 있을 땐 카드에 <b>업무 전 · 업무 후 · 주말 · 추석</b> 같은 이유가 작게 붙어요(<b>설명 표시</b>로 끌 수 있어요). 각자 설정이고 기본은 꺼짐이에요.</li>
+                <li><b>마감이 지난 작업이 한눈에</b> — 지난 카드는 붉은 바탕에 <b>+2:30 초과</b>처럼 지난 시간이 보여요. 3시간 남은 작업과 같은 빨강으로 섞이지 않아요.</li>
+                <li><b>숫자 색이 더 또렷하게</b> — 라이트 모드에서 오늘 마감(주황)·여유 있음(초록) 숫자가 흐릿하던 것을 고쳤어요.</li>
+                <li><b>완료한 작업에 상태와 메모</b> — 완료 카드의 빈자리에 「수정 전달 완료」 같은 처리 상태가 보이고, 메모가 있으면 한 줄 더 보여요. 알람 표시도 다시 보여요.</li>
+                <li>완료 체크를 누를 때 눌림 느낌이 생겼고, 애니메이션 줄이기 설정을 켠 PC 에선 창·팝업 모션도 함께 줄어요.</li>
+              </ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.30</span><span class="cl-date">2026-08-28</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
+              <div class="cl-body"><div class="cl-body-inner"><ul>
+                <li><b>업데이트 알림 배너</b> — 새 버전이 있을 때 위쪽에 나타나는 배너가 화면과 한 몸으로 부드럽게 열리고 닫혀요. 다크 모드에서 안 보이던 것, 받아 둔 업데이트가 메인 창에 안 보이던 것도 고쳤어요.</li>
+                <li><b>설정에서 「지금 재시작할까요」 팝업이 뒤에 가려지던 문제</b> 해결 — 클릭해도 반응이 없는 것처럼 보였어요.</li>
+                <li><b>Intel Mac 용 파일</b> — 이름은 Intel(x64)인데 내용은 Apple Silicon 용이던 문제를 고쳤어요. Intel Mac 은 이 버전부터 정상 설치돼요.</li>
+              </ul></div></div>
+            </details>
+            <details class="cl-entry">
+              <summary class="cl-head"><span class="cl-ver">v1.0.28</span><span class="cl-date">2026-08-28</span><span class="cl-chev"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></span></summary>
               <div class="cl-body"><div class="cl-body-inner"><ul>
                 <li><b>알람이 안 울리던 문제 해결</b> — 다른 팀원 보드를 보고 있으면 내 작업 알람이 울리지 않고, 대신 그 팀원의 알림이 오던 문제를 고쳤어요. 이제 어느 보드를 보고 있든 <b>내 알람만</b> 정확히 울려요.</li>
                 <li><b>메일 종류를 골라서 받기</b> — 설정 → 알람 → <b>받을 메일 종류</b>에서 업무 요청·코멘트 알림·담당자 배정을 각각 켜고 끌 수 있어요. <b>목록에서도 숨기기</b>를 켜면 안 읽음 배지에서도 빠져요. 어느 분류에도 안 맞는 메일은 항상 받으니 놓칠 걱정은 없어요.</li>
@@ -678,6 +700,8 @@
                 <li><b>작업을 추가했는데 사라지던 문제</b> — 자동 동기화와 겹치는 순간 방금 추가한 작업이 화면에서 사라지던 문제를 고쳤어요. 삭제 후 목록이 어긋나던 것도 함께 정리했어요.</li>
                 <li><b>설정창 정리</b> — 여러 개를 고를 수 있는 항목에 점 표시가 생겨 한눈에 구분돼요. 관련 설정끼리 묶어 정리했고, 설정을 아래로 내려도 <b>닫기 버튼이 사라지지 않아요</b>.</li>
                 <li><b>작업 제목에 &lt; 기호가 있으면 카드가 깨지던 문제</b> 해결.</li>
+                <li><b>자동 업데이트</b> — 새 버전이 나오면 앱 위쪽 배너에서 <b>받기</b>를 눌러 앱 안에서 받고 재시작해요(Windows). Mac 은 받아서 검증까지 한 뒤 폴더를 열어 줘요.</li>
+                <li><b>완료 처리에 「베리 전달 완료」</b> 추가 — 수정 전달 완료와 담당 제작 완료 사이예요.</li>
               </ul></div></div>
             </details>
             <details class="cl-entry">
@@ -817,7 +841,7 @@
         </div>
       </section>
 
-      <footer>작업 타이머 v1.0.30 · 영상팀 내부용 · ADEF</footer>
+      <footer>작업 타이머 v1.0.31 · 영상팀 내부용 · ADEF</footer>
     </main>
   </div>
 </div>
