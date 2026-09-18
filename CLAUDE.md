@@ -8,7 +8,7 @@ BrowserWindow 440×720. 런타임 의존성은 **`electron-updater` 하나뿐**(
 Windows 정상. ⚠️ **맥은 v1.0.27~1.0.30 이 실기 미검증**이다(`TODO.md` D-2).
 
 사용자: 구민석(영상팀 팀장). 한국어, 두괄식·간결 선호. 픽셀 디테일에 민감.
-팀원 7명: 구민석·한영채·주지현·박나진·김본희·구정현·박지수.
+팀원 7명: 구민석·한영채·주지현·박나진·김본희·구정현·표경림 (2026-09-18 실측 — 박지수 → 표경림 교체. 정본은 `🤖자동화` 시트 A열이라 이 목록은 참고용).
 
 ## 레포
 **`minsk999/teamtimer-releases`** (public)
@@ -23,7 +23,7 @@ build-secrets.example.js  비밀값 템플릿
 docs/index.html         GitHub Pages 설명서 = 다운로드 페이지
 docs/intranet-ddalkkak-extension.zip   딸깍 크롬 확장 배포본
 AppsScript_읽기API.gs   ⚠️ **폐기된 1단계 사본** — 현행과 계약이 다르다. 붙여넣지 말 것(파일 상단 경고 참조)
-gas/                    GAS **참조 사본** + v56 지문 설계 초안 (정본은 intranet-ttalkak/server/)
+gas/                    GAS **참조 사본**(v60) + 지문 설계 초안(v60 으로 실현) (정본은 intranet-ttalkak/server/)
 bump-version.js         `npm run bump 1.0.31` — package.json + docs 버전 동시 갱신
 _mintest/ _apptest/     과거 진단용. ⚠️ **무해하지 않다** — 아래 참조
 .github/workflows/release.yml   v* 태그 → macOS+Windows 빌드 → Releases
@@ -175,7 +175,10 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 측정 전에 `resize_window` 로 **440×720 을 명시**하고, `visibilityState` 도 함께 찍을 것.
 
 ## GAS (구글 앱스스크립트)
-배포본 **v54**. v55 는 딸깍 세션이 완성해 배포 대기(`TODO.md` B-1).
+배포본 **v60** (2026-09-18). v55~v60 에 들어간 것: READ_ROWS 클램프 · 쓰기 경로도 `readGrid` · action 화이트리스트 ·
+**쓰기 락**(LockService 8초, 못 잡으면 `{ok:false, busy:true}` — 핸들러 진입 전 반환이라 쓰기가 확실히 안 일어난 것) ·
+**행 지문 검사**(`expectTitle`/`expectIdx`, 불일치면 `{ok:false, stale:true, found}`). 참조 사본 `gas/AppsScript-v60.gs`.
+⚠️ **읽기 전용으로는 서버 버전을 못 잰다** — `withVer` 가 insert 경로에만 있다. 배포 여부는 사용자에게 묻는다.
 시트: `영상팀 업무현황` (탭: `🎬업무현황`, `🤖자동화` 등)
 
 ⚠️ **이 웹앱은 인트라넷 딸깍과 공유한다. 배포본이 하나뿐이다.**
@@ -201,7 +204,7 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
   응답 예: `{"ok":true,"members":[...],"source":"config"}` — `source:"config"` = 자동화 시트에서 읽음
 
 ## 연계 제품
-- **인트라넷 딸깍** (크롬 확장, 현재 v1.5) — 인트라넷 게시글 → 시트 전송.
+- **인트라넷 딸깍** (크롬 확장, 현재 **v1.8** — 09-18 게시, 팀원은 각자 받아야 한다) — 인트라넷 게시글 → 시트 전송.
   소스는 `docs/intranet-ddalkkak-extension.zip` 안에만 있음. 수정 시 압축 풀고 → 수정 → 재압축 → manifest version 올림.
 - **BatchRenameComps** (AE CEP 확장) — 별도 레포 `minsk999/batchrenamecomps-releases`
 - **Slate** — 영상팀 work hub, 단일 HTML 프로토타입 (별도 진행)

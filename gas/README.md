@@ -1,7 +1,7 @@
 # GAS (Google Apps Script) — 작업타이머 시트 API
 
 > ## ⚠️ 이 폴더는 **참조 사본**이다
-> **정본: `intranet-ttalkak/server/GoogleAppsScript.v54.gs`**
+> **정본: `intranet-ttalkak/server/GoogleAppsScript.v60.gs`** (2026-09-18 배포)
 > (배포 진실원천은 그대로 Apps Script 편집기)
 >
 > 이 웹앱은 **작업타이머와 인트라넷 딸깍이 공유**한다. 배포본이 하나뿐이라
@@ -20,8 +20,16 @@
 
 | 파일 | 내용 |
 |---|---|
-| `AppsScript-v54.gs` | 편집기에 통째로 붙여넣을 완성본 |
-| `v54-수정지침.md` | 4곳만 손으로 고치고 싶을 때의 지침 (완성본과 결과 동일) |
+| `AppsScript-v60.gs` | 2026-09-18 편집기에 붙여넣은 배포본의 사본 (정본에서 복사, LF) |
+| `v56-expectTitle-초안.md` | 행 지문 검사 설계 기록 — v60 으로 실현됨 |
+
+## v60 이 v54 에서 바꾼 것 (v55~v60 누적, 딸깍 세션 작업)
+- v55: `scanLen<1` 가드 · action 화이트리스트 · `READ_ROWS` 클램프 · **쓰기 경로(addMemo·insert)도 `readGrid` 경유** — 130행 절단 위험 종료
+- v58: 딸깍 버전 알림(`LATEST_TTALKAK_VER`, insert 응답에 `latestVer`)
+- v60: **쓰기 락**(LockService, 8초, 실패 시 `{ok:false, busy:true}` — 핸들러 진입 전 반환) +
+  **행 지문 검사**(`toggleDone`/`updateDue`/`updateTask`/`deleteTask` 에 `expectTitle`, 삭제엔 `expectIdx` 추가,
+  불일치 시 `{ok:false, stale:true, row, found, foundIdx}`) + 딸깍 1.8 표기. 계약 표·diff: `intranet-ttalkak/server/v60-패치.md`
+- 타이머 클라이언트 대응(지문 발신·stale 롤백·busy 재시도)은 **v1.0.28 부터 릴리스본에 있음**
 
 ## v54 가 v53 에서 바꾼 것 (6곳)
 1. **【버그】`READ_ROWS` 미설정으로 150행 아래가 사라짐** — `ensureMembers` 가 팀원 캐시(60초)에
@@ -54,6 +62,8 @@
 2. `testMemberList()` — 경고 없음
 3. 앱에서 동기화 2~3회 — 콘솔 `[sync] ...ms` 가 두 번째부터 빨라져야 함
 4. **완료 체크 → 바로 동기화** — 체크가 유지되는지 (4번 무효화 검증) ★가장 중요
+5. (v60) 완료 체크가 「행이 밀렸어요 — 동기화 후 다시 시도해 주세요」로 막히면 지문 불일치다 — 동기화 후 재시도.
+   자주 나면 지문이 아니라 이름 오탐(`TODO.md` A-1)부터 본다
 
 ## 되돌리기
 캐시만 끄려면 `READ_CACHE_SEC` 를 `0` 으로. 1·2번(버그 수정·중복 제거)은 그대로 둬도 안전하다.

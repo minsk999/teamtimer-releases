@@ -1,3 +1,7 @@
+> ✅ **2026-09-18 GAS v60 으로 배포됨.** 이 문서는 설계 기록이다.
+> 구현 정본: `intranet-ttalkak/server/GoogleAppsScript.v60.gs` · 계약 표와 diff: `intranet-ttalkak/server/v60-패치.md`
+> 참조 사본: `gas/AppsScript-v60.gs`. 합의안과 다른 점 하나 — 락을 딸깍 insert 에도 걸었다(타이머 세션 동의).
+
 # v56 초안 — 행 키 지문 검사(`expectTitle`)
 
 > **상태: 초안. 딸깍 세션 검토 전.** 정본은 `intranet-ttalkak/server/`.

@@ -1,5 +1,92 @@
 // ============================================================
-//  Google Apps Script v54  (7칸 구조
+//  Google Apps Script v60  (7칸 구조
+//  - v60: ① LATEST_TTALKAK_VER 1.8 + UPDATE_MSG 채움. 딸깍 v1.8(v1.5 형태 + v1.7 기능) 배포에 맞춤.
+//            v59(1.7)는 배포된 적 없이 v60 으로 대체됨.
+//         ② LockService — 쓰기 전부(타이머 6종 + 딸깍 insert)를 한 번에 하나씩. 8초. 읽기엔 안 건다.
+//            못 잡으면 {ok:false, busy:true} (최상위 키). busy = "쓰기가 확실히 안 일어났다" → 재시도 안전.
+//         ③ 스테일 행 지문 — toggleDone·updateDue·updateTask·deleteTask 가 expectTitle / expectIdx 를
+//            받으면 대상 행과 대조, 다르면 {ok:false, stale:true}. 없으면 건너뜀(하위호환).
+//            deleteTask 는 둘 다 봄(되돌릴 수 없는 유일한 액션). stale 은 재시도로 못 고친다 — 동기화 후.
+//         ④ deleteTask 의 scanCount<1 가드 — 사람이 시트에서 행을 지워 row 가 lastRow 를 넘으면
+//            구글 예외 문자열 대신 stale 응답.
+//         설계 합의: server/v55-패치.md 하단 (타이머 세션과 2026-08-27 합의, 09-18 v60 에 합치기로 동의).
+//         ★딸깍을 새로 배포할 때마다 이 값을 같이 올릴 것.
+//  (구) v58  (7칸 구조
+//  - v58: ★신규 입사자용 빈 자리에 남의 작업이 꽂히던 것 수정. 실측으로 원인 3개 확인.
+//
+//    ① ▼업무 구분선을 못 찾고 있었다 — ▼ 와 "업무" 가 서로 다른 칸에 있다.
+//       (체크칸 ▼ / 제목칸 "업무") 칸별로 보면 둘 다 조건에 안 걸린다.
+//       addMemo(:672) 는 세 칸을 이어붙여 봐서 맞게 찾고 있었고, insert 만 아예 안 봤다.
+//
+//    ② 그래서 제목칸의 맨 "업무" 가 그냥 제목으로 잡혔다.
+//       구정현처럼 자기 작업 아래에 다음 구역이 있으면
+//       그 구역의 "업무" 를 마지막 작업으로 보고 바로 아래(=남의 자리)에 꽂았다.
+//       실측: 구정현 lastTitle 80행 → 삽입행 81 (본인 구역은 56~71)
+//
+//    ③ 이름을 아직 안 적은 빈 자리는 nameAtRow 로 감지되지 않아 경계가 안 잡혔다.
+//       실측: 구정현 구역끝 105행 (본인 구역은 77행 앞에서 끝나야 함)
+//
+//    처방
+//     · ★사고를 고치는 것은 이것 하나다 — findSectionEnd 가 ▼업무 구분선을 세어
+//       두 번째를 만나면 경계로 본다. 한 구역에 구분선은 하나뿐이므로 두 번째는
+//       다음 사람 구역이라는 뜻이고, 이름이 없어도 감지된다.
+//       (측정: v57 경계 + 아래 taskStart 조합의 삽입행은 81 로 v57 과 같다.
+//        즉 taskStart 만으로는 이 사고가 안 고쳐진다. 되돌릴 때 헷갈리지 말 것)
+//     · insert 의 taskStart 는 '작업은 구분선 아래에만' 이라는 의도를 코드에 남기는 것이다.
+//       현재 배치에서 결과를 바꾸지 않는다. 무해하지만 사고 수정의 근거는 아니다.
+//     · 구분선 판정은 isDividerRow() 하나로 모은다. 부분일치로 두면
+//       작업 제목·메모에 ▼ 와 "업무" 가 함께 들어갈 때 구역이 잘려 더 큰 사고가 난다.
+//     · 그리고 쓰기 직전에 목적지가 비어 있는지 확인한다. 위치 계산이 또 틀리더라도
+//       조용한 덮어쓰기 대신 명확한 오류로 멈춘다.
+//  (구) v57  (7칸 구조
+//  - v57: 딸깍 확장 버전 알림. 확장이 전송할 때 자기 버전(ver)을 같이 보내고,
+//         서버가 LATEST_TTALKAK_VER 보다 낮으면 응답에 latestVer 를 실어 보낸다.
+//         확장은 그걸 저장해 두고 실제로 올릴 때까지 팝업 상단에 띄운다.
+//
+//         zip 수동 배포라 자동 업데이트가 없다 — 지금까지는 누가 구버전을 쓰는지
+//         알 방법이 아예 없었다. 이게 그 유일한 신호다.
+//
+//         ★ 딸깍을 새로 배포할 때 아래 LATEST_TTALKAK_VER 을 같이 올릴 것.
+//           안 올리면 알림이 안 뜨고, 너무 올리면 최신을 쓰는 사람에게도 뜬다.
+//  (구) v56  (7칸 구조
+//  - v56: ★구역 경계를 '명단'이 아니라 '행의 형태'로 판정한다.
+//         퇴사자를 🤖자동화 A열에서 지우면 ALL_MEMBERS 에서 빠지는데,
+//         업무현황의 그 사람 구역은 남는다. 그러면 그 이름 행이 경계 역할을 잃고
+//         바로 위 팀원의 구역이 퇴사자 구역까지 흡수했다.
+//         (실제 사고: 박지수 퇴사 → 김본희 읽기 구역이 151행까지 뻗고,
+//          딸깍 삽입행이 69→94로 밀리고, 주지현 4건 뒤 TypeError 예정이었음)
+//         신규 입사자가 시트에만 있고 아직 명단에 없을 때도 같은 일이 난다 — 같은 버그의 양쪽.
+//
+//         nameAtRow() 를 새로 두고 findNameRow·findSectionEnd 가 그걸 쓴다.
+//         명단 대조를 없애고 v53 의 isNameRowShape 가드 + 한글 2~4자 판정으로만 본다.
+//         덤으로 v53 가드가 없던 두 함수의 이름 오탐도 함께 사라진다 —
+//         작업 제목에 팀원 이름이 들어가도(예: "한영채 인터뷰 편집") 그 행은
+//         HYPERLINK 를 가지므로 이름 행 형태가 아니라 경계로 오인되지 않는다.
+//
+//         insert 의 인라인 경계 루프도 findSectionEnd 로 대체했다.
+//         nameSheetRow+100 기본값이 사라져 배열 범위 초과 TypeError 가 원천 차단된다.
+//
+//         그리고 '업무현황에는 구역이 있는데 자동화 명단에 없는 이름'을 warn 으로 보고한다.
+//         퇴사자 잔존 구역과 미등록 신규 입사자가 눈에 보인다.
+//
+//         부수: findNameRow·detectStartCol 의 2차 부분일치가 '이미 다른 사람의 이름 행'인
+//         줄은 건너뛴다. 신입 이름이 기존 팀원 이름의 일부일 때(예: 신입 "김본" vs 기존 "김본희")
+//         남의 구역으로 작업이 들어가는 것을 막는다.
+//  (구) v55  (7칸 구조
+//  - v55: 딸깍 세션 검토 반영. 전부 타이머 무영향(하위호환).
+//         ① scanLen < 1 가드 — 경계가 이름 행에 붙으면 getRange 가 죽거나,
+//            중복체크를 끈 경우 기존 작업 행의 B~E 4칸을 조용히 덮어썼다.
+//         ② action 화이트리스트 — 인식 못 하는 action 이 insert 로 흘러들어
+//            「(제목 없음)」 유령 행을 만들고 전원의 행 번호를 밀던 것 차단.
+//         ③ member 파라미터 통일 — updateMemo·addMemo 도 p.member 수용(추가만, 하위호환).
+//         ④ READ_ROWS 클램프 — 그리드 행 수를 넘으면 doRead 가 JSON 대신 오류 HTML 을 뱉는다.
+//         ⑤ ★쓰기 경로도 readGrid 경유 — v54 의 READ_ROWS 수정이 doRead 에만 적용돼 있었다.
+//            readGrid 호출부는 :230(ensureMembers 캐시미스)과 doRead 둘뿐이라,
+//            insert 와 addMemo 는 팀원 캐시 적중 시 READ_ROWS=150 으로 읽었다.
+//            지금은 lastRow 93 이라 무해하지만 130행을 넘는 순간
+//            v54 가 죽이려던 버그(150행 아래 조용히 사라짐)가 쓰기 쪽에서 되살아난다.
+//         ※ :1076 경계 기본값 치환(F)은 진단 후 별도 적용 — server/v55-패치.md 참조
+//  (구) v54  (7칸 구조
 //  - v54: ①【버그】READ_ROWS 미설정으로 150행 아래가 사라지던 것 수정.
 //           ensureMembers 가 팀원 캐시(60초)에 적중하면 READ_ROWS 를 안 정하고 반환해,
 //           doRead 가 기본값 150행으로 읽었다. 시트가 150행을 넘는 순간 그 아래 작업이
@@ -109,6 +196,33 @@ var COL = { CHECK: 0, TITLE: 1, LINK: 2, PLAN: 3, DATE: 4, MEMO: 5, STATUS: 6 };
 //      체크열(A/I) 글자색을 항상 이 값으로 고정하면 진한 회색으로 통일된다.
 var CHECK_FONT_COLOR = "#434343";
 
+// ── 딸깍 확장 버전 알림 (v57) ───────────────────────────────
+// 딸깍을 새 버전으로 배포하면 이 값을 같이 올린다.
+var LATEST_TTALKAK_VER = "1.8";
+// 알림에 덧붙일 안내 (빈 문자열이면 "새 버전이 있어요"만 뜬다)
+var UPDATE_MSG = "— 받은 zip 을 기존 폴더에 덮어쓰고 chrome://extensions 에서 ↻ 를 눌러주세요";
+
+// a < b ? — "1.10" 과 "1.9" 를 문자열로 비교하면 틀리므로 자리별 숫자로 본다.
+function verLt(a, b) {
+  var x = String(a || "0").split("."), y = String(b || "0").split(".");
+  var n = Math.max(x.length, y.length);
+  for (var i = 0; i < n; i++) {
+    var p = parseInt(x[i], 10) || 0, q = parseInt(y[i], 10) || 0;
+    if (p !== q) return p < q;
+  }
+  return false;
+}
+
+// 응답 객체에 버전 알림을 얹는다. 구버전이 아니거나 ver 을 안 보냈으면 그대로 둔다.
+// (구버전 딸깍은 ver 을 안 보내므로 알림도 못 받는다 — 한 번은 손으로 올려야 한다)
+function withVer(obj, clientVer) {
+  if (clientVer && verLt(clientVer, LATEST_TTALKAK_VER)) {
+    obj.latestVer = LATEST_TTALKAK_VER;
+    if (UPDATE_MSG) obj.updateMsg = UPDATE_MSG;
+  }
+  return obj;
+}
+
 // ── 팀원 자동 인식 (v51) ────────────────────────────────────
 // 이름 셀에서 한글만 남긴다 — 이모지·기호·영문·숫자·공백 전부 제거.
 // 장식 문자를 일일이 열거하는 방식은 새 장식이 나오면 뚫리므로 화이트리스트로 처리.
@@ -117,6 +231,46 @@ function hangulOnly(s) {
 }
 function isPersonName(s) {
   return /^[가-힣]{2,4}$/.test(s);
+}
+
+// v58: 이 행이 '▼업무 구분선'인가 — 형태로 판정한다.
+//   느슨하게 보면(▼ 와 "업무" 부분일치) 작업 제목이나 메모에 둘 다 들어갈 때
+//   그 행이 구분선으로 오인돼 구역이 잘리고, insert 가 살아 있는 작업 행을 덮어쓴다.
+//   addMemo 는 사용자 자유 텍스트를 관리항목 칸에 그대로 쓰므로 메모 한 줄로 만들어진다.
+//   그래서 세 조건을 모두 요구한다.
+//     ① 영상작업 행이 아닐 것 (HYPERLINK 없음)
+//     ② 📌 관리항목 행이 아닐 것
+//     ③ 체크·제목·링크 어딘가에 ▼ 가 있고, 제목칸의 한글이 정확히 "업무" 일 것
+//   ★ ▼ 와 "업무" 는 서로 다른 칸에 있다(체크칸 ▼ / 제목칸 업무).
+//     칸별로 보면 못 찾으므로 ▼ 는 이어붙인 문자열에서 본다.
+function isDividerRow(allData, formulas, r, base) {
+  if (/HYPERLINK/i.test(String(formulas[r][base + COL.LINK])) ||
+      /HYPERLINK/i.test(String(formulas[r][base + COL.PLAN]))) return false;   // 영상작업
+  var chk = String(allData[r][base + COL.CHECK] == null ? "" : allData[r][base + COL.CHECK]);
+  if (chk.indexOf("📌") !== -1) return false;                                   // 관리항목
+  var title = String(allData[r][base + COL.TITLE] == null ? "" : allData[r][base + COL.TITLE]);
+  // ▼ 는 제목칸이 아닌 곳(체크칸 또는 링크칸)에 있어야 한다.
+  //   실측된 구분선은 제목칸이 정확히 "업무" 이므로 ▼ 가 제목칸에 있을 수 없다.
+  //   이 조건이 "메모 본문이 마침 ▼업무" 인 경우를 배제한다.
+  var outside = chk + String(allData[r][base + COL.LINK] == null ? "" : allData[r][base + COL.LINK]);
+  if (outside.indexOf("▼") === -1) return false;
+  return hangulOnly(title) === "업무";
+}
+
+// v56: 이 행이 '누군가의 이름 행'인가 — 명단과 대조하지 않고 형태로만 판정한다.
+//      맞으면 장식을 걷어낸 이름(한글만)을, 아니면 "" 를 돌려준다.
+//      명단에 의존하지 않으므로 퇴사자·미등록 신규입사자의 이름 행도 그대로 인식된다.
+//      isNameRowShape 가 HYPERLINK 행(영상작업)·📌 행(관리항목)·체크박스 행·▼ 구분선을 걸러내므로,
+//      작업 제목에 사람 이름이 들어가도("한영채 인터뷰 편집") 이름 행으로 오인되지 않는다.
+function nameAtRow(allData, formulas, r, base) {
+  if (!isNameRowShape(allData, formulas, r, base)) return "";
+  var raw = String(allData[r][base + COL.CHECK] == null ? "" : allData[r][base + COL.CHECK]) +
+            String(allData[r][base + COL.TITLE] == null ? "" : allData[r][base + COL.TITLE]);
+  if (!raw.replace(/\s/g, "")) return "";           // 빈 행
+  var n = hangulOnly(raw);
+  if (NAME_EXCLUDE.indexOf(n) !== -1) return "";     // 참고사항·공지사항 등
+  if (!isPersonName(n)) return "";                   // 한글 2~4자가 아니면 이름 아님
+  return n;
 }
 
 // 시트 전체를 훑어 이름 행을 찾는다 → [{name, startCol, row}, ...]
@@ -128,16 +282,9 @@ function discoverMembers(data, formulas) {
       var chkVal   = data[r][base + COL.CHECK];
       var chkRaw   = String(chkVal == null ? "" : chkVal);
       var titleRaw = String(data[r][base + COL.TITLE] == null ? "" : data[r][base + COL.TITLE]);
-      var raw = chkRaw + " " + titleRaw;
-      if (!raw.replace(/\s/g, "")) continue;                                  // 빈 행
-      if (/HYPERLINK/i.test(String(formulas[r][base + COL.LINK])) ||
-          /HYPERLINK/i.test(String(formulas[r][base + COL.PLAN]))) continue;   // 영상작업 행
-      if (chkRaw.indexOf("📌") !== -1) continue;                     // 📌 관리항목 행
-      if (chkVal === true || chkVal === false) continue;                       // 체크박스 행
-      if (raw.indexOf("▼") !== -1) continue;                              // ▼ 구분선
-      var name = hangulOnly(raw);
-      if (NAME_EXCLUDE.indexOf(name) !== -1) continue;
-      if (!isPersonName(name)) continue;
+      // v56: 판정을 nameAtRow 하나로 일원화 (findSectionEnd·findNameRow 와 같은 기준)
+      var name = nameAtRow(data, formulas, r, base);
+      if (!name) continue;
       out.push({ name: name, startCol: startCol, row: r + 1 });
     }
   }
@@ -198,6 +345,9 @@ function detectStartCol(allData, formulas, name) {
     for (var b2 = 0; b2 < bases.length; b2++) {
       var base2 = bases[b2];
       if (!isNameRowShape(allData, formulas, r2, base2)) continue;
+      // v56: findNameRow 와 같은 이유 — 이미 다른 사람의 이름 행이면 부분일치시키지 않는다.
+      var other2 = nameAtRow(allData, formulas, r2, base2);
+      if (other2 && other2 !== name) continue;
       var raw2 = String(allData[r2][base2 + COL.CHECK] == null ? "" : allData[r2][base2 + COL.CHECK]) +
                  String(allData[r2][base2 + COL.TITLE] == null ? "" : allData[r2][base2 + COL.TITLE]);
       if (raw2.indexOf(name) !== -1) return base2 + 1;
@@ -244,6 +394,22 @@ function ensureMembers(sheet) {
       var found = discoverMembers(data, forms);
       for (var j = 0; j < found.length; j++) { order.push(found[j].name); cols[found[j].name] = found[j].startCol; }
       if (order.length) warn.push("자동화 시트를 읽지 못해 업무현황 시트 자동 감지로 대체함");
+    }
+
+    // v56: 반대 방향 점검 — 업무현황에는 구역이 있는데 자동화 명단에 없는 이름.
+    //      퇴사자의 잔존 구역이거나, 아직 명단에 안 넣은 신규 입사자다.
+    //      v56 부터 경계 판정은 명단과 무관하므로 동작은 정상이지만,
+    //      사람이 알아야 정리하거나 등록할 수 있으므로 보고한다.
+    //      (그리드는 이미 메모리에 있어 추가 API 호출이 없다)
+    var inRoster = {};
+    for (var q = 0; q < order.length; q++) inRoster[order[q]] = 1;
+    var onSheet = discoverMembers(data, forms);
+    for (var q2 = 0; q2 < onSheet.length; q2++) {
+      var nm2 = onSheet[q2].name;
+      if (inRoster[nm2]) continue;
+      inRoster[nm2] = 1;   // 같은 이름 중복 보고 방지
+      warn.push(nm2 + " — 업무현황 " + onSheet[q2].row + "행에 구역이 있는데 자동화 명단에 없음" +
+                       " (퇴사자면 그대로 둬도 되고, 신규 입사자면 자동화 A열에 추가하세요)");
     }
   } catch (e2) { /* ④로 */ }
 
@@ -380,7 +546,8 @@ function readGrid(sheet) {
   // ★READ_ROWS 는 반드시 여기서 정한다. 예전엔 ensureMembers 안에서만 정해서,
   //   팀원 캐시(60초)가 살아 있으면 READ_ROWS 가 기본값 150 인 채로 doRead 가 읽었다.
   //   시트가 150행을 넘는 순간 그 아래 작업이 조용히 사라진다(2026-08-27 실측 93행).
-  READ_ROWS = Math.max(150, sheet.getLastRow() + 20);
+  // v55: 그리드 행 수를 넘으면 getRange 가 예외를 던져 doRead 가 JSON 대신 오류 HTML 을 뱉는다.
+  READ_ROWS = Math.min(sheet.getMaxRows(), Math.max(150, sheet.getLastRow() + 20));
   var rng = sheet.getRange(1, 1, READ_ROWS, READ_COLS);
   _grid = { data: rng.getValues(), forms: rng.getFormulas() };
   return _grid;
@@ -399,6 +566,31 @@ function respond(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// v60 ★스테일 행 지문 — 타이머가 들고 있던 행 번호가 그 사이 밀렸는지 확인한다.
+//   타이머는 행 번호를 화면에 들고 있다가 그 번호로 쓴다(동기화 10분 주기 → 최대 10분 스테일 창).
+//   그 사이 딸깍 insert 가 행을 밀면 옆 행을 건드린다. isVideo 가드는 "영상작업 행인가"만 보지
+//   "그 작업이 맞는가"는 안 본다 — 밀린 옆 행도 영상작업 행이라 통과한다. 이 검사가 그걸 본다.
+//     expectTitle : 제목칸(B/J) 현재값과 trim 비교
+//     expectIdx   : 요청글 링크(C/K) HYPERLINK 수식에서 뽑은 idx 와 비교
+//   두 지문의 실패 조건이 서로 반대다 — idx 는 "다른 게시글·같은 제목"을 잡고 "같은 게시글·여러 행"을
+//   놓친다, 제목은 그 반대. 그래서 deleteTask 는 둘 다 본다.
+//   파라미터가 없거나 빈 값이면 그 검사는 건너뛴다 — 구버전 타이머·딸깍은 안 보낸다(하위호환).
+//   linkFormula 는 호출자가 isVideo 판정용으로 이미 읽은 C/K 수식이다. 새로 읽지 않는다.
+//   실패 → {ok:false, stale:true, row, found, foundIdx}. busy 와 달리 재시도로 못 고친다.
+//   ⚠ updateTask 의 title 은 *바꿀 새 제목*이라 지문이 아니다 — 클라이언트가 prev.title 을 expectTitle 로 보낸다.
+function checkFingerprint(p, sheet, row, startCol, linkFormula) {
+  var wantIdx   = (p.expectIdx   == null) ? "" : String(p.expectIdx).trim();
+  var wantTitle = (p.expectTitle == null) ? "" : String(p.expectTitle).trim();
+  if (!wantIdx && !wantTitle) return null;
+  var curIdx   = (String(linkFormula == null ? "" : linkFormula).match(/idx=(\d+)/) || [])[1] || "";
+  var curTitle = String(sheet.getRange(row, startCol + COL.TITLE).getValue()).trim();
+  var okIdx    = !wantIdx   || curIdx   === wantIdx;
+  var okTitle  = !wantTitle || curTitle === wantTitle;
+  if (okIdx && okTitle) return null;
+  return respond({ ok: false, stale: true, row: row, found: curTitle, foundIdx: curIdx,
+                   error: "행이 밀렸어요 — 동기화 후 다시 시도해 주세요" });
 }
 
 function findSheetByHint(hint) {
@@ -461,32 +653,59 @@ function toISO(val) {
   return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2);
 }
 
-// 이름 행 탐색 (1-based). 데코 이름("💎한영채💎" 등)도 indexOf로 매칭.
-function findNameRow(allData, member, startCol) {
+// 이름 행 탐색 (1-based).
+// v56: v53 이 detectStartCol 에만 넣었던 '이름 행 형태' 가드를 여기에도 적용한다.
+//      예전엔 형태를 안 보고 indexOf 만 해서, 자기 이름 행보다 위에 있는
+//      남의 작업 제목("한영채 인터뷰 편집")을 이름 행으로 오인할 수 있었다.
+//      그러면 그 사람의 작업 목록이 통째로 남의 구역에서 시작된다.
+// 1차: 장식을 걷어내면 이름과 정확히 같은 이름 행 / 2차: 이름 칸에 직함 등이 붙은 경우
+function findNameRow(allData, formulas, member, startCol) {
+  var base = startCol - 1;
   for (var r = 0; r < allData.length; r++) {
-    if (String(allData[r][startCol - 1]).indexOf(member) !== -1 ||
-        String(allData[r][startCol]).indexOf(member) !== -1) {
-      return r + 1; // 1-based
-    }
+    if (nameAtRow(allData, formulas, r, base) === member) return r + 1; // 1-based
+  }
+  for (var r2 = 0; r2 < allData.length; r2++) {
+    if (!isNameRowShape(allData, formulas, r2, base)) continue;
+    // ★ 이미 '다른 사람의 이름 행'으로 확정된 줄은 건너뛴다.
+    //   신입 이름이 기존 팀원 이름의 일부일 때(예: 신입 "김본" vs 기존 "김본희")
+    //   부분일치가 남의 이름 행을 잡아 그 사람 구역으로 작업이 들어가는 것을 막는다.
+    //   장식·직함이 붙어 nameAtRow 가 "" 를 주는 줄은 그대로 부분일치 대상이다
+    //   (예: "구민석 팀장" → hangulOnly 5자라 이름 판정 실패 → 여기서 잡아야 함).
+    var other = nameAtRow(allData, formulas, r2, base);
+    if (other && other !== member) continue;
+    var raw2 = String(allData[r2][base + COL.CHECK] == null ? "" : allData[r2][base + COL.CHECK]) +
+               String(allData[r2][base + COL.TITLE] == null ? "" : allData[r2][base + COL.TITLE]);
+    if (raw2.indexOf(member) !== -1) return r2 + 1;
   }
   return -1;
 }
 
 // 섹션 끝(=다음 섹션 시작 행, 1-based) 탐색.
-// 같은 단(좌/우)의 다른 팀원 이름 또는 구분어를 만나면 그 행이 경계.
-function findSectionEnd(allData, member, startCol, nameRow) {
-  var c0 = startCol - 1; // 체크열(0-based)
-  var c1 = startCol;     // 제목열(0-based)
+// v56: ★명단(ALL_MEMBERS)과 대조하지 않는다. '이름 행 형태인가'만 본다.
+//      예전엔 명단에 있는 이름만 경계로 인정해서,
+//        · 퇴사자를 자동화 A열에서 지우면 그 구역이 경계를 잃고 위 팀원이 흡수
+//        · 신규 입사자가 시트에만 있고 명단에 없으면 역시 위 팀원이 흡수
+//      명단은 사람이 관리하는 것이고 시트 배치는 그와 별개로 움직이므로
+//      경계는 시트 자체에서 읽어야 한다.
+function findSectionEnd(allData, formulas, member, startCol, nameRow) {
+  var base = startCol - 1;
+  var dividers = 0;
   for (var r = nameRow; r < allData.length; r++) { // r=0-based → 시트행 r+1 (이름행 다음부터)
-    var combined = String(allData[r][c0]) + String(allData[r][c1]);
+    var combined = String(allData[r][base]) + String(allData[r][base + COL.TITLE]);
     for (var k = 0; k < BOUNDARY_WORDS.length; k++) {
       if (combined.indexOf(BOUNDARY_WORDS[k]) !== -1) return r + 1;
     }
-    for (var m = 0; m < ALL_MEMBERS.length; m++) {
-      var mm = ALL_MEMBERS[m];
-      if (mm === member) continue;
-      if (MEMBER_COLS[mm] !== startCol) continue; // 같은 단만 경계로 인정
-      if (combined.indexOf(mm) !== -1) return r + 1;
+    // 같은 단에서 '다른 사람의 이름 행'을 만나면 거기가 경계 (명단 등재 여부 무관)
+    var n = nameAtRow(allData, formulas, r, base);
+    if (n && n !== member) return r + 1;
+    // v58: ▼업무 구분선은 한 구역에 하나뿐이다. 두 번째를 만나면 다음 사람 구역이다.
+    //      신규 입사자용 빈 자리를 미리 만들어 두면 이름이 없어 nameAtRow 로는 안 잡힌다 —
+    //      구분선이 그 경계 신호가 된다.
+    //      ★ ▼ 와 "업무" 가 서로 다른 칸에 나뉘어 있으므로(체크칸 ▼ / 제목칸 업무)
+    //        반드시 이어붙인 문자열에서 봐야 한다. 칸별로 보면 못 찾는다.
+    if (isDividerRow(allData, formulas, r, base)) {
+      dividers++;
+      if (dividers >= 2) return r + 1;
     }
   }
   return allData.length + 1;
@@ -498,11 +717,11 @@ function buildMemberData(allData, formulas, richAt, member) {
   var side     = (startCol === 1) ? "left" : "right";
   var base     = startCol - 1; // 0-based 시작열
 
-  var nameRow = findNameRow(allData, member, startCol);
+  var nameRow = findNameRow(allData, formulas, member, startCol);
   if (nameRow === -1) {
     return { name: member, side: side, error: "이름 못찾음", video: [], mgmt: [] };
   }
-  var endRow  = findSectionEnd(allData, member, startCol, nameRow); // 1-based 다음 섹션 시작
+  var endRow  = findSectionEnd(allData, formulas, member, startCol, nameRow); // 1-based 다음 섹션 시작
   var lastRow = endRow - 1;                                         // 1-based 섹션 마지막 행
 
   var video = [], mgmt = [];
@@ -600,7 +819,7 @@ function doRead(e) {
 
 // ── 쓰기: 관리항목 B/C 텍스트 되받아쓰기 ─────────────────────
 function updateMemo(p) {
-  var target = p.targetMember || "";
+  var target = p.member || p.targetMember || "";   // v55: member 도 수용(추가만, 하위호환)
   var row    = parseInt(p.row, 10);
   var startCol = MEMBER_COLS[target];
   if (!startCol) return respond({ ok: false, error: "팀원 이름 없음: " + target });
@@ -649,21 +868,21 @@ function writeMemoCell(sheet, row, col, val) {
 // 관리 구간(이름행 ~ ▼업무 위)에서 빈 B/C 칸을 먼저 채우고,
 // 꽉 차면 ▼업무 바로 위에 행을 삽입하고 체크열(A/I)에 📌 + B에 텍스트.
 function addMemo(p) {
-  var target = p.targetMember || "";
+  var target = p.member || p.targetMember || "";   // v55: member 도 수용(추가만, 하위호환)
   var text   = (p.text == null ? "" : String(p.text));
   var startCol = MEMBER_COLS[target];
   if (!startCol) return respond({ ok: false, error: "팀원 이름 없음: " + target });
   if (!text.trim()) return respond({ ok: false, error: "빈 텍스트" });
 
   var sheet    = getSheet();
-  var rng      = sheet.getRange(1, 1, READ_ROWS, READ_COLS);
-  var allData  = rng.getValues();
-  var formulas = rng.getFormulas();
+  var _g       = readGrid(sheet);   // v55: 위와 같은 이유 (구: getRange 직접)
+  var allData  = _g.data;
+  var formulas = _g.forms;
   var base     = startCol - 1;
 
-  var nameRow = findNameRow(allData, target, startCol);
+  var nameRow = findNameRow(allData, formulas, target, startCol);
   if (nameRow === -1) return respond({ ok: false, error: target + " 이름 못찾음" });
-  var endRow = findSectionEnd(allData, target, startCol, nameRow); // 1-based 다음 섹션 시작
+  var endRow = findSectionEnd(allData, formulas, target, startCol, nameRow); // 1-based 다음 섹션 시작
 
   // ▼업무 구분선 행 탐색 (1-based)
   var dividerRow = -1;
@@ -789,6 +1008,8 @@ function toggleDone(p) {
   var f = sheet.getRange(row, startCol + COL.LINK, 1, 2).getFormulas()[0];
   var isVideo = /HYPERLINK/i.test(String(f[0])) || /HYPERLINK/i.test(String(f[1]));
   if (!isVideo) return respond({ ok: false, error: "영상작업 행이 아님(보호): row " + row });
+  var stale = checkFingerprint(p, sheet, row, startCol, f[0]);   // v60
+  if (stale) return stale;
 
   try {
     var chkCell = sheet.getRange(row, startCol + COL.CHECK);
@@ -819,6 +1040,8 @@ function updateDue(p) {
   var f = sheet.getRange(row, startCol + COL.LINK, 1, 2).getFormulas()[0];
   var isVideo = /HYPERLINK/i.test(String(f[0])) || /HYPERLINK/i.test(String(f[1]));
   if (!isVideo) return respond({ ok: false, error: "영상작업 행이 아님(보호): row " + row });
+  var stale = checkFingerprint(p, sheet, row, startCol, f[0]);   // v60
+  if (stale) return stale;
 
   try {
     var dm = dueDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
@@ -855,6 +1078,8 @@ function updateTask(p) {
   var f = sheet.getRange(row, startCol + COL.LINK, 1, 2).getFormulas()[0];
   var isVideo = /HYPERLINK/i.test(String(f[0])) || /HYPERLINK/i.test(String(f[1]));
   if (!isVideo) return respond({ ok: false, error: "영상작업 행이 아님(보호): row " + row });
+  var stale = checkFingerprint(p, sheet, row, startCol, f[0]);   // v60 — expectTitle 은 prev.title 이어야 한다
+  if (stale) return stale;
 
   try {
     // 제목 (B/J)
@@ -904,9 +1129,18 @@ function deleteTask(p) {
 
   // 삭제 행 아래로 연속된 영상작업 행 범위 파악 (C/D HYPERLINK 기준) — 한 번에 읽기
   var scanCount = Math.max(0, lastRow - row + 1);
+  // v60: 사람이 시트에서 행을 지우면 타이머가 들고 있던 row 가 lastRow 를 넘는다.
+  //      그러면 아래 getRange(row, col, 0, 2) 가 구글 예외를 던지고 그 문자열이 그대로 사용자에게 갔다.
+  if (scanCount < 1) {
+    return respond({ ok: false, stale: true, row: row, found: "", foundIdx: "",
+                     error: "그 행이 더 이상 없어요 — 동기화 후 다시 시도해 주세요" });
+  }
   var linkF = sheet.getRange(row, startCol + COL.LINK, scanCount, 2).getFormulas(); // C,D (또는 K,L)
   function isVid(i) { return /HYPERLINK/i.test(String(linkF[i][0])) || /HYPERLINK/i.test(String(linkF[i][1])); }
   if (!isVid(0)) return respond({ ok: false, error: "영상작업 행이 아님(보호): row " + row });
+  // v60: 되돌릴 수 없는 유일한 액션이라 지문을 둘 다 본다. linkF[0][0] 은 방금 읽은 C/K 수식.
+  var stale = checkFingerprint(p, sheet, row, startCol, linkF[0][0]);
+  if (stale) return stale;
 
   var n = 1; // 삭제 행 포함 연속 영상작업 행 수
   while (n < scanCount && isVid(n)) n++;
@@ -957,9 +1191,9 @@ function alignMgmtLeft() {
   var count = 0;
   for (var n = 0; n < names.length; n++) {
     var member = names[n], startCol = MEMBER_COLS[member], base = startCol - 1;
-    var nameRow = findNameRow(allData, member, startCol);
+    var nameRow = findNameRow(allData, formulas, member, startCol);
     if (nameRow === -1) continue;
-    var endRow = findSectionEnd(allData, member, startCol, nameRow);
+    var endRow = findSectionEnd(allData, formulas, member, startCol, nameRow);
     var dividerRow = -1;
     for (var r = nameRow; r < endRow - 1; r++) {
       var s = String(allData[r][base + COL.CHECK]) + String(allData[r][base + COL.TITLE]) + String(allData[r][base + COL.LINK]);
@@ -1023,6 +1257,7 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  var lock = null;
   try {
     var p      = e.parameter;
     var action = p.action || "insert";
@@ -1031,7 +1266,22 @@ function doPost(e) {
     ensureMembers();
     if (action === "read")       return doRead(e);
 
+    // v60 ★LockService — 여기서부터 아래는 전부 쓰기(타이머 6종 + 딸깍 insert)다. 한 번에 하나씩.
+    //   읽기(doRead)에는 걸지 않는다 — 걸면 v54 가 1~2초로 내린 동기화가 다시 70초까지 간다.
+    //   8초 = 타이머 HTTP 20초에서 역산(콜드스타트 5 + 락 8 + 쓰기 3 = 16). 딸깍도 20초.
+    //   ★ busy 는 "쓰기가 확실히 안 일어났다"는 뜻이어야 클라이언트 재시도가 안전하다.
+    //     그래서 tryLock 실패는 어떤 쓰기보다도, bustReadCache 보다도 앞에서 반환한다.
+    //     busy 를 최상위 키로 — error 문자열 안에 넣으면 타이머가 못 잡는다.
+    //   stale 은 다르다(아래 checkFingerprint) — 행 번호 자체가 틀린 것이라 재시도로 못 고친다.
+    lock = LockService.getScriptLock();
+    if (!lock.tryLock(8000)) {
+      lock = null;
+      return respond({ ok: false, busy: true, error: "다른 저장이 진행 중이에요. 잠시 후 다시 시도해 주세요." });
+    }
+
     // v54 ★쓰기 경로: 읽기 캐시를 버리고 실행한 뒤 **한 번 더** 버린다.
+    //   (v60: 이 bustReadCache 는 락 안쪽이다. 밖에 두면 "버리고 → 남이 옛 데이터 재캐싱 → 쓰기"
+    //    순서가 생겨 v54 가 잡은 「완료 체크했는데 되돌아옴」이 재발한다.)
     //   실행 중에 다른 사람의 읽기가 옛 데이터를 다시 캐싱해 버리면
     //   내가 방금 체크한 완료가 캐시 수명 동안 되돌아온 것처럼 보인다.
     bustReadCache();
@@ -1042,6 +1292,14 @@ function doPost(e) {
     else if (action === "deleteTask") out = deleteTask(p);
     else if (action === "updateDue")  out = updateDue(p);
     else if (action === "updateTask") out = updateTask(p);
+    // v55: 인식 못 하는 action 이 아래 insert 로 흘러드는 것을 막는다.
+    // 예전엔 action=toggledone(소문자) 같은 오타 하나가 완료 토글이 아니라
+    // 「(제목 없음)」 행 삽입이 되고, needBlank 경로까지 돌아 전원의 행 번호를 밀었다.
+    // 클라이언트는 {ok:true} 를 받아 화면과 시트가 갈라진 채로 남았다.
+    // 딸깍은 action 을 아예 안 보내므로 "insert" 기본값 경로는 그대로 유지된다.
+    else if (action !== "insert") {
+      return respond({ ok: false, error: "알 수 없는 action: " + action });
+    }
     if (out) { bustReadCache(); return out; }
 
     // ===== 이하 기존 전송(insert) 로직 — 변경 없음 =====
@@ -1052,6 +1310,7 @@ function doPost(e) {
     var dueDate   = p.dueDate      || "";
     var memo      = p.memo         || "";
     var dupCheck  = p.dupCheck !== "0";
+    var clientVer = p.ver          || "";   // v57: 딸깍이 보낸 자기 버전
 
     var startCol = MEMBER_COLS[target];
     if (!startCol) return respond({ ok: false, error: "팀원 이름 없음: " + target });
@@ -1059,40 +1318,38 @@ function doPost(e) {
     var sheet   = getSheet();
 
     // ── 전체 데이터 한 번에 읽기 (1-based 행 기준으로 통일) ──
-    var allData = sheet.getRange(1, 1, READ_ROWS, READ_COLS).getValues();  // A~O (7칸 구조)
+    var _gi         = readGrid(sheet);   // v55: READ_ROWS 확정 + 요청당 1회 읽기
+    var allData     = _gi.data;
+    var insFormulas = _gi.forms;         // v56: 이름 행 형태 판정에 필요
 
-    // 이름 행 탐색 → sheetRow (1-based)
-    var nameSheetRow = -1;
-    for (var r = 0; r < allData.length; r++) {
-      if (String(allData[r][startCol - 1]).indexOf(target) !== -1 ||
-          String(allData[r][startCol]).indexOf(target) !== -1) {
-        nameSheetRow = r + 1; // 1-based
-        break;
-      }
-    }
+    // v56: 읽기(doRead)와 같은 함수를 쓴다. 예전엔 여기만 인라인 루프였고 규칙이 달랐다 —
+    //      좌·우 네 칸을 합쳐 보고(반대편 단 이름에도 끊김) 자기 이름 skip 도 없었다.
+    //      이제 읽기와 쓰기가 같은 구역을 본다.
+    var nameSheetRow = findNameRow(allData, insFormulas, target, startCol);
     if (nameSheetRow === -1) return respond({ ok: false, error: target + " 이름을 찾을 수 없음" });
 
-    // 섹션 끝 행 탐색 → sectionEndSheetRow (1-based, 다음 섹션 시작 행)
-    var sectionEndSheetRow = nameSheetRow + 100; // 기본값
-    for (var r2 = nameSheetRow; r2 < allData.length; r2++) {
-      // 좌측 체크A(0)+제목B(1), 우측 체크I(8)+제목J(9) 네 칸에서 이름/구분어 탐색
-      var combined = String(allData[r2][0]) + String(allData[r2][1])
-                   + String(allData[r2][8]) + String(allData[r2][9]);
-      var hit = false;
-      for (var k = 0; k < BOUNDARY_WORDS.length; k++) {
-        if (combined.indexOf(BOUNDARY_WORDS[k]) !== -1) { sectionEndSheetRow = r2; hit = true; break; }
-      }
-      if (!hit) {
-        for (var m = 0; m < ALL_MEMBERS.length; m++) {
-          if (combined.indexOf(ALL_MEMBERS[m]) !== -1) { sectionEndSheetRow = r2; hit = true; break; }
-        }
-      }
-      if (hit) break;
-    }
+    // v56: nameSheetRow+100 기본값 제거.
+    //      findSectionEnd 의 무경계 반환은 allData.length + 1 이라 −1 하면 항상 배열 안이다.
+    //      예전 기본값은 최하단 팀원(경계 없음)에서 allData 를 넘어 TypeError 를 냈다.
+    //  ★ '- 1' 을 반드시 유지할 것. findSectionEnd 는 경계 행(1-based)을 돌려주는데
+    //    이 자리는 그보다 1 작은 값을 쓴다. 이 1칸이 아래 needBlank 의 간격행 보존을 지탱한다.
+    //    빼면 needBlank 가 false 로 뒤집혀 팀원 사이 간격행을 잡아먹고,
+    //    그다음 전송이 다음 팀원 이름 행을 덮어쓴다.
+    var sectionEndSheetRow = findSectionEnd(allData, insFormulas, target, startCol, nameSheetRow) - 1;
 
     var scanStart    = nameSheetRow;           // 1-based, 이름 행 다음부터
     var scanEnd      = sectionEndSheetRow - 1;  // 1-based, 섹션 마지막 행
     var scanLen      = scanEnd - scanStart;
+
+    // v55: 경계가 이름 행에 바로 붙으면 scanLen 이 0 또는 음수가 된다.
+    // 그대로 두면 아래 getRange 가 "numRows must be at least 1" 로 죽고,
+    // 중복체크를 끈 경우엔 lastTitleSheetRow 가 이름 행에 머물러
+    // insertRow 가 기존 작업 행을 가리켜 B~E 4칸을 조용히 덮어쓴다.
+    if (scanLen < 1) {
+      return respond({ ok: false, error: target +
+        " 섹션 범위 계산 실패(경계가 이름 행에 붙어 있음). " +
+        "관리항목·작업 제목에 다른 팀원 이름이 있는지 확인해 주세요." });
+    }
 
     // 중복 체크
     if (dupCheck && sourceUrl) {
@@ -1101,16 +1358,26 @@ function doPost(e) {
       for (var i = 0; i < scanLen; i++) {
         var hay = String(allData[scanStart + i][startCol - 1 + COL.LINK]) + String(formulas[i][0]);
         if (idxNum ? hay.indexOf("idx=" + idxNum) !== -1 : hay.indexOf(sourceUrl) !== -1) {
-          return respond({ ok: false, duplicate: true, message: "이미 등록된 게시글입니다." });
+          return respond(withVer({ ok: false, duplicate: true, message: "이미 등록된 게시글입니다." }, clientVer));
         }
       }
     }
 
-    // 삽입 위치: 제목이 있는 마지막 행 바로 다음 (1-based)
-    var lastTitleSheetRow = scanStart;
-    for (var j = 0; j < scanLen; j++) {
-      if (String(allData[scanStart + j][startCol - 1 + COL.TITLE]).trim()) {
-        lastTitleSheetRow = scanStart + j + 1; // 1-based
+    // v58: 이 구역의 ▼업무 구분선을 찾는다. addMemo 와 같은 규칙 —
+    //      ▼ 와 "업무" 가 다른 칸에 있으므로 세 칸을 이어붙여서 본다.
+    var dividerRow = -1;
+    for (var dv = scanStart; dv < scanEnd && dv < allData.length; dv++) {
+      if (isDividerRow(allData, insFormulas, dv, startCol - 1)) { dividerRow = dv + 1; break; }
+    }
+    // 작업은 구분선 아래에만 들어간다. 구분선을 못 찾으면 예전처럼 이름 행 다음부터(하위호환).
+    var taskStart = (dividerRow !== -1) ? dividerRow : scanStart;
+
+    // 삽입 위치: 작업 구간에서 제목이 있는 마지막 행 바로 다음 (1-based)
+    // 예전엔 이름 행 다음부터 훑어서, 구분선 제목칸의 "업무" 도 제목으로 셌다.
+    var lastTitleSheetRow = taskStart;
+    for (var j = taskStart; j < scanEnd && j < allData.length; j++) { // j=0-based → 시트행 j+1
+      if (String(allData[j][startCol - 1 + COL.TITLE]).trim()) {
+        lastTitleSheetRow = j + 1; // 1-based
       }
     }
     var insertRow = lastTitleSheetRow + 1; // 1-based
@@ -1121,6 +1388,23 @@ function doPost(e) {
     // (인트라넷 end_date에 연도가 들어있으므로 추정 불필요 — 그대로 정확히 사용)
     var dm = dueDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     var dateValue = dm ? new Date(+dm[1], +dm[2] - 1, +dm[3]) : dueDate;
+
+    // v58: ★쓰기 직전에 목적지가 비어 있는지 확인한다.
+    //   위치 계산이 틀리면(구역 경계 오판 등) 아래 setValues 가 남의 작업을 조용히 덮어쓴다.
+    //   2026-08-28 구정현 건에서 실제로 그럴 뻔했다 — 계산은 사람이 못 보고 결과만 남는다.
+    //   빈 행의 체크박스(boolean false)는 정상 목적지이므로 통과시킨다.
+    var dIdx = insertRow - 1;   // 0-based
+    if (dIdx >= 0 && dIdx < allData.length) {
+      var dChk   = String(allData[dIdx][startCol - 1 + COL.CHECK] == null ? "" : allData[dIdx][startCol - 1 + COL.CHECK]);
+      var dTitle = String(allData[dIdx][startCol - 1 + COL.TITLE] == null ? "" : allData[dIdx][startCol - 1 + COL.TITLE]).trim();
+      var dLinkF = String(insFormulas[dIdx][startCol - 1 + COL.LINK]);
+      if (dTitle || /HYPERLINK/i.test(dLinkF) ||
+          dChk.indexOf("📌") !== -1 || dChk.indexOf("▼") !== -1) {
+        return respond({ ok: false, error: target + " " + insertRow + "행에 이미 내용이 있어 멈췄습니다. " +
+          "구역 경계가 잘못 잡힌 것 같아요 — 시트를 확인해 주세요." +
+          (dTitle ? " (그 행: " + dTitle.slice(0, 30) + ")" : "") });
+      }
+    }
 
     // 위 행 서식 복사 (체크박스 색상 통일)
     sheet.getRange(insertRow - 1, startCol + COL.CHECK)
@@ -1166,10 +1450,12 @@ function doPost(e) {
     }
 
     bustReadCache();   // v54: insert 도 읽기 캐시를 버린다
-    return respond({ ok: true, message: target + " " + insertRow + "행 추가됨 (섹션끝:" + scanEnd + ", needBlank:" + needBlank + ")" });
+    return respond(withVer({ ok: true, message: target + " " + insertRow + "행 추가됨 (섹션끝:" + scanEnd + ", needBlank:" + needBlank + ")" }, clientVer));
 
   } catch (err) {
     return respond({ ok: false, error: err.toString() });
+  } finally {
+    if (lock) { try { lock.releaseLock(); } catch (e2) {} }
   }
 }
 
