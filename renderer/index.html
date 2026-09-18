@@ -398,7 +398,7 @@
   .count.orange .t { color: var(--st-today-ink); }
   .count.green .t { color: var(--st-soon-ink); }
   .count.over .t { color: var(--st-urgent-ink); }
-  /* 정의만 있고 cdText 가 늘 l:"" 를 돌려줘 한 번도 안 쓰이던 죽은 슬롯 — 여기 '지남' 이 들어간다.
+  /* 정의만 있고 cdText 가 늘 l:"" 를 돌려줘 한 번도 안 쓰이던 죽은 슬롯 — 여기 '초과' 와 멈춘 이유 표식(업무 전·업무 후·주말·공휴일)이 들어간다.
      ★반드시 흐름에서 뺀다(absolute). .count 는 display:flex 라 라벨을 형제로 두면 칸이 넓어져
        제목이 다시 잘리고, flex-direction:column 으로 바꾸면 라벨이 붙은 카드만 .t 가 약 7.9px
        위로 올라가 옆 카드와 숫자 베이스라인이 어긋난다. absolute 면 .t 이동 0px·카드 높이 변화 0.
@@ -407,7 +407,8 @@
   .count .l {
     position: absolute; top: 100%; right: 0; margin-top: 2px;
     white-space: nowrap; pointer-events: none;
-    font-size: 9.5px; color: var(--ink-3); font-weight: 600; letter-spacing: 0.02em;
+    font-family: 'Inter Tight', 'Pretendard', sans-serif;
+    font-size: 9.5px; color: var(--ink-2); font-weight: 600; letter-spacing: 0.02em;
   }
   .count.over .l { color: var(--st-urgent-ink); }
   /* 완료 카드 — 통째로 비어 있던 카운트다운 슬롯(440px 에서 78px)에 시트 _status.
@@ -437,7 +438,7 @@
   .task.orange { border-left-color: var(--st-today); }
   .task.green { border-left-color: var(--st-soon); }
   .task.over { border-left-color: var(--st-urgent); }
-  /* 마감 지남 — 완료(opacity:.45, '면을 빼낸다')와 반대로 '면을 더한다'.
+  /* 마감 초과 — 완료(opacity:.45, '면을 빼낸다')와 반대로 '면을 더한다'.
      --red-bg 는 라이트 #fff0f0 / 다크 #2a1515 로 양쪽 다 이미 정의돼 있다(26·47행).
      :not(.done) 필수 — 완료했는데 마감일만 지난 카드까지 붉게 물들면 완료가 급해 보인다.
      전이는 .task 원본 목록(303행)의 background-color 0.4s 가 태운다(여기서 중복 선언하지 않는다).
@@ -670,7 +671,7 @@
   .opt-row.is-off:hover, .dark .opt-row.is-off:hover { background: transparent; }
   /* ★margin shorthand 가 margin-top 을 0 으로 만들므로 이 규칙은 반드시 뒤에 와야 한다.
      칩 다음에 오는 토글 행의 광학 여백 18px(= 14 + padding 4) 유지. */
-  #modal-settings .seg + .opt-row { margin-top: 14px; }
+  #modal-settings .seg + .opt-row, #modal-settings .preset-row.wh + .opt-row { margin-top: 14px; }
   .opt-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .opt-title { font-size: 14px; font-weight: 600; color: var(--ink); }
   .opt-desc { font-size: 12px; color: var(--ink-3); line-height: 1.45; }
@@ -919,9 +920,11 @@
   /* 설정 — 프리셋 */
   .setting-desc { font-size: 12.5px; color: var(--ink-3); margin: -2px 0 12px; line-height: 1.5; letter-spacing: -0.01em; text-transform: none; font-weight: 400; }
   .preset-head { display: grid; grid-template-columns: 1fr 84px 40px; gap: 8px; margin-bottom: 7px; padding: 0 2px; }
-  .preset-head .ph-name, .preset-head .ph-time { font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.04em; }
-  .preset-head .ph-time { text-align: center; }
+  .preset-head .ph-name, .preset-head .ph-time, .preset-row.wh .ph-time { font-size: 11px; font-weight: 600; color: var(--ink-3); letter-spacing: 0.04em; }
+  .preset-head .ph-time, .preset-row.wh .ph-time { text-align: center; }
   .preset-row { display: grid; grid-template-columns: 1fr 84px 40px; gap: 8px; margin-bottom: 8px; align-items: center; }
+  /* 업무시간 입력 행(설정 → 남은 시간) — 시작·대시·끝. 시간 칸 폭은 프리셋 행의 84px 그대로, 대시는 .ph-time 을 빌려 쓴다(위 두 규칙에 선택자만 추가). */
+  .preset-row.wh { grid-template-columns: 84px 14px 84px; margin-bottom: 0; }
   .preset-name {
     width: 100%; min-width: 0; padding: 11px 14px; border: 1.5px solid var(--line); border-radius: 12px;
     font-family: inherit; font-size: 14px; color: var(--ink); outline: none;
@@ -1041,7 +1044,7 @@
     .count { min-width: 78px; }
     .count .t { font-size: 15px; }
     /* 8.5px 은 이 슬롯이 라틴 라벨용이던 시절 값이다. 440px 창에서 늘 이 분기를 타는데
-       한글 '지남'은 8.5px 에서 읽히지 않아 기본 9.5px 을 유지한다(폭 영향 없음 — .l 은 absolute). */
+       한글 '초과'는 8.5px 에서 읽히지 않아 기본 9.5px 을 유지한다(폭 영향 없음 — .l 은 absolute). */
     .count .l { font-size: 9.5px; }
     .actions { gap: 0; }
     .act { width: 30px; height: 30px; }
@@ -1547,6 +1550,38 @@
           <svg viewBox="0 0 20 20"><path d="M10 4.5v11M4.5 10h11"/></svg>
           <span>프리셋 추가</span>
         </button>
+      </div>
+
+      <div class="settings-divider"></div>
+
+      <!-- 남은 시간 — 「업무시간만 세기」(드래프트 → [저장]). 골격은 알람 → 알람 소리와 같다: 주 토글이 꺼지면 아래 #field-workhours 가 .disabled 로 흐려진다(접기 모션 없음). -->
+      <div class="field">
+        <label>남은 시간</label>
+        <p class="setting-desc">카드의 남은 시간을 어떻게 셀지 정해요. 마감 시각과 알람은 그대로예요.</p>
+        <div class="opt-row" onclick="toggleWorkDraft()">
+          <div class="opt-text">
+            <span class="opt-title">업무시간만 세기</span>
+            <span class="opt-desc">주말·공휴일과 퇴근 후 시간은 빼고 계산해요. 그동안은 숫자가 멈추고 카드에 이유가 표시돼요.</span>
+          </div>
+          <div class="mh-toggle" id="work-toggle"><div class="mh-switch"></div></div>
+        </div>
+      </div>
+
+      <div class="field demoted" id="field-workhours">
+        <label>업무시간</label>
+        <p class="setting-desc">평일 이 시간 안에서만 남은 시간이 줄어요. 마감 당일엔 퇴근 뒤에도 마감 시각까지 줄어요. 자정을 넘길 수 없어요.</p>
+        <div class="preset-row wh">
+          <input type="text" size="1" class="preset-time" id="work-start" value="09:00" placeholder="09:00" oninput="draftWork.start=this.value" onblur="normalizeWorkTime(this,'start')" onkeydown="if(event.key==='Enter'){event.preventDefault(); normalizeWorkTime(this,'start'); this.blur();}">
+          <span class="ph-time">–</span>
+          <input type="text" size="1" class="preset-time" id="work-end" value="18:00" placeholder="18:00" oninput="draftWork.end=this.value" onblur="normalizeWorkTime(this,'end')" onkeydown="if(event.key==='Enter'){event.preventDefault(); normalizeWorkTime(this,'end'); this.blur();}">
+        </div>
+        <div class="opt-row" onclick="toggleWorkLabelsDraft()">
+          <div class="opt-text">
+            <span class="opt-title">설명 표시</span>
+            <span class="opt-desc">「초과」와 멈춘 이유(업무 전·업무 후·주말·공휴일)를 카드에 작게 적어요.</span>
+          </div>
+          <div class="mh-toggle on" id="work-labels-toggle"><div class="mh-switch"></div></div>
+        </div>
       </div>
 
       <div class="settings-divider"></div>
@@ -2338,6 +2373,34 @@
     mailFilterScope: "notify",
   };
   try { const _as = JSON.parse(localStorage.getItem("alarmSettings") || "null"); if (_as && typeof _as === "object") alarmSettings = { ...alarmSettings, ..._as }; } catch(e){}
+
+  // ── 업무시간만 세기 — 저장 모델. localStorage 'workHours' = {on, start, end, labels}. 키 없음·깨짐 = 기본값·off ──
+  //   참조 구현 _audit/bizleft.js(규칙 B, 테스트 125건). 계산 함수 6개는 urgencyAt() 위에 있다.
+  //   labels = 하위 옵션 「설명 표시」. ★없거나 깨진 값은 true — 정확히 false 로 저장된 것만 끈다.
+  const WORK_DEFAULT = { on:false, start:"09:00", end:"18:00", labels:true };
+  // localStorage 문자열(또는 객체)을 안전한 workHours 로. 형식 실패·끝≤시작이면 기본값(off).
+  function parseWorkHours(raw){
+    let workHours = { ...WORK_DEFAULT };
+    try {
+      const _w = typeof raw === "string" ? JSON.parse(raw || "null") : raw;
+      if(_w && typeof _w === "object"){
+        const s = normalizeTime(_w.start), e = normalizeTime(_w.end);
+        if(s && e && hmToMin(e) > hmToMin(s)) workHours = { on: !!_w.on, start: s, end: e, labels: _w.labels !== false };
+      }
+    } catch(e){}
+    return workHours;
+  }
+  // 켜져 있고 끝 > 시작일 때만 {startMin,endMin,labels}, 아니면 null → 달력 경로(기존 계산 그대로).
+  // ★유일한 관문: saveSettings 가 직접 만든 workHours 라도 여기서 역전·NaN 이 걸러진다(NaN 이면 비교가 false → null).
+  function makeCfg(workHours){
+    if(!workHours || !workHours.on) return null;
+    const s = hmToMin(workHours.start), e = hmToMin(workHours.end);
+    return e > s ? { startMin: s, endMin: e, labels: workHours.labels !== false } : null;
+  }
+  let _whRaw = null;
+  try { _whRaw = localStorage.getItem("workHours"); } catch(e) {}   // alarmSettings(위)와 같은 관문 — top-level 에서 던지면 스크립트가 통째로 죽는다
+  let workHours = parseWorkHours(_whRaw);
+  let workCfg = makeCfg(workHours);          // null = 옵션 꺼짐. urgency()/cdText() 가 매 tick 읽는다
 
   // 메일 (Gmail)
   // 새 메일 알림: 카운트 증감이 아니라 '새로운 안읽음 메일 ID'가 생겼을 때만 1회 알림(중복 방지)
@@ -3219,6 +3282,7 @@
     } catch(e){ toast("저장 공간이 부족해 음원을 저장하지 못했어요 — 더 작은 파일을 사용해주세요"); }
   }
   let draftAlarm = {};
+  let draftWork = {};   // 업무시간만 세기 드래프트 — openSettings 에서 workHours 복사, [저장]에서만 반영
 
   // ── 내 이름 커스텀 드롭다운 ──
   function renderNamePop(){
@@ -3270,7 +3334,9 @@
     draftPresets = JSON.parse(JSON.stringify(PRESETS));
     // mailKinds 는 객체라 얕은 복사로는 공유된다 → 따로 복제해야 [취소]가 진짜 취소가 된다
     draftAlarm = { ...alarmSettings, mailKinds: { ...(alarmSettings.mailKinds || {}) } };
+    draftWork = { ...workHours };
     renderPresetList();
+    renderWorkHours();
     syncSegments();
     renderGmailConn();
     syncMailSliders();
@@ -3664,6 +3730,19 @@
     if(t) t.classList.toggle("on", draftAlarm.mailFilterScope === "hide");
   }
 
+  // 남은 시간 — 「업무시간만 세기」 토글·「설명 표시」 토글·시간 입력. 전부 draftWork 에만 담고 [저장]에서 검증·반영한다(프리셋과 같은 부류).
+  function toggleWorkDraft(){ draftWork.on = !draftWork.on; renderWorkHours(); }
+  function toggleWorkLabelsDraft(){ draftWork.labels = draftWork.labels === false; renderWorkHours(); }   // 없음(=켜짐)·true → false, false → true
+  function renderWorkHours(){
+    const t = $("work-toggle"); if(t) t.classList.toggle("on", !!draftWork.on);
+    const lt = $("work-labels-toggle"); if(lt) lt.classList.toggle("on", draftWork.labels !== false);
+    const s = $("work-start"), e = $("work-end"); if(s) s.value = draftWork.start; if(e) e.value = draftWork.end;
+    // 주 토글이 꺼지면 하위 필드 통째로 흐림(.field.disabled = opacity .4 + pointer-events none). 접기 모션 없음.
+    const f = $("field-workhours"); if(f) f.classList.toggle("disabled", !draftWork.on);
+  }
+  // blur/Enter 즉시 정규화 — normalizePresetTime 과 같은 규칙('9' → 09:00, '1830' → 18:30). 실패하면 그대로 두고 [저장]에서 걸린다.
+  function normalizeWorkTime(el, key){ const n = normalizeTime(el.value); if(n){ el.value = n; draftWork[key] = n; } }
+
   function setToggle(segId, val, on) {
     const btn = document.querySelector(`#${segId} .seg-btn[data-val="${val}"]`);
     if (btn) btn.classList.toggle("on", !!on);
@@ -3878,6 +3957,9 @@
     // 마감 프리셋 (드래프트 → 저장 시 적용)
     draftPresets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
     renderPresetList();
+    // 업무시간만 세기 끄기 + 09:00–18:00 + 설명 표시 켜기 (드래프트 → 저장 시 적용)
+    draftWork = { ...WORK_DEFAULT };
+    renderWorkHours();
     // 알람 방식/소리/반복/기본시점 + 커스텀 음원 제거 (드래프트 → 저장 시 적용)
     draftAlarm = { notify: true, sound: true, soundType: "ding", repeat: "1", defaultAlarm: "60", volume: 0.8, customSoundData: null, customSoundName: "",
                    mailKinds: { req: true, comment: true, assign: true }, mailFilterScope: "notify" };
@@ -3908,9 +3990,17 @@
       if (!nt) { toast(`"${p.name}" 시간 형식이 올바르지 않아요 (예: 14:00)`); return; }
       p.time = nt; // 1111 등도 정규화해서 저장
     }
+    // 업무시간 검증 — 토글 상태와 무관하게 항상(꺼진 채 저장된 값도 다음에 켤 때 그대로 쓰이므로). 실패 시 저장 중단·모달 유지(프리셋과 같은 방식).
+    const ws = normalizeTime(draftWork.start), we = normalizeTime(draftWork.end);
+    if(!ws || !we){ toast("업무시간 형식이 올바르지 않아요 (예: 09:00)"); return; }
+    if(hmToMin(we) <= hmToMin(ws)){ toast("퇴근 시간은 출근 시간보다 늦어야 해요"); return; }
     PRESETS = JSON.parse(JSON.stringify(draftPresets));
     alarmSettings = { ...draftAlarm, mailKinds: { ...(draftAlarm.mailKinds || {}) } };
     saveAlarmAndPresets(); // 재시작 후에도 유지(커스텀 음원 포함)
+    workHours = { on: !!draftWork.on, start: ws, end: we, labels: draftWork.labels !== false };
+    try { localStorage.setItem("workHours", JSON.stringify(workHours)); } catch(e){}
+    workCfg = makeCfg(workHours);
+    tick();   // 1초 안 기다리고 숫자·표식·색·상단 통계를 즉시 — 켜고 끄는 순간 카드가 바로 따라오게
     // 메일 종류 필터가 바뀌었을 수 있으므로 목록·배지를 즉시 다시 반영한다
     // (동기화·폴링은 그대로 돈다 — 필터는 표시/알림 단계에서만 걸린다)
     renderMailList(); setMailBadge();
@@ -3918,27 +4008,133 @@
     toast("설정을 저장했어요");
   }
 
+  // ── 업무시간만 세기 — 순수 계산 6개 (참조 구현 _audit/bizleft.js, node 테스트 bizleft.test.js 125건) ──
+  // ★본 규칙 = 규칙 B(마감 당일 창 확장) — 사용자 결정 2026-09-18.
+  //   마감일 D 이전 날들: 업무일의 [start,end) 만 센다(쉬는 날 0).
+  //   D 당일: 쉬는 날이어도 세고, 창을 [D@start, max(D@end, ts)] 로 늘린다. bizLeft = Σ(이전 날) + overlap([now,ts], D 창).
+  //   표식은 카드별: 지금이 그 카드의 D 창 안이면 흐르고 표식 없음(예: 금 19:00 에 '오늘 21:00' 카드), 창 밖이면 이유 표식.
+  // cfg 규약: {startMin, endMin, labels}(분) 또는 null. null = 옵션 꺼짐 = 달력 경로(기존 계산 그대로, 라벨만 '초과').
+  //   ★유효한 cfg 는 makeCfg 만 만든다(끝 > 시작). 그래도 하류는 null·역전 cfg 를 각자 달력 폴백으로 받는다 — "Infinityd NaNh" 가 나오지 않게.
+  //   labels(「설명 표시」) 를 읽는 곳은 cdTextAt 게이트와 pauseLabel 첫 줄 둘뿐 — 색(urgency)·통계(updateStats)·정렬은 모른다.
+  // 시간 규약: 전부 로컬 타임스탬프(ms). 한국 = DST 없음 가정.
+  // ★nowTs/cfg/compact 를 전부 인자로 받는 순수 함수다(테스트가 '지금'을 고정한다). 앱 전역(Date.now·workCfg·innerWidth)은 맨 아래 래퍼 urgency()/cdText() 만 읽는다.
+  function hmToMin(s){ const [h,m] = String(s).split(":").map(Number); return h*60 + m; }
+
+  // 쉬는 날 — 주말 + 공휴일(내장 2026·2027 + KASI 주1회 머지). getHoliday 는 0 기반 월.
+  function isOffDay(y, mo, d){ const w = new Date(y, mo, d).getDay(); return w === 0 || w === 6 || !!getHoliday(y, mo, d); }
+
+  // 업무시간 기준 남은 ms(규칙 B).
+  // ★마감이 과거·동시각이면 달력 차이(≤0)를 그대로 돌려준다 — over 판정·'+Nd Nh 초과' 가 손대지 않고 산다.
+  // 하루 단위 루프 O(일수). 4000일 가드 = 시트 오타(연도 2062)·NaN 에도 멈추지 않는다(약 11년 뒤 마감은 전부 같은 상한값 — 정렬은 deadline 기준이라 실무 영향 없음).
+  // ★규칙 B 는 단조가 아니다(금 23:30 마감 6.5h > 토 00:00 마감 1h) — 정렬은 deadline 기준이라 화면 순서엔 영향 없음.
+  function bizLeft(nowTs, ts, cfg){
+    if(!(ts > nowTs)) return ts - nowTs;
+    if(!cfg || !(cfg.endMin > cfg.startMin)) return ts - nowTs;
+    const cur = new Date(nowTs); cur.setHours(0,0,0,0);
+    const endDay = new Date(ts).setHours(0,0,0,0);
+    let total = 0;
+    for(let g = 0; g < 4000; g++){
+      const y = cur.getFullYear(), mo = cur.getMonth(), d = cur.getDate();
+      const isD = cur.getTime() >= endDay;                        // 마감 당일
+      if(isD || !isOffDay(y, mo, d)){
+        const ws = new Date(y, mo, d, 0, cfg.startMin).getTime(), we0 = new Date(y, mo, d, 0, cfg.endMin).getTime();   // 분 인자 정규화 → 09:30 도 됨
+        const we = isD ? Math.max(we0, ts) : we0;                 // D 당일만 창을 마감까지
+        const a = Math.max(ws, nowTs), b = Math.min(we, ts);
+        if(b > a) total += b - a;
+      }
+      if(isD) break;
+      cur.setDate(cur.getDate() + 1);
+    }
+    return total;
+  }
+
+  // 오늘 다음 첫 업무일의 시작 시각 — '오늘마감'(orange) 의 첫 조건. cfg 없으면 NaN(비교가 전부 false 로 떨어져 green).
+  function nextBizStart(nowTs, cfg){
+    if(!cfg) return NaN;
+    const d = new Date(nowTs); d.setHours(0,0,0,0);
+    for(let g = 0; g < 400; g++){ d.setDate(d.getDate() + 1); if(!isOffDay(d.getFullYear(), d.getMonth(), d.getDate())) break; }
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, cfg.startMin).getTime();
+  }
+
+  // 공휴일 표식 — getHoliday 이름 그대로('추석'·'대체공휴일'), 단 6자 이상이면 '공휴일' 로 접는다.
+  //   근거: ≤400px 슬롯 52px, 9.5px 600 ≈ 8.4px/자 → 5자 42px 안전, 6자 50.4px 위험. KASI 이름 길이는 통제 불가.
+  function holidayLabel(name){ return name.length >= 6 ? "공휴일" : name; }
+
+  // 지금 이 카드의 숫자가 왜 멈춰 있는지 — 카드 .l 슬롯. 카드별 판정(규칙 B): 마감일 D 당일이고 지금이 그 카드의 창
+  //   [D@start, max(D@end, ts)] 안이면 ""(흐름). 그 밖은 지금 시각의 이유 — 주말 > 공휴일 이름 > 업무 전 > 업무 후, 업무시간 안이면 "".
+  function pauseLabel(nowTs, ts, cfg){
+    if(!cfg) return "";                                   // 옵션 꺼짐 = 표식 없음
+    if(cfg.labels === false) return "";                   // 「설명 표시」 끔 = 표식 없음
+    const n = new Date(nowTs), d = new Date(ts);
+    if(n.getFullYear() === d.getFullYear() && n.getMonth() === d.getMonth() && n.getDate() === d.getDate()){   // 마감 당일
+      const ws = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, cfg.startMin).getTime();
+      const we = Math.max(new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, cfg.endMin).getTime(), ts);
+      if(nowTs >= ws && nowTs <= we) return "";           // 그 카드의 창 안 = 흐름. 닫힌 구간 — 마감 정각도 '업무 후' 가 아니라 표식 없음
+    }
+    const w = n.getDay();
+    if(w === 0 || w === 6) return "주말";
+    const hol = getHoliday(n.getFullYear(), n.getMonth(), n.getDate());
+    if(hol) return holidayLabel(hol);
+    const min = n.getHours()*60 + n.getMinutes();
+    if(min < cfg.startMin) return "업무 전";
+    if(min >= cfg.endMin) return "업무 후";
+    return "";
+  }
+
   // ★반환값이 .task / .count 의 클래스로 그대로 쓰인다. "over" 를 추가하면 네 곳이 같이 바뀌어야 한다 —
   //   ① tick() 의 classList.remove 목록 ② updateStats() 의 집계 ③ .task.over / .count.over CSS
-  //   ④ tick() 의 '지남' 라벨 생성. 하나라도 빠지면 지난 카드가 색을 잃거나 '여유 있음'으로 세어진다.
-  function urgency(ts) {
-    const left=ts-Date.now();
+  //   ④ tick() 의 '초과' 라벨 생성. 하나라도 빠지면 지난 카드가 색을 잃거나 '여유 있음'으로 세어진다.
+  // cfg 가 null 이면 기존 달력 경로와 바이트 동일한 계산.
+  function urgencyAt(nowTs, ts, cfg) {
+    if(cfg && !(cfg.endMin > cfg.startMin)) cfg = null;   // 역전·NaN cfg → 달력 경로 (makeCfg 를 거치지 않은 cfg 방어)
+    if(cfg){                                       // 업무시간만 세기 — over 는 달력, red 는 업무시간(규칙 B), orange 는 다음 업무일 시작 전 + 하루 미만
+      if(ts < nowTs) return "over";
+      const left = bizLeft(nowTs, ts, cfg);
+      if(left < 3*3600000) return "red";
+      // orange 정합 — 'Nd Nh' 와 주황이 한 카드에 나오지 않게, 숫자 형식(cdTextAt)과 같은 기준을 쓴다:
+      //   마감이 달력상 오늘이거나 bizLeft < dayMs(끝−시작) 일 때만 주황. 규칙 B 는 마감 당일을 통째로 세므로
+      //   금 17:00 의 일 18:00 마감이 10h = '1d 1h' 인데 주황(ts ≤ 월 09:00)이 되는 조합이 생겼었다 → 초록.
+      const sameDay = new Date(nowTs).setHours(0,0,0,0) === new Date(ts).setHours(0,0,0,0);
+      const dayMs = (cfg.endMin - cfg.startMin) * 60000;
+      if(ts <= nextBizStart(nowTs, cfg) && (sameDay || left < dayMs)) return "orange";
+      return "green";
+    }
+    const left=ts-nowTs;
     if(left<0) return "over";          // 마감 넘김 — 3시간 남은 작업과 같은 칸·같은 빨강에 두지 않는다
     if(left<3*3600000) return "red";
-    const eod=new Date(); eod.setHours(23,59,59,999);
+    const eod=new Date(nowTs); eod.setHours(23,59,59,999);
     if(ts<=eod.getTime()) return "orange";
     return "green";
   }
-  function cdText(ts) {
-    const compact = window.innerWidth <= 400;
-    let left=ts-Date.now();
+  // 반환 규약 {t, l}. l 은 ''|'업무 전'|'업무 후'|'주말'|공휴일 이름(≤5자, 아니면 '공휴일')|'초과'. compact = 창 폭 ≤400px(초 없음).
+  //   ★cfg.labels === false(「설명 표시」 끔)면 l 은 항상 '' — 「초과」도 숨는다. t·색은 그대로. cfg null 이면 게이트를 지나지 않아 「초과」 그대로.
+  // d 단위 규칙(켜짐): 마감이 '오늘'(달력 같은 날)이면 항상 HH:MM:SS — 업무 전에 본 오늘 마감이 '1d 0h' 로 뜨지 않게.
+  //   그 외엔 days = floor(left / dayMs). 그래서 월 18:00 마감은 금 17:59:59 도 18:00:00 도 '1d 0h' — 숫자 형태가
+  //   멈추는 순간(퇴근 시각)에 바뀌지 않는다. 형태가 바뀌는 때는 마감일 자정(1d 0h → 09:00:00 · 업무 전)뿐.
+  function cdTextAt(nowTs, ts, cfg, compact) {
+    if(cfg && !((cfg.endMin - cfg.startMin) > 0)) cfg = null;   // 역전·NaN cfg → 달력 경로 (dayMs ≤ 0 이면 아래 나눗셈이 깨진다)
+    // ★「설명 표시」 끔 — 같은 cfg 에서 labels 만 뗀 채 한 번 더 계산해 t 만 쓴다. 아래 본체(초과 분기 포함)는 그대로라 null 경로가 변하지 않는다.
+    if(cfg && cfg.labels === false) return { t: cdTextAt(nowTs, ts, { startMin: cfg.startMin, endMin: cfg.endMin }, compact).t, l: "" };
+    let left=ts-nowTs;
     if(left<0){
       left=-left;
       const days=Math.floor(left/86400000),h=Math.floor((left%86400000)/3600000),m=Math.floor((left%3600000)/60000);
       // 미래 쪽엔 이미 있던 일 단위 분기가 음수에만 없어 사흘 지난 건이 +74:12 로 나왔다.
       // 최장 '+29d 23h' = 8자, 15px 모노로 약 68px < .count min-width 78px(≤560px).
-      if(days>0) return {t:`+${days}d ${h}h`,l:"지남"};
-      return {t:`+${h}:${String(m).padStart(2,"0")}`,l:"지남"};
+      if(days>0) return {t:`+${days}d ${h}h`,l:"초과"};
+      return {t:`+${h}:${String(m).padStart(2,"0")}`,l:"초과"};
+    }
+    if(cfg){                                        // 켜짐: 단위 d = 업무일(끝−시작), 표식 = pauseLabel(카드별). 초과는 위에서 달력으로 끝났다.
+      left = bizLeft(nowTs, ts, cfg);
+      const dayMs = (cfg.endMin - cfg.startMin) * 60000;
+      const sameDay = new Date(nowTs).setHours(0,0,0,0) === new Date(ts).setHours(0,0,0,0);
+      const days = sameDay ? 0 : Math.floor(left/dayMs);         // ★오늘 마감은 항상 HH:MM:SS, 그 외 floor
+      const rem = days ? left % dayMs : left;
+      const h=Math.floor(rem/3600000), m=Math.floor((rem%3600000)/60000), s=Math.floor((rem%60000)/1000);
+      const l = pauseLabel(nowTs, ts, cfg);
+      if(days>0) return {t:`${days}d ${h}h`,l};
+      if(compact) return {t:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`,l};
+      return {t:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`,l};
     }
     const days=Math.floor(left/86400000),h=Math.floor((left%86400000)/3600000),m=Math.floor((left%3600000)/60000),s=Math.floor((left%60000)/1000);
     if(days>0) return {t:`${days}d ${h}h`,l:""};
@@ -3946,6 +4142,9 @@
     if(compact) return {t:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`,l:""};
     return {t:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`,l:""};
   }
+  // 앱 래퍼 — 호출처(tick·updateStats·card)는 그대로. 전역(지금·workCfg·창 폭)은 여기서만 읽는다.
+  function urgency(ts) { return urgencyAt(Date.now(), ts, workCfg); }
+  function cdText(ts) { return cdTextAt(Date.now(), ts, workCfg, window.innerWidth <= 400); }
 
   function updateStats() {
     const a=tasks.filter(t=>!t.done); let r=0,o=0,g=0;
@@ -4006,7 +4205,7 @@
         const tn=tEl.firstChild;
         if(tn&&tn.nodeType===3&&!tn.nextSibling) tn.nodeValue=cd.t; else tEl.textContent=cd.t;
       }
-      // ★'지남' 라벨은 반드시 여기서 만들고 지워야 한다. red→over 는 마감 시각이 그대로라
+      // ★'초과'·멈춘 이유 라벨은 반드시 여기서 만들고 지워야 한다. red→over 는 마감 시각이 그대로라
       //   정렬 순서가 안 바뀌고, reorderCards() 는 순서 문자열이 같으면 render() 를 건너뛴다
       //   → card() 가 다시 안 돌아 라벨이 영영 안 생긴다.
       const lEl=cEl?cEl.querySelector(".l"):null;
@@ -4228,7 +4427,7 @@
         // ★끝나면 인라인 스타일을 반드시 지운다. 인라인 transition 은 단축 속성이라
         //   .task 의 전이 목록(border-color/box-shadow/transform 0.13s + 이번에 추가되는
         //   border-left-color·background-color 0.4s)을 통째로 대체한다 →
-        //   한 번이라도 이동한 카드만 hover 와 '지남' 전환이 다른 속도로 논다.
+        //   한 번이라도 이동한 카드만 hover 와 '초과' 전환이 다른 속도로 논다.
         //   animation:none 이 남으면 그 카드는 이후 cardIn/itemIn 도 못 탄다.
         const clearFlip = () => { el.style.transition = ""; el.style.transform = ""; el.style.animation = ""; };
         requestAnimationFrame(() => {
@@ -4264,10 +4463,11 @@
     const st=String(t._status||"").trim(), mm=String(t._memo||"").trim();
     const memo=mm?`<div class="task-memo" title="${esc(mm)}"><span>${esc(mm)}</span></div>`:"";
     // 완료 카드: 통째로 비어 있던 카운트다운 슬롯(440px 에서 78px)에 상태 — 카드 높이 증가 0.
-    // 진행 중 카드: 마감 넘김이면 cd.l("지남")이 .l 슬롯에 들어간다(absolute — 폭·높이 영향 0).
+    // 진행 중 카드: 마감 넘김이면 cd.l("초과"), 업무시간만 세기가 켜져 멈췄으면 이유(업무 전·업무 후·주말·공휴일 이름)가 .l 슬롯에 들어간다(absolute — 폭·높이 영향 0).
+    // ★공휴일 이름은 KASI API(외부)에서 주1회 머지된 값이다 — 제목·상태와 같은 이유로 esc() 를 거친다. tick() 쪽은 textContent 라 안전.
     const countInner = t.done
       ? (st ? `<div class="cst" title="${esc(st)}">${esc(st)}</div>` : `<div class="t"></div>`)
-      : `<div class="t">${cd.t}</div>${cd.l?`<div class="l">${cd.l}</div>`:""}`;
+      : `<div class="t">${cd.t}</div>${cd.l?`<div class="l">${esc(cd.l)}</div>`:""}`;
     return `<div class="task ${u} ${t.done?'done':''}" data-id="${t.id}" onclick="openTaskReq(${t.id}, event)" style="cursor:pointer">
       <div class="check ${t.done?'on':''}" onclick="toggleDone(${t.id})">${IC.check}</div>
       <div class="task-main">
