@@ -174,6 +174,10 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 뷰포트가 `0x0` 이면 폭이 0 이라 텍스트가 한 글자씩 줄바꿈돼 높이가 허수로 나온다.
 측정 전에 `resize_window` 로 **440×720 을 명시**하고, `visibilityState` 도 함께 찍을 것.
 
+## 상태색 — 점·바·글자는 항상 같은 색 (v1.0.32, 2026-09-18)
+C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도값)을 사용자가 **"설정한 색과 다르다"고 반려**해 되돌렸다.
+지금은 `--st-*-ink: var(--st-*)`. 글자 가독성 제보가 오면 잉크가 아니라 **기본 상태색 자체**를 바꿀 것 — 설정 화면이 "이 색으로 표시"를 약속한다.
+
 ## 업무시간만 세기 (v1.0.31, 2026-09-18)
 팀원 제안으로 넣은 **개인 옵션**. 설정 「남은 시간」 그룹. 저장 `localStorage.workHours = {on,start,end,labels}`, 기본 off.
 - 계산은 index.html 안의 순수 함수: hmToMin·isOffDay·bizLeft·nextBizStart·holidayLabel·pauseLabel·**urgencyAt·cdTextAt**
