@@ -12,7 +12,7 @@
 | 항목 | 버전 | 비고 |
 |---|---|---|
 | 타이머 앱 | **v1.0.32** (2026-09-18) | v1.0.31(업무시간만 세기 + C1~C5) + 상태색 잉크 보정 되돌림 |
-| GAS | **v60** (2026-09-18 배포) | 쓰기 락 + 행 지문 검사. 정본 `intranet-ttalkak/server/GoogleAppsScript.v60.gs`, 사본 `gas/AppsScript-v60.gs` |
+| GAS | **v61** (2026-09-21 배포 확인) | v60(쓰기 락 + 행 지문) + members 응답에 딸깍 버전 알림 키. 정본 `intranet-ttalkak/server/GoogleAppsScript.v61.gs`, 사본 `gas/AppsScript-v61.gs` |
 | 인트라넷 딸깍 | **v1.8** (09-18 웹 게시) | 팀원 PC 는 각자 받아야 한다 — 받기 전엔 v1.5 |
 | 설명서 | v1.0.30 반영 완료 | |
 
@@ -114,7 +114,7 @@ min-content 인데 패딩은 `min-height:0` 으로 안 줄어 18px 이 남는다
   제목·idx 원천이 같은 셀·같은 수식, `busy` 재시도 후 롤백, `stale` 의 `found`, `scanCount<1` ↔ 내림차순 삭제)
 - **배포 확인의 출처**: 사용자 「v60 앱스 스크립트에 배포했어」(09-18) + 딸깍 세션의 라이브 실측
   (dupCheck insert 응답에 `latestVer:"1.8"`, 틀린 지문 → `stale:true, found:…`, 맞는 지문 → `ok:true`).
-  ⚠️ 타이머 세션은 **읽기 전용으로는 서버 버전을 못 잰다** — `withVer` 가 insert 경로에만 있다
+  ⚠️ v60 까지는 **읽기 전용으로 서버 버전을 못 쟀다**(`withVer` 가 insert 경로에만). **v61 부터는 `?action=members` 응답의 `latestVer` 키 유무로 잴 수 있다** — 09-21 실측: 키 있음(=v61 이상)
 
 ---
 

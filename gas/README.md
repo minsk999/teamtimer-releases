@@ -1,7 +1,7 @@
 # GAS (Google Apps Script) — 작업타이머 시트 API
 
 > ## ⚠️ 이 폴더는 **참조 사본**이다
-> **정본: `intranet-ttalkak/server/GoogleAppsScript.v60.gs`** (2026-09-18 배포)
+> **정본: `intranet-ttalkak/server/GoogleAppsScript.v61.gs`** (2026-09-21 배포 확인 — v60 은 09-18)
 > (배포 진실원천은 그대로 Apps Script 편집기)
 >
 > 이 웹앱은 **작업타이머와 인트라넷 딸깍이 공유**한다. 배포본이 하나뿐이라
@@ -20,7 +20,7 @@
 
 | 파일 | 내용 |
 |---|---|
-| `AppsScript-v60.gs` | 2026-09-18 편집기에 붙여넣은 배포본의 사본 (정본에서 복사, LF) |
+| `AppsScript-v61.gs` | 배포본의 사본 (정본에서 복사, LF). v61 = v60 + `?action=members` 응답에 `latestVer`·`updateMsg` 상시 포함(딸깍 팝업 알림용, 타이머는 무시) |
 | `v56-expectTitle-초안.md` | 행 지문 검사 설계 기록 — v60 으로 실현됨 |
 
 ## v60 이 v54 에서 바꾼 것 (v55~v60 누적, 딸깍 세션 작업)

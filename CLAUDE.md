@@ -23,7 +23,7 @@ build-secrets.example.js  비밀값 템플릿
 docs/index.html         GitHub Pages 설명서 = 다운로드 페이지
 docs/intranet-ddalkkak-extension.zip   딸깍 크롬 확장 배포본
 AppsScript_읽기API.gs   ⚠️ **폐기된 1단계 사본** — 현행과 계약이 다르다. 붙여넣지 말 것(파일 상단 경고 참조)
-gas/                    GAS **참조 사본**(v60) + 지문 설계 초안(v60 으로 실현) (정본은 intranet-ttalkak/server/)
+gas/                    GAS **참조 사본**(v61) + 지문 설계 초안(v60 으로 실현) (정본은 intranet-ttalkak/server/)
 bump-version.js         `npm run bump 1.0.31` — package.json + docs 버전 동시 갱신
 _mintest/ _apptest/     과거 진단용. ⚠️ **무해하지 않다** — 아래 참조
 .github/workflows/release.yml   v* 태그 → macOS+Windows 빌드 → Releases
@@ -193,10 +193,10 @@ C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도�
 - ⚠️ `bump-version.js` 는 설명서의 **변경 내역 절을 건드리지 않는다**(옛 항목 이름까지 갈아 버리던 사고, 09-18 수정). 새 버전 항목은 손으로 추가.
 
 ## GAS (구글 앱스스크립트)
-배포본 **v60** (2026-09-18). v55~v60 에 들어간 것: READ_ROWS 클램프 · 쓰기 경로도 `readGrid` · action 화이트리스트 ·
+배포본 **v61** (2026-09-21 확인; v60 은 09-18). v61 = members 응답에 `latestVer`·`updateMsg` 상시(타이머는 ok·members 만 읽어 무관). v55~v60 에 들어간 것: READ_ROWS 클램프 · 쓰기 경로도 `readGrid` · action 화이트리스트 ·
 **쓰기 락**(LockService 8초, 못 잡으면 `{ok:false, busy:true}` — 핸들러 진입 전 반환이라 쓰기가 확실히 안 일어난 것) ·
 **행 지문 검사**(`expectTitle`/`expectIdx`, 불일치면 `{ok:false, stale:true, found}`). 참조 사본 `gas/AppsScript-v60.gs`.
-⚠️ **읽기 전용으로는 서버 버전을 못 잰다** — `withVer` 가 insert 경로에만 있다. 배포 여부는 사용자에게 묻는다.
+서버 버전 측정: **v61 부터 `?action=members` 응답에 `latestVer` 키가 있으면 v61 이상**(읽기 전용, 시트 변화 0). 그 이하는 못 잰다 — 사용자에게 묻는다.
 시트: `영상팀 업무현황` (탭: `🎬업무현황`, `🤖자동화` 등)
 
 ⚠️ **이 웹앱은 인트라넷 딸깍과 공유한다. 배포본이 하나뿐이다.**

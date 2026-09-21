@@ -1,5 +1,9 @@
 // ============================================================
-//  Google Apps Script v60  (7칸 구조
+//  Google Apps Script v61  (7칸 구조
+//  - v61: members 응답(GET/POST ?action=members)에 latestVer·updateMsg 를 항상 실어 보낸다.
+//         딸깍 v1.8.4+ 가 팝업을 열 때 이 값으로 새 버전 알림을 띄운다(예전엔 전송 응답에만 있었다).
+//         비교는 클라이언트가 한다(verLt). 타이머도 members 를 부르지만 members 키만 읽으므로 무해.
+//  (구) v60  (7칸 구조
 //  - v60: ① LATEST_TTALKAK_VER 1.8 + UPDATE_MSG 채움. 딸깍 v1.8(v1.5 형태 + v1.7 기능) 배포에 맞춤.
 //            v59(1.7)는 배포된 적 없이 v60 으로 대체됨.
 //         ② LockService — 쓰기 전부(타이머 6종 + 딸깍 insert)를 한 번에 하나씩. 8초. 읽기엔 안 건다.
@@ -427,19 +431,25 @@ function ensureMembers(sheet) {
 }
 
 // 이름만 필요한 클라이언트(딸깍 확장)용 — 업무현황 시트를 읽지 않는다.
+// v61: 세 경로 모두 latestVer·updateMsg 를 얹는다 — 딸깍이 팝업을 열 때 새 버전을 안다.
+function membersOut(o) {
+  o.latestVer = LATEST_TTALKAK_VER;
+  o.updateMsg = UPDATE_MSG;
+  return respond(o);
+}
 function membersLight() {
   try {
     var cached = CacheService.getScriptCache().get(MEMBER_CACHE_KEY);
     if (cached) {
       var o = JSON.parse(cached);
-      if (o && o.order && o.order.length) return respond({ ok: true, members: o.order, source: "cache" });
+      if (o && o.order && o.order.length) return membersOut({ ok: true, members: o.order, source: "cache" });
     }
   } catch (e) {}
   var names = null;
   try { names = readMemberNamesFromConfig(); } catch (e2) {}
-  if (names && names.length) return respond({ ok: true, members: names, source: "config" }); // A열만 읽고 끝
+  if (names && names.length) return membersOut({ ok: true, members: names, source: "config" }); // A열만 읽고 끝
   ensureMembers();
-  return respond({ ok: true, members: ALL_MEMBERS, cols: MEMBER_COLS, warn: MEMBER_WARN, source: "scan" });
+  return membersOut({ ok: true, members: ALL_MEMBERS, cols: MEMBER_COLS, warn: MEMBER_WARN, source: "scan" });
 }
 
 // 시트를 고친 뒤 즉시 반영하고 싶을 때 편집기에서 실행
