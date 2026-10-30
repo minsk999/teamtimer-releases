@@ -3125,7 +3125,7 @@
     doneCtx = { id, toDone };
     $("done-title").textContent = toDone ? "완료 처리" : "되돌리기";
     $("done-sub").textContent = t.title || "";
-    const presets = toDone ? ["전달 완료","수정 전달 완료","베리 전달 완료","담당 제작 완료"] : ["수정 진행","베리 진행"];
+    const presets = toDone ? ["전달 완료","수정 전달 완료","베리 전달 완료","담당 제작 완료","홀딩"] : ["수정 진행","베리 진행"];
     let presetHtml = presets
       .map(p => `<button class="preset-pill" onclick="confirmDone('${p}')">${esc(p)}</button>`).join("");
     if(!toDone){
