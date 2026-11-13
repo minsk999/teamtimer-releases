@@ -174,6 +174,16 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 뷰포트가 `0x0` 이면 폭이 0 이라 텍스트가 한 글자씩 줄바꿈돼 높이가 허수로 나온다.
 측정 전에 `resize_window` 로 **440×720 을 명시**하고, `visibilityState` 도 함께 찍을 것.
 
+## 자동 실행(시작 프로그램) 등록 (v1.0.34, 2026-11-13)
+- 윈도우 Run 값 이름은 **`LOGIN_ITEM_NAME` 으로 고정**한다. Electron 은 이름을 안 주면 AppUserModelID 를 쓰는데,
+  v1.0.20 까지는 `electron.app.작업 타이머`, v1.0.21 부터는 `kr.co.adef.jakeop-timer` 였다 → 옛 항목이 고아로 남아
+  **부팅 때 두 번 실행 → second-instance 가 창을 띄움**(「트레이로 시작」 무시, 꺼도 계속 자동 실행). 사용자 제보로 발견.
+- `second-instance` 는 argv 에 `--autostart` 가 있으면 무시한다(항목이 몇 개든 안전). 손으로 다시 실행하면 창 표시.
+- 옛 이름 삭제는 **새 이름 등록을 확인한 뒤에만**. 윈도우 구현은 레지스트리 쓰기 실패를 알리지 않는다(예외 없음).
+- Electron 31 사실(소스 확인): 켤 때 StartupApproved 값은 **삭제**(= 사용), 끌 때 Run·StartupApproved 둘 다 삭제,
+  Run 값 경로에 따옴표 없음, `getLoginItemSettings` 는 같은 `args` 를 줘야 일치 판정, 기본 이름은 exe 의 ProductName 기반.
+- 개발본(`!app.isPackaged`)은 OS 등록을 건드리지 않는다. **시험할 때도 electron.exe 로 실제 등록 호출을 돌리지 말 것.**
+
 ## 상태색 — 점·바·글자는 항상 같은 색 (v1.0.32, 2026-09-18)
 C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도값)을 사용자가 **"설정한 색과 다르다"고 반려**해 되돌렸다.
 지금은 `--st-*-ink: var(--st-*)`. 글자 가독성 제보가 오면 잉크가 아니라 **기본 상태색 자체**를 바꿀 것 — 설정 화면이 "이 색으로 표시"를 약속한다.

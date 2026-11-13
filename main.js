@@ -424,7 +424,11 @@ if (!gotTheLock) {
   // app.exit(0)으로 즉시 프로세스를 끝내 두 번째 창을 확실히 차단.
   app.exit(0);
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (event, argv) => {
+    // ★부팅 자동 실행이 겹쳐 들어온 것이면 무시한다. 시작 프로그램에 이 앱 항목이 둘이면
+    //   (옛 이름으로 남은 것 + 지금 이름) 부팅 때 두 번 실행되고, 두 번째가 여기로 들어와
+    //   '트레이로 시작'을 켜 둔 창을 띄워 버린다(2026-11-13 제보).
+    if (Array.isArray(argv) && argv.includes('--autostart')) return;
     // 사용자가 앱을 또 실행했을 때 — 기존 창을 복원·표시하고 포커스
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
@@ -1015,8 +1019,22 @@ ipcMain.handle('gmail-login', async () => {
 ipcMain.handle('gmail-logout', () => { clearTokens(); return { ok: true }; });
 
 // ── 윈도우/맥 시작 시 자동 실행 ──
+const LOGIN_ITEM_NAME = 'kr.co.adef.jakeop-timer';
+// v1.0.20 까지 쓰던 이름. Electron 기본값 'electron.app.' + 실행 파일의 ProductName 이다
+// (app.getName() 이 아니다 — 패키징본에서 그건 'team-timer' 라 만들어진 적 없는 이름이 된다).
+const LEGACY_LOGIN_ITEM_NAMES = ['electron.app.작업 타이머'];
+// 옛 이름으로 남은 이 앱의 시작 프로그램 항목을 지운다(윈도우 전용).
+// 값 이름으로만 지우므로 남의 항목은 건드리지 않는다.
+function removeLegacyLoginItems() {
+  if (process.platform !== 'win32') return;
+  LEGACY_LOGIN_ITEM_NAMES.forEach(name => {
+    if (name === LOGIN_ITEM_NAME) return;
+    try { app.setLoginItemSettings({ openAtLogin: false, name }); } catch (e) {}
+  });
+}
 ipcMain.handle('get-autostart', () => {
-  try { return { ok: true, enabled: app.getLoginItemSettings().openAtLogin }; }
+  // 윈도우는 등록값이 '…exe --autostart' 라 같은 인자를 줘야 일치로 판정된다(안 주면 항상 false).
+  try { return { ok: true, enabled: app.getLoginItemSettings({ args: ['--autostart'] }).openAtLogin }; }
   catch (e) { return { ok: false, enabled: false }; }
 });
 ipcMain.handle('set-autostart', (event, enabled) => {
@@ -1028,7 +1046,22 @@ ipcMain.handle('set-autostart', (event, enabled) => {
   //   설치본이 다음에 켜질 때 그대로 반영한다.
   if (!app.isPackaged) return { ok: true, enabled: !!enabled, skipped: 'dev' };
   try {
-    app.setLoginItemSettings({ openAtLogin: !!enabled, args: ['--autostart'] }); // 자동실행 식별용 인자
+    // ★등록 이름을 직접 정한다(윈도우). Electron 은 이름을 안 주면 AppUserModelID 를 쓰는데,
+    //   v1.0.20 까지는 그 값을 정하지 않아 'electron.app.작업 타이머' 로, v1.0.21 부터는
+    //   'kr.co.adef.jakeop-timer' 로 등록됐다. 옛 항목을 아무도 지우지 않아 그 전부터 자동 실행을
+    //   켜 둔 PC 는 항목이 둘 → 부팅 때 두 번 실행 → 두 번째가 창을 띄웠다. 끌 때도 새 이름만
+    //   지워져 꺼도 계속 자동 실행됐다. 이름을 못 박아 두면 13행이 바뀌어도 다시 갈리지 않는다.
+    const opts = { openAtLogin: !!enabled, args: ['--autostart'] }; // 자동실행 식별용 인자
+    if (process.platform === 'win32') opts.name = LOGIN_ITEM_NAME;
+    app.setLoginItemSettings(opts);
+    // 옛 이름은 '새 이름 등록이 실제로 됐을 때'만 지운다. 윈도우 구현은 레지스트리 쓰기가
+    // 실패해도 예외를 던지지 않아서, 확인 없이 지우면 자동 실행이 조용히 통째로 사라질 수 있다.
+    let registered = true;
+    if (enabled && process.platform === 'win32') {
+      try { registered = !!app.getLoginItemSettings({ args: ['--autostart'] }).openAtLogin; }
+      catch (e) { registered = false; }
+    }
+    if (!enabled || registered) removeLegacyLoginItems();
     return { ok: true, enabled: !!enabled };
   } catch (e) {
     return { ok: false, error: String(e.message || e) };
