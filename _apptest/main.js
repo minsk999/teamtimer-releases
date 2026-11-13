@@ -589,6 +589,8 @@ ipcMain.handle('get-autostart', () => {
   catch (e) { return { ok: false, enabled: false }; }
 });
 ipcMain.handle('set-autostart', (event, enabled) => {
+  // 본체 main.js 와 같은 이유 — 개발본에서는 OS 자동 실행 등록을 건드리지 않는다(거기 주석 참조).
+  if (!app.isPackaged) return { ok: true, enabled: !!enabled, skipped: 'dev' };
   try {
     app.setLoginItemSettings({ openAtLogin: !!enabled, args: ['--autostart'] }); // 자동실행 식별용 인자
     return { ok: true, enabled: !!enabled };
