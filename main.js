@@ -5,7 +5,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shel
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 // ── Windows 알림 표시 이름/아이콘 ──
 // AppUserModelID를 지정하지 않으면 Windows가 알림 좌상단에 앱 아이콘을 못 찾고
@@ -548,7 +548,13 @@ function openUrl(url) {
     const exe = chromeExecutable();
     if (exe) {
       try {
-        execFile(exe, ['--profile-directory=' + linkProfileDir, url], (err) => { if (err) shell.openExternal(url); });
+        // ★execFile 로 띄우지 말 것. 크롬이 꺼져 있을 때는 이 호출이 크롬 본체를 띄우는데,
+        //   execFile 은 ①크롬을 이 앱의 출력 파이프에 묶고 ②출력이 1MB 를 넘으면 크롬을 죽이며
+        //   ③크롬이 나중에 0 이 아닌 코드로 끝나면 '실행 실패'로 보고 같은 링크를 기본 브라우저
+        //   (= 지정 프로필이 아닐 수 있음)로 다시 연다. 분리 실행하고, 못 띄웠을 때만 폴백한다.
+        const child = spawn(exe, ['--profile-directory=' + linkProfileDir, url], { detached: true, stdio: 'ignore' });
+        child.on('error', () => shell.openExternal(url));
+        child.unref();
         return;
       } catch (e) { /* 폴백 */ }
     }

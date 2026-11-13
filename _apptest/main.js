@@ -5,7 +5,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shel
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 
 // ── 빌드 비밀값 (공개 레포 보호를 위해 소스에서 분리) ──
 // 로컬 빌드: 옆의 build-secrets.js 사용 (git에는 올라가지 않음, 배포 zip에는 포함)
@@ -316,7 +316,10 @@ function openUrl(url) {
     const exe = chromeExecutable();
     if (exe) {
       try {
-        execFile(exe, ['--profile-directory=' + linkProfileDir, url], (err) => { if (err) shell.openExternal(url); });
+        // 본체 main.js 의 openUrl 과 같은 이유로 분리 실행한다(execFile 금지 — 거기 주석 참조).
+        const child = spawn(exe, ['--profile-directory=' + linkProfileDir, url], { detached: true, stdio: 'ignore' });
+        child.on('error', () => shell.openExternal(url));
+        child.unref();
         return;
       } catch (e) { /* 폴백 */ }
     }
