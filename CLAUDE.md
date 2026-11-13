@@ -183,6 +183,10 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 - Electron 31 사실(소스 확인): 켤 때 StartupApproved 값은 **삭제**(= 사용), 끌 때 Run·StartupApproved 둘 다 삭제,
   Run 값 경로에 따옴표 없음, `getLoginItemSettings` 는 같은 `args` 를 줘야 일치 판정, 기본 이름은 exe 의 ProductName 기반.
 - 개발본(`!app.isPackaged`)은 OS 등록을 건드리지 않는다. **시험할 때도 electron.exe 로 실제 등록 호출을 돌리지 말 것.**
+- ★**Claude 데스크톱 세션의 셸에서 읽는 HKCU 는 가상 뷰다**(MSIX 전용 하이브가 덧씌워짐). 이 PC 에서는 세션 셸로 보면
+  Run 의 `kr.co.adef.jakeop-timer` 가 `electron.exe --autostart` 로 보이지만 그건 예전에 세션에서 띄운 개발본이 남긴 그림자 값이고,
+  실제 값은 설치본 경로다. 실제 값은 `Invoke-CimMethod -Namespace root\default -ClassName StdRegProv …` 로 읽을 것.
+  2026-11-13 확인(v1.0.34 적용 후 실제 Run): 이 앱 항목 **1개**, 설치본 경로 — 사용자 재부팅으로 트레이 시작 확인.
 
 ## 상태색 — 점·바·글자는 항상 같은 색 (v1.0.32, 2026-09-18)
 C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도값)을 사용자가 **"설정한 색과 다르다"고 반려**해 되돌렸다.

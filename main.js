@@ -1041,7 +1041,9 @@ ipcMain.handle('set-autostart', (event, enabled) => {
   // ★개발본(app.isPackaged=false)에서는 OS 등록을 건드리지 않는다.
   //   렌더러가 시작할 때마다 이 핸들러를 부르는데, 개발본의 실행 파일은 electron.exe 이고
   //   등록 이름(AppUserModelID)은 설치본과 같다. 그대로 두면 설치본의 자동 실행 항목이
-  //   'electron.exe --autostart' 로 덮여, 다음 부팅에 빈 Electron 창이 뜬다(2026-11-13 실측).
+  //   'electron.exe --autostart' 로 덮인다. (2026-11-13 정정: 그날 '실측'한 값은 Claude 데스크톱
+  //   세션의 가상 레지스트리에만 있던 것이고 실제 Run 키는 멀쩡했다 — 일반 터미널에서 개발본을
+  //   띄우면 실제로 덮이므로 이 가드는 그대로 둔다.)
   //   끄는 쪽도 마찬가지 — 설치본의 항목을 지워 버린다. 설정값은 localStorage 에 남아 있어
   //   설치본이 다음에 켜질 때 그대로 반영한다.
   if (!app.isPackaged) return { ok: true, enabled: !!enabled, skipped: 'dev' };
