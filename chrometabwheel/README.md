@@ -18,7 +18,7 @@
 - 동작: Raw Input(RIDEV_INPUTSINK)으로 휠을 지켜보기만 하고, 커서가 크롬(`Chrome_WidgetWin_1`, chrome.exe)의
   탭 줄(UI Automation `TabStripRegionView`, 세로 탭 제외) 위면 `WM_COMMAND IDC_SELECT_NEXT/PREVIOUS_TAB` 을 보낸다. 포커스를 바꾸지 않는다.
 - 옵션: `--autostart=on|off`(HKCU Run 의 `ChromeTabWheel`, 성공 시 종료 코드 0), `--quit`, `--debug`, `--dry-run`, `--no-input`.
-- 예전 프로그램 MouseWheelTabScroll4Chrome 과 같이 돌면 탭이 두 칸씩 넘어간다 → 설명서에 끄는 법 안내.
+- 예전 프로그램 MouseWheelTabScroll4Chrome 과 같이 돌면 탭이 두 칸씩 넘어간다. 그 프로그램은 사용자 본인만 써서 설명서에는 안내하지 않는다(2026-11-18 사용자 지시).
 
 ## 맥판 (`mac/`)
 - `main.swift` 하나. 메뉴 막대 앱(LSUIElement), macOS 11 이상, 유니버설(arm64 + x86_64).
