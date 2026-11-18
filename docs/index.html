@@ -374,6 +374,62 @@
           <div class="note"><span class="ic">i</span><span>인트라넷 영상 요청글 페이지를 연 상태에서 딸깍 아이콘을 누르고 <b>현재 페이지 불러오기 → 구글 시트로 전송</b>하면 끝이에요.</span></div>
           <div class="note warn"><span class="ic">!</span><span><b>업데이트할 때</b>는 새 ZIP을 받아 같은 폴더에 덮어쓴 뒤, <code>chrome://extensions</code>에서 딸깍의 <b>새로고침 ⟳</b> 버튼을 눌러요. (제거 후 재설치하면 저장한 설정이 초기화돼요.)</span></div>
         </div>
+
+        <h3 class="sub" style="margin-top:30px">크롬 탭 휠</h3>
+        <p style="font-size:13.5px; color:var(--ink-2); margin-bottom:14px">크롬 <b>탭 줄 위에서 마우스 휠</b>을 굴리면 탭이 넘어가는 작은 도구예요. <b>휠 위 = 이전 탭, 휠 아래 = 다음 탭.</b> 창을 클릭하지 않아도 커서 아래 창의 탭이 바뀌어요.</p>
+        <div class="tabs" id="ctw-tabs">
+          <button data-os="win" class="on"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5l8-1.1v7.2H3V5.5zm0 13l8 1.1v-7.1H3v6zm9 1.2l9 1.3V12h-9v8.7zM12 3.9v7.1h9V2.6L12 3.9z"/></svg>Windows</button>
+          <button data-os="mac"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.7 1.3c.1 1-.3 2-1 2.8-.7.8-1.7 1.4-2.7 1.3-.1-1 .4-2 1-2.7.7-.8 1.8-1.4 2.7-1.4zM19 17.3c-.5 1.1-.7 1.6-1.3 2.6-.9 1.4-2.1 3.1-3.6 3.1-1.3 0-1.7-.9-3.5-.8-1.8 0-2.2.8-3.5.8-1.5 0-2.7-1.5-3.6-2.9C1.5 16.3.5 11.6 2.4 8.4 3.3 6.9 5 5.9 6.8 5.9c1.4 0 2.3.8 3.5.8 1.1 0 1.8-.8 3.5-.8 1.3 0 2.7.7 3.6 1.9-3.2 1.7-2.6 6.2 0 7.5z"/></svg>macOS</button>
+        </div>
+
+        <div class="pane on" data-pane="win">
+          <div class="card dlcard">
+            <div class="dlinfo">
+              <div class="dltitle">크롬 탭 휠 · Windows <span class="ver">v1.0.0</span></div>
+              <div class="dlmeta">실행 파일 하나 (압축 파일)</div>
+            </div>
+            <a class="dlbtn" href="ChromeTabWheel-1.0.0-win.zip" download>
+              <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
+              <span>다운로드 <span class="sz">ZIP</span></span>
+            </a>
+          </div>
+          <div class="card">
+            <div class="note warn"><span class="ic">!</span><span><b>MouseWheelTabScroll4Chrome을 쓰고 있었다면</b> 먼저 꺼 주세요. 둘이 같이 돌면 탭이 <b>두 칸씩</b> 넘어가요. 트레이의 초록 <b>H</b> 아이콘 우클릭 → <b>Exit</b>, 그리고 작업 관리자(<code>Ctrl+Shift+Esc</code>) → <b>시작 앱</b> → MouseWheelTabScroll4Chrome → <b>사용 안 함</b>.</span></div>
+            <ol class="steps">
+              <li><span class="t">받은 ZIP의 <b>압축을 풀고</b>, <b>ChromeTabWheel</b> 폴더를 계속 둘 곳으로 옮겨요. (예: <code>C:\Users\내이름\Tools</code>) 자동 실행이 이 위치를 기억하니, 나중에 옮기면 4번을 다시 해 주세요.</span></li>
+              <li><span class="t">폴더 안의 <b>ChromeTabWheel.exe</b>를 더블클릭해요. 파란 <b>“Windows의 PC 보호”</b> 창이 뜨면 → <b>추가 정보</b> → <b>실행</b>.</span></li>
+              <li><span class="t">작업 표시줄 오른쪽 트레이에 파란 <b>▲▼</b> 아이콘이 생기면 실행된 거예요. (안 보이면 <b>^</b> 를 눌러 숨겨진 아이콘을 확인)</span></li>
+              <li><span class="t">트레이 아이콘 <b>우클릭 → 윈도우 시작 시 자동 실행</b>을 체크해요.</span></li>
+            </ol>
+            <div class="note"><span class="ic">i</span><span>잠시 끄려면 트레이 아이콘 우클릭 → <b>탭 줄 휠 전환 사용</b> 체크 해제. 완전히 끄려면 <b>종료</b>를 눌러요.</span></div>
+          </div>
+        </div>
+
+        <div class="pane" data-pane="mac">
+          <div class="card dlcard">
+            <div class="dlinfo">
+              <div class="dltitle">크롬 탭 휠 · macOS <span class="ver">v1.0.0</span></div>
+              <div class="dlmeta">Apple Silicon · Intel 공용 (압축 파일)</div>
+            </div>
+            <a class="dlbtn" href="ChromeTabWheel-1.0.0-mac.zip" download>
+              <svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>
+              <span>다운로드 <span class="sz">ZIP</span></span>
+            </a>
+          </div>
+          <div class="card">
+            <ol class="steps">
+              <li><span class="t">받은 ZIP을 더블클릭해 압축을 풀고(사파리는 자동으로 풀려요), <b>ChromeTabWheel</b> 앱을 <b>응용 프로그램(Applications) 폴더로 드래그</b>해요.</span></li>
+              <li><span class="t">Apple 서명이 없어 처음엔 차단돼요. <b>터미널(Terminal)</b>에서 아래 한 줄을 실행해 “격리” 표시를 떼어 주세요.</span>
+                <div class="cmdbox"><code>xattr -cr "/Applications/ChromeTabWheel.app"</code><button class="cmdcopy" type="button">복사</button></div>
+              </li>
+              <li><span class="t">앱을 <b>더블클릭</b>해요. 화면 위 메뉴 막대에 <b>위아래 화살표</b> 아이콘이 생기면 실행된 거예요.</span></li>
+              <li><span class="t"><b>“ChromeTabWheel이(가) ‘Google Chrome’을(를) 제어하려고 합니다”</b> 창이 뜨면 <b>허용</b>을 눌러요. (크롬이 꺼져 있었다면 크롬 탭 줄에서 처음 휠을 굴릴 때 떠요)</span></li>
+              <li><span class="t">메뉴 막대 아이콘 → <b>로그인 시 자동 실행</b>을 체크해요.</span></li>
+            </ol>
+            <div class="note warn"><span class="ic">!</span><span><b>허용을 안 눌렀다면</b> 시스템 설정 → 개인정보 보호 및 보안 → <b>자동화</b> → ChromeTabWheel 아래 <b>Google Chrome</b>을 켜 주세요. 새 버전을 설치하면 이 질문이 한 번 더 나와요.</span></div>
+            <div class="note"><span class="ic">i</span><span>잠시 끄려면 메뉴 막대 아이콘 → <b>탭 줄 휠 전환 사용</b> 체크 해제. 완전히 끄려면 <b>종료</b>를 눌러요.</span></div>
+          </div>
+        </div>
       </section>
 
       <!-- 2 -->
@@ -887,11 +943,13 @@
   // 플랫폼 탭 (설치 - 자동 감지)
   const isMacUA = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
   const tabs = document.getElementById('os-tabs');
+  // 설치 탭과 크롬 탭 휠 탭은 같은 OS 를 가리키도록 함께 움직인다.
+  const osTabGroups = [tabs, document.getElementById('ctw-tabs')].filter(Boolean);
   function selectOS(os){
-    tabs.querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.os===os));
+    osTabGroups.forEach(g=> g.querySelectorAll('button').forEach(b=> b.classList.toggle('on', b.dataset.os===os)));
     document.querySelectorAll('.pane[data-pane]').forEach(p=> p.classList.toggle('on', p.dataset.pane===os));
   }
-  tabs.addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) selectOS(b.dataset.os); });
+  osTabGroups.forEach(g=> g.addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) selectOS(b.dataset.os); }));
   if(isMacUA) selectOS('mac');
   { const _osd=document.getElementById('osdetect-label'); if(_osd) _osd.textContent = isMacUA ? 'macOS' : 'Windows'; }
 

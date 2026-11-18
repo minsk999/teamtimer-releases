@@ -1,2 +1,6 @@
 # 배치 파일은 CRLF 여야 한다 — LF 면 cmd.exe 가 라벨/goto 를 잘못 읽는다.
 *.cmd text eol=crlf
+# 맥에서 도는 스크립트·소스는 LF 여야 한다 — CRLF 면 bash 가 `\r` 을 명령의 일부로 읽는다.
+*.sh text eol=lf
+*.swift text eol=lf
+*.plist text eol=lf

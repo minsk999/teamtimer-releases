@@ -1,0 +1,27 @@
+name: ChromeTabWheel (mac)
+
+# 크롬 탭 휠 맥판 빌드. 릴리스를 만들지 않는다 — 결과 zip 은 아티팩트로만 올린다.
+# (릴리스를 만들면 release.yml 의 release:published 가 발화하고, 정식 릴리스면 releases/latest 가 바뀌어
+#  작업 타이머의 업데이트 배너가 고장 난다. 배포본은 docs/ 에 손으로 커밋한다.)
+on:
+  push:
+    paths:
+      - 'chrometabwheel/mac/**'
+      - '.github/workflows/chrometabwheel-mac.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: bash chrometabwheel/mac/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChromeTabWheel-mac
+          path: chrometabwheel/mac/build/ChromeTabWheel-*-mac.zip
+          if-no-files-found: error
