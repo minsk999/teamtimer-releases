@@ -1,5 +1,6 @@
 // 광고창 차단 (AdPopupBlock) — Windows
-// 시작할 때 광고 팝업을 띄우는 프로그램 셋(디자인210 FontManager, 산돌구름, 네이트온)의 광고창을 막는다.
+// 시작할 때 광고 팝업을 띄우는 프로그램 셋(디자인210 FontManager, 산돌구름, 네이트온)의 광고창과
+// 카카오톡 메인 창의 광고를 막는다.
 // 원리는 adpopupblock/README.md 참조. .NET Framework 4.x 기본 컴파일러(C# 5)로 빌드한다 → build.cmd
 using System;
 using System.Collections.Generic;
@@ -16,14 +17,14 @@ using Microsoft.Win32;
 [assembly: System.Reflection.AssemblyTitle("광고창 차단")]
 [assembly: System.Reflection.AssemblyProduct("AdPopupBlock")]
 [assembly: System.Reflection.AssemblyCompany("ADEF 영상팀")]
-[assembly: System.Reflection.AssemblyVersion("1.0.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("1.0.0.0")]
+[assembly: System.Reflection.AssemblyVersion("1.1.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.1.0.0")]
 
 namespace AdPopupBlock
 {
     static class Program
     {
-        public const string AppVersion = "1.0.0";
+        public const string AppVersion = "1.1.0";
         public const string TaskName = "AdPopupBlock";
         const string MutexName = "Local\\AdPopupBlock.Running";
         public const string QuitEventName = "Local\\AdPopupBlock.Quit";
@@ -215,7 +216,7 @@ namespace AdPopupBlock
     {
         readonly NotifyIcon tray;
         readonly System.Windows.Forms.Timer timer;
-        readonly ToolStripMenuItem miD210, miSandoll, miNateon, miAuto;
+        readonly ToolStripMenuItem miD210, miSandoll, miNateon, miKakao, miAuto;
         readonly Blocker blocker;
         readonly EventWaitHandle quitEvent;
         readonly RegisteredWaitHandle quitWait;
@@ -235,6 +236,7 @@ namespace AdPopupBlock
             miD210 = Toggle(menu, "디자인210 FontManager", "Design210");
             miSandoll = Toggle(menu, "산돌구름", "Sandoll");
             miNateon = Toggle(menu, "네이트온", "Nateon");
+            miKakao = Toggle(menu, "카카오톡", "KakaoTalk");
             menu.Items.Add(new ToolStripSeparator());
             miAuto = new ToolStripMenuItem("윈도우 시작 시 자동 실행");
             miAuto.Click += delegate { ToggleAutoStart(); };
@@ -286,6 +288,7 @@ namespace AdPopupBlock
             miD210.Checked = Settings.Get("Design210");
             miSandoll.Checked = Settings.Get("Sandoll");
             miNateon.Checked = Settings.Get("Nateon");
+            miKakao.Checked = Settings.Get("KakaoTalk");
             bool auto = false;
             try { auto = AutoStart.IsEnabled(); } catch { }
             miAuto.Checked = auto;
@@ -318,6 +321,7 @@ namespace AdPopupBlock
         protected override void ExitThreadCore()
         {
             timer.Stop();
+            blocker.Shutdown();
             tray.Visible = false;
             tray.Dispose();
             if (quitWait != null) quitWait.Unregister(null);
@@ -333,12 +337,17 @@ namespace AdPopupBlock
         readonly Dictionary<IntPtr, DateTime> closing = new Dictionary<IntPtr, DateTime>();
         readonly HashSet<IntPtr> reportedMain = new HashSet<IntPtr>();
 
-        public Blocker(bool dryRun) { this.dryRun = dryRun; }
+        readonly Kakao kakao;
+
+        public Blocker(bool dryRun) { this.dryRun = dryRun; kakao = new Kakao(dryRun, LogOnce); }
+
+        public void Shutdown() { kakao.Stop(); }
 
         public void Tick()
         {
             tickCount++;
             try { if (Settings.Get("Sandoll")) SandollTick(); } catch (Exception ex) { LogOnce("sandoll", ex); }
+            try { kakao.Tick(Settings.Get("KakaoTalk")); } catch (Exception ex) { LogOnce("kakao", ex); }
             // 디자인210 날짜는 2초마다, 네이트온 파일은 30초마다 확인(둘 다 가볍다)
             if (tickCount % 5 == 1) { try { if (Settings.Get("Design210")) Design210.EnsureToday(dryRun); } catch (Exception ex) { LogOnce("d210", ex); } }
             if (tickCount % 75 == 1) { try { if (Settings.Get("Nateon")) Nateon.Ensure(dryRun); } catch (Exception ex) { LogOnce("nateon", ex); } }
@@ -347,11 +356,12 @@ namespace AdPopupBlock
         public void OnSettingChanged(string key, bool on)
         {
             if (key == "Nateon" && !on) Nateon.Restore(dryRun);
+            if (key == "KakaoTalk" && !on) kakao.Stop();
             tickCount = 0;
         }
 
         readonly HashSet<string> errorsLogged = new HashSet<string>();
-        void LogOnce(string tag, Exception ex)
+        internal void LogOnce(string tag, Exception ex)
         {
             string k = tag + ":" + ex.GetType().Name + ":" + ex.Message;
             if (errorsLogged.Add(k)) Log.Write("오류(" + tag + "): " + ex.Message);
@@ -395,6 +405,216 @@ namespace AdPopupBlock
             List<IntPtr> gone = new List<IntPtr>();
             foreach (IntPtr h in closing.Keys) if (!Native.IsWindow(h)) gone.Add(h);
             foreach (IntPtr h in gone) closing.Remove(h);
+        }
+    }
+
+    // 카카오톡: 메인 창(EVA_Window_Dblclk) 아래쪽에 광고를 세 겹으로 깐다(2026-11-18 실측).
+    //  ① 메인 창이 소유한 제목 없는 EVA_Window_Dblclk 창 — 안에 'AdFit NAS Advertisement' 웹뷰가 있다 → 숨김
+    //  ② 메인 창의 직속 자식 중 제목 없는 EVA_ChildWindow(광고 자리, 보통 카카오톡이 이미 숨겨 둠) → 숨김
+    //  ③ OnlineMainView_* / LockModeView_* 가 광고 높이만큼 짧다 → 메인 창 아래 끝까지 늘림
+    // ①② 는 크기를 건드리지 않고 숨기기만 한다 — 카카오톡은 창을 옮기거나 키울 때마다 ①의 크기를 되돌리는데,
+    //   우리가 매번 0 으로 줄이면 웹뷰 크기 변경이 프레임마다 오가 카카오톡이 심하게 버벅인다(1.1.0 첫 빌드, 사용자 제보).
+    //   숨긴 창은 크기가 되돌아가도 다시 보이지 않는다(실측).
+    // 창 표시·이동 이벤트(SetWinEventHook)로 바로 반응하되, 여러 개가 몰리면 한 번으로 합친다.
+    // 사용자가 창을 끌고 있는 동안(MOVESIZESTART~END)에는 손대지 않다가 놓는 순간 한 번 맞춘다.
+    //   끄는 동안 카카오톡은 WM_SIZE 마다 목록을 광고 높이만큼 줄여 그린다. 그때마다 늘리면 매 프레임 목록을 두 번
+    //   그리게 돼 다시 버벅였고, 그래도 줄어든 프레임이 먼저 그려져 빈칸은 안 없어졌다(18:30 교체본, 사용자 제보).
+    //   → 끄는 동안 아래 빈칸은 감수한다(광고 내용은 안 보임). 없애려면 카카오톡 안에 코드를 심어야 한다.
+    // SetWindowPos 는 비동기(SWP_ASYNCWINDOWPOS)라 카카오톡이 멈춰도 우리는 안 멈춘다.
+    class Kakao
+    {
+        readonly bool dryRun;
+        readonly Action<string, Exception> logOnce;
+        readonly Native.WinEventProc proc;
+        readonly SynchronizationContext ctx;
+        IntPtr hook = IntPtr.Zero, hookSize = IntPtr.Zero;
+        uint pid;
+        IntPtr main = IntPtr.Zero;
+        uint mainThread;
+        bool busy, pending, sizing;
+        DateTime sizingSince;
+        readonly HashSet<IntPtr> reported = new HashSet<IntPtr>();
+
+        public Kakao(bool dryRun, Action<string, Exception> logOnce)
+        {
+            this.dryRun = dryRun;
+            this.logOnce = logOnce;
+            ctx = SynchronizationContext.Current;
+            proc = OnEvent;   // 델리게이트를 필드로 붙잡아 GC 를 막는다
+        }
+
+        public void Tick(bool on)
+        {
+            if (!on) { Stop(); return; }
+            int[] pids = Native.PidsOf("KakaoTalk");
+            uint p = pids.Length > 0 ? (uint)pids[0] : 0;
+            if (p != pid)
+            {
+                Unhook();
+                pid = p;
+                main = IntPtr.Zero;
+                reported.Clear();
+                if (p != 0)
+                {
+                    uint flags = Native.WINEVENT_OUTOFCONTEXT | Native.WINEVENT_SKIPOWNPROCESS;
+                    hook = Native.SetWinEventHook(Native.EVENT_OBJECT_SHOW, Native.EVENT_OBJECT_LOCATIONCHANGE, IntPtr.Zero, proc, p, 0, flags);
+                    hookSize = Native.SetWinEventHook(Native.EVENT_SYSTEM_MOVESIZESTART, Native.EVENT_SYSTEM_MOVESIZEEND, IntPtr.Zero, proc, p, 0, flags);
+                    Log.Write("카카오톡 감시 시작 (pid " + p + (hook == IntPtr.Zero ? ", 이벤트 훅 실패 — 0.4초 확인만" : "") + ")");
+                }
+            }
+            // 끌기 끝 이벤트를 놓쳤을 때 대비
+            if (sizing && (DateTime.Now - sizingSince).TotalSeconds > 30) sizing = false;
+            if (pid != 0 && !sizing) Fix();
+        }
+
+        public void Stop()
+        {
+            Unhook();
+            pid = 0;
+            main = IntPtr.Zero;
+            sizing = false;
+        }
+
+        void Unhook()
+        {
+            if (hook != IntPtr.Zero) { Native.UnhookWinEvent(hook); hook = IntPtr.Zero; }
+            if (hookSize != IntPtr.Zero) { Native.UnhookWinEvent(hookSize); hookSize = IntPtr.Zero; }
+        }
+
+        void OnEvent(IntPtr hHook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time)
+        {
+            if (ev == Native.EVENT_SYSTEM_MOVESIZESTART) { sizing = true; sizingSince = DateTime.Now; return; }
+            if (ev == Native.EVENT_SYSTEM_MOVESIZEEND) { sizing = false; Schedule(); return; }
+            if (sizing) return;
+            if (hwnd == IntPtr.Zero || idObject != 0 /*OBJID_WINDOW*/ || idChild != 0) return;
+            if (ev != Native.EVENT_OBJECT_SHOW && ev != Native.EVENT_OBJECT_LOCATIONCHANGE) return;
+            // 메인 창 · 그 직속 자식 · 메인 창이 소유한 창(광고 창) · 새로 뜬 최상위 창만 본다(웹뷰 내부 이벤트는 무시)
+            IntPtr parent = Native.GetParent(hwnd);
+            bool relevant = hwnd == main || (main != IntPtr.Zero && parent == main) || (ev == Native.EVENT_OBJECT_SHOW && parent == IntPtr.Zero);
+            if (relevant) Schedule();
+        }
+
+        // 몰려 오는 이벤트를 한 번의 Fix 로 합친다(이미 큐에 있는 이벤트를 다 받은 뒤 실행된다)
+        void Schedule()
+        {
+            if (pending) return;
+            pending = true;
+            SendOrPostCallback run = delegate
+            {
+                pending = false;
+                if (sizing) return;
+                try { Fix(); } catch (Exception ex) { logOnce("kakao", ex); }
+            };
+            if (ctx != null) ctx.Post(run, null); else run(null);
+        }
+
+        void Fix()
+        {
+            if (busy) return;
+            busy = true;
+            try
+            {
+                if (!FindMain()) return;
+                Native.RECT mr;
+                if (!Native.GetWindowRect(main, out mr)) return;
+                IntPtr m = main;
+                // ②③ 메인 창의 직속 자식
+                Native.EnumChildWindows(m, delegate (IntPtr c, IntPtr l)
+                {
+                    if (Native.GetParent(c) != m) return true;
+                    string t = Native.TitleOf(c);
+                    if (t.StartsWith("OnlineMainView") || t.StartsWith("LockModeView")) Stretch(c, mr.B, mr.R, t);
+                    else if (t.Length == 0 && Native.ClassOf(c) == "EVA_ChildWindow") Hide(c, "광고 자리");
+                    return true;
+                }, IntPtr.Zero);
+                // ① 광고 웹뷰를 품은 별도 창(메인 창과 같은 스레드)
+                Native.EnumThreadWindows(mainThread, delegate (IntPtr h, IntPtr l)
+                {
+                    if (h != m && Native.IsWindowVisible(h) && Native.ClassOf(h) == "EVA_Window_Dblclk" && Native.TitleOf(h).Length == 0 && HasAdInside(h))
+                        Hide(h, "광고 창");
+                    return true;
+                }, IntPtr.Zero);
+            }
+            finally { busy = false; }
+        }
+
+        bool FindMain()
+        {
+            if (main != IntPtr.Zero && Native.IsWindow(main)) return true;
+            main = IntPtr.Zero;
+            foreach (IntPtr h in Native.TopWindows())
+            {
+                uint p;
+                uint tid = Native.GetWindowThreadProcessId(h, out p);
+                if (p != pid || Native.ClassOf(h) != "EVA_Window_Dblclk") continue;
+                if (Native.GetParent(h) != IntPtr.Zero) continue;
+                if (!HasChildTitled(h, "OnlineMainView")) continue;
+                main = h;
+                mainThread = tid;
+                return true;
+            }
+            return false;
+        }
+
+        static bool HasChildTitled(IntPtr h, string prefix)
+        {
+            bool found = false;
+            Native.EnumChildWindows(h, delegate (IntPtr c, IntPtr l)
+            {
+                if (Native.TitleOf(c).StartsWith(prefix)) { found = true; return false; }
+                return true;
+            }, IntPtr.Zero);
+            return found;
+        }
+
+        static bool HasAdInside(IntPtr h)
+        {
+            bool found = false;
+            Native.EnumChildWindows(h, delegate (IntPtr c, IntPtr l)
+            {
+                string t = Native.TitleOf(c);
+                if (t.IndexOf("AdFit", StringComparison.OrdinalIgnoreCase) >= 0 || t.StartsWith("BannerAd") || t.IndexOf("Advertisement", StringComparison.OrdinalIgnoreCase) >= 0)
+                { found = true; return false; }
+                return true;
+            }, IntPtr.Zero);
+            return found;
+        }
+
+        void Stretch(IntPtr c, int bottom, int mainRight, string title)
+        {
+            if (!Native.IsWindowVisible(c)) return;   // 잠금 화면 등 안 보이는 쪽은 보일 때(SHOW 이벤트) 맞춘다
+            Native.RECT r;
+            if (!Native.GetWindowRect(c, out r)) return;
+            // 메인 창 테두리(오른쪽 여백과 같은 두께)는 덮지 않는다
+            int border = mainRight - r.R;
+            if (border < 0 || border > 8) border = 0;
+            bottom -= border;
+            int want = bottom - r.T;
+            // 광고 창을 숨겨 두면 카카오톡이 스스로 목록을 끝까지 깐다(실측). 테두리 계산이 1~2px 어긋날 뿐이면
+            // 건드리지 않는다 — 고치면 창 크기가 바뀔 때마다 목록을 한 번 더 그리게 된다.
+            if (want <= 0 || Math.Abs(r.B - bottom) <= 8) return;
+            Report(c, "목록 높이 " + (r.B - r.T) + "→" + want + " " + title.Split('_')[0]);
+            if (dryRun) return;
+            Native.SetWindowPos(c, IntPtr.Zero, 0, 0, r.R - r.L, want, Native.SWP_FLAGS);
+        }
+
+        // 크기는 건드리지 않고 숨기기만 한다(위 설명 참조)
+        int hideCount;
+        void Hide(IntPtr h, string what)
+        {
+            if (!Native.IsWindowVisible(h)) return;
+            hideCount++;
+            // 카카오톡이 계속 다시 띄우는지(서로 다투는지) 기록으로 알 수 있게 10·100·1000번째에 남긴다(첫 번째는 Report)
+            if (hideCount == 10 || hideCount == 100 || hideCount == 1000) Log.Write("카카오톡: 숨김 누적 " + hideCount + "회");
+            Report(h, what + " 숨김 " + Native.SizeOf(h));
+            if (dryRun) return;
+            Native.ShowWindowAsync(h, 0 /*SW_HIDE*/);
+        }
+
+        // 드래그 중에는 같은 창을 수백 번 고치므로 창마다 처음 한 번만 기록한다
+        void Report(IntPtr h, string msg)
+        {
+            if (reported.Add(h)) Log.Write("카카오톡: " + msg + (dryRun ? " (dry-run)" : ""));
         }
     }
 
@@ -560,8 +780,20 @@ namespace AdPopupBlock
         [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint msg, IntPtr w, IntPtr l);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
-        [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
-        [StructLayout(LayoutKind.Sequential)] struct RECT { public int L, T, R, B; }
+        [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+        [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L, T, R, B; }
+        [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
+        [DllImport("user32.dll")] public static extern bool EnumThreadWindows(uint tid, EnumProc cb, IntPtr l);
+        [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr h, int cmd);
+        [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+        // SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS
+        public const uint SWP_FLAGS = 0x0002 | 0x0004 | 0x0010 | 0x0200 | 0x4000;
+        public delegate void WinEventProc(IntPtr hHook, uint ev, IntPtr hwnd, int idObject, int idChild, uint thread, uint time);
+        [DllImport("user32.dll")] public static extern IntPtr SetWinEventHook(uint evMin, uint evMax, IntPtr hmod, WinEventProc proc, uint pid, uint tid, uint flags);
+        [DllImport("user32.dll")] public static extern bool UnhookWinEvent(IntPtr hook);
+        public const uint EVENT_OBJECT_SHOW = 0x8002, EVENT_OBJECT_LOCATIONCHANGE = 0x800B;
+        public const uint EVENT_SYSTEM_MOVESIZESTART = 0x000A, EVENT_SYSTEM_MOVESIZEEND = 0x000B;
+        public const uint WINEVENT_OUTOFCONTEXT = 0x0000, WINEVENT_SKIPOWNPROCESS = 0x0002;
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern bool WritePrivateProfileString(string section, string key, string value, string file);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
@@ -586,13 +818,44 @@ namespace AdPopupBlock
             return found;
         }
 
+        // 최상위 창을 가진 프로세스 중 이름이 같은 것. Process.GetProcessesByName 은 한 번에 ~10ms 라
+        // 0.4초마다 부르면 그것만으로 CPU 를 몇 % 쓴다(2026-11-18 실측) → 창 목록 + pid→이름 캐시로 대신한다.
+        static readonly Dictionary<uint, string> nameCache = new Dictionary<uint, string>();
+        static DateTime nameCacheAt = DateTime.Now;
+
         public static int[] PidsOf(string name)
         {
-            Process[] ps = Process.GetProcessesByName(name);
-            int[] ids = new int[ps.Length];
-            for (int i = 0; i < ps.Length; i++) { ids[i] = ps[i].Id; ps[i].Dispose(); }
-            return ids;
+            if ((DateTime.Now - nameCacheAt).TotalSeconds > 60) { nameCache.Clear(); nameCacheAt = DateTime.Now; }   // pid 재사용 대비
+            List<int> ids = new List<int>();
+            foreach (IntPtr h in TopWindows())
+            {
+                uint pid;
+                GetWindowThreadProcessId(h, out pid);
+                if (pid == 0 || ids.Contains((int)pid)) continue;
+                if (string.Equals(ProcName(pid), name, StringComparison.OrdinalIgnoreCase)) ids.Add((int)pid);
+            }
+            return ids.ToArray();
         }
+
+        static string ProcName(uint pid)
+        {
+            string n;
+            if (nameCache.TryGetValue(pid, out n)) return n;
+            n = "";
+            IntPtr h = OpenProcess(0x1000 /*PROCESS_QUERY_LIMITED_INFORMATION*/, false, pid);
+            if (h != IntPtr.Zero)
+            {
+                StringBuilder sb = new StringBuilder(1024);
+                int len = sb.Capacity;
+                if (QueryFullProcessImageName(h, 0, sb, ref len)) n = Path.GetFileNameWithoutExtension(sb.ToString());
+                CloseHandle(h);
+            }
+            nameCache[pid] = n;
+            return n;
+        }
+        [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr h, int flags, StringBuilder sb, ref int len);
+        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
 
         public static string ClassOf(IntPtr h) { StringBuilder sb = new StringBuilder(256); GetClassName(h, sb, 256); return sb.ToString(); }
         public static string TitleOf(IntPtr h) { StringBuilder sb = new StringBuilder(256); GetWindowText(h, sb, 256); return sb.ToString(); }
