@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-latest   # macos-14 는 2026-11 기준 지원 종료(즉시 취소됨)
     steps:
       - uses: actions/checkout@v4
       - name: Build
