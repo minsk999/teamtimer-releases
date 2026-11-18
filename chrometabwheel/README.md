@@ -10,7 +10,7 @@
 
 | 파일 | 내용 |
 |---|---|
-| `docs/ChromeTabWheel-1.0.0-win.zip` | 윈도우판 1.0.0. SHA256 `BA6D6741F535713E4D417FA147C3CC37F56C4206BD21378EB959F541C95E9AE6` |
+| `docs/ChromeTabWheel-1.0.0-win.zip` | 윈도우판 1.0.0. SHA256 `F24B0E561BB614588DF6E41AA8DC4D42CD57FA110307068C091D03303059EE86` — 원본 zip(`BA6D6741…`)과 exe 는 같고, `설치 방법.txt` 에서 MouseWheelTabScroll4Chrome 단계만 뺐다(11-18) |
 | `docs/ChromeTabWheel-1.0.0-mac.zip` | 맥판 1.0.0 (CI 아티팩트를 받아 커밋). SHA256 `7d7a5c1f5f214872822f7a7e3bcf7f55e51ecf80f43f938ebf924164166f8963` |
 
 ## 윈도우판
