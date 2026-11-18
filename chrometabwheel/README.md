@@ -11,7 +11,7 @@
 | 파일 | 내용 |
 |---|---|
 | `docs/ChromeTabWheel-1.0.0-win.zip` | 윈도우판 1.0.0. SHA256 `BA6D6741F535713E4D417FA147C3CC37F56C4206BD21378EB959F541C95E9AE6` |
-| `docs/ChromeTabWheel-1.0.0-mac.zip` | 맥판 1.0.0 (CI 아티팩트를 받아 커밋) |
+| `docs/ChromeTabWheel-1.0.0-mac.zip` | 맥판 1.0.0 (CI 아티팩트를 받아 커밋). SHA256 `7d7a5c1f5f214872822f7a7e3bcf7f55e51ecf80f43f938ebf924164166f8963` |
 
 ## 윈도우판
 - 단일 실행 파일(.NET Framework 4.8), 서명 없음. **소스는 이 저장소에 없다**(사용자 집 PC).
