@@ -1056,6 +1056,40 @@
       h.check("toggleDone 요청 행", h.posts(m, "toggleDone").map(p => p.row), [10]);
       h.check("서버 B 두 줄의 완료 여부(기존 6행·새 10행)", h.server.sheet[ME].filter(v => v.title === T.B).map(v => !!v.done), [false, true]);
     } },
+    { key: "LATE1", name: "맨 아래 카드 삭제(내 읽기와 안 겹침) — 뒤늦은 동기화가 다른 PC 의 느린 읽기가 넣은 삭제 전 캐시를 받음 → 다시 보여도 스스로 사라진다",
+      opts: { mine: [{ title: T.A, idx: "1001" }, { title: T.B, idx: "1002" }] },
+      async run(h) {
+        const before = h.server.snapshot();
+        const m = h.mark();
+        h.del(T.B);
+        await h.settle();
+        h.check("삭제 직후 화면의 B", h.onScreen(T.B), 0);
+        await h.clock.advance(20000);
+        h.server.readQueue.push(before);                 // 삭제와 겹쳤던 다른 PC 의 느린 읽기가 이제야 끝나 캐시에 삭제 전 목록을 넣었다
+        await h.clock.advance(7000);                     // 25.3초의 뒤늦은 동기화가 그 캐시를 받는다
+        h.check("27초 시점 화면의 B(잠깐 다시 보이는 것은 알려진 한계)", h.onScreen(T.B), 1);
+        await h.clock.advance(30000);                    // 지켜보는 기록이 캐시가 죽은 뒤 한 번 더 받게 한다
+        h.check("57초 시점 화면의 B", h.onScreen(T.B), 0);
+        h.check("57초 시점 행 번호가 서버와 일치", h.rowsMatchServer(), true);
+        h.check("deleteTask 요청 수", h.posts(m, "deleteTask").length, 1);
+        const s0 = h.syncs(m);
+        await h.clock.advance(300000);
+        h.check("그 뒤 5분간 추가 동기화 없음", h.syncs(m) - s0, 0);
+      } },
+    { key: "DL1", name: "다른 곳에서 링크(게시글 번호)만 바뀐 카드를 삭제 → 「이미 지워짐」으로 넘기지 않고 안내, 다시 누르면 지워진다", async run(h) {
+      h.server.sheet[ME].find(v => v.title === T.D).idx = "8890";   // 화면은 아직 1004
+      const m = h.mark();
+      h.del(T.D);
+      await h.settle();
+      h.check("첫 누름 요청(행·게시글)", h.posts(m, "deleteTask").map(p => [p.row, p.expectIdx]), [[8, "1004"]]);
+      h.check("첫 누름 토스트", h.toastsSince(m), [DELETED, "삭제하지 못했어요 — 목록을 다시 불러왔어요. 다시 눌러 주세요"]);
+      h.check("화면·서버의 D", [h.onScreen(T.D), h.server.has(T.D)], [1, 1]);
+      const m2 = h.mark();
+      h.del(T.D);
+      await h.settle();
+      h.check("둘째 누름 요청(행·게시글)", h.posts(m2, "deleteTask").map(p => [p.row, p.expectIdx]), [[8, "8890"]]);
+      h.check("둘째 누름 뒤 화면·서버의 D", [h.onScreen(T.D), h.server.has(T.D)], [0, 0]);
+    } },
     { key: "Z1", name: "두 건을 차례로 삭제한 뒤 두 건 모두 지우기 전의 응답이 옴 → 둘 다 다시 안 그려지고 행 번호도 맞다", async run(h) {
       const before = h.server.snapshot();                // A5 B6 C7 D8 E9
       h.del(T.B); await h.settle();
