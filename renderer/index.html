@@ -2206,6 +2206,7 @@
   let syncDroppedLoud = false;   // 버린 것이 수동 요청이었다 → 다시 받았을 때 「동기화 완료」를 알린다
   let syncRoundDropped = false;  // 방금 회차가 버려졌나(doSync 루프용)
   let syncAppliedSeq = 0;        // 응답을 화면에 반영한 횟수 — 호출자가 "새 목록을 정말 받았나"를 가린다
+  let syncDropSeq = 0;           // 응답을 버린 횟수 — 삭제가 "내 읽기와 겹쳤나"를 가린다(묘비를 세울지)
   let syncCatchUpTimer = null;
   function beginWrite(){ writeGen++; writesInFlight++; }
   function endWrite(){
@@ -2223,11 +2224,20 @@
       const sent = window.timerAPI.postSheet(payload);
       // 상한 뒤에 온 응답 = 확인용 동기화보다 늦게 커밋됐을 수 있다 → 한 번 더 받는다
       sent.then(() => { if (capped) doSync({ silent:true }); }, () => {});
-      return await Promise.race([sent, new Promise(res => {
+      return asStale(payload, await Promise.race([sent, new Promise(res => {
         cap = setTimeout(() => { capped = true; res({ ok:false, timeout:true }); }, WRITE_CAP_MS);
-      })]);
+      })]));
     }
     finally { clearTimeout(cap); endWrite(); }
+  }
+  // 서버는 그 행이 작업 행이 아니면(비었거나 이름·관리 행) 지문 검사보다 **먼저** 「영상작업 행이 아님(보호)」 일반 오류를 준다.
+  // 위쪽 줄이 빠져 한 칸 당겨진 뒤 **맨 아래 카드**를 누르면 이쪽으로 온다(stale 은 시트 전체 끝을 넘었을 때뿐).
+  // 뜻은 stale 과 같다 — 쓰기는 일어나지 않았고 행 번호가 틀렸다. 같은 경로(재동기화)로 태운다.
+  const ROW_ACTIONS = ["deleteTask", "toggleDone", "updateDue", "updateTask"];
+  function asStale(payload, r){
+    if (r && !r.ok && !r.stale && !r.busy && !r.timeout && ROW_ACTIONS.indexOf(payload && payload.action) >= 0
+        && /^영상작업 행이 아님/.test(String(r.error || ""))) return { ...r, stale:true, found:"", foundIdx:"" };
+    return r;
   }
   function scheduleSyncCatchUp(ms){
     if (syncCatchUpTimer) return;
@@ -2339,7 +2349,7 @@
 
       // 요청한 뒤로 쓰기가 시작됐거나 끝났다 → 이 응답은 그 쓰기 전의 시트일 수 있다. 반영하지 않는다.
       if (writesInFlight > 0 || gen0 !== writeGen) {
-        syncRoundDropped = true;
+        syncRoundDropped = true; syncDropSeq++;
         if (!silent || syncLoud) syncDroppedLoud = true;   // syncLoud: 조용히 시작한 회차에 수동 요청이 합류했다
         // 쓰기가 아직 가는 중이면 지금 다시 받아도 또 버려진다 → 그 쓰기가 끝날 때(endWrite) 받는다
         if (writesInFlight > 0) syncDropped = true; else syncQueued = true;
@@ -2412,13 +2422,25 @@
   function taskFp(t){ return { row: t._row || t.id, idx: idxOf(t.reqLink), title: String(t.title || "").trim(), done: !!t.done }; }
   function fpMatch(t, fp){ return idxOf(t.reqLink) === fp.idx && String(t.title || "").trim() === fp.title; }
   function unpendDelete(fp){ const i = pendingDeletes.indexOf(fp); if (i >= 0) pendingDeletes.splice(i, 1); }
-  function addTombstone(fp){
+  function addTombstone(fp, stillQueued){
     const now = Date.now();
-    // left: 지운 뒤에도 내 보드에 남은 같은 지문(같은 게시글·같은 제목 = 쌍둥이)의 수. 쌍둥이가 붙어 있으면 정상 응답에서도
+    // left: 지운 뒤에도 서버의 내 단에 남아 있을 같은 지문(같은 게시글·같은 제목 = 쌍둥이)의 수. 쌍둥이가 붙어 있으면 정상 응답에서도
     // 그 행에 같은 지문이 당겨져 와 행·지문만으로는 낡은 응답과 구별되지 않는다 → 응답에 left 보다 많이 있을 때만 거른다.
     // (쌍둥이의 유령을 그냥 두면 사용자가 그걸 다시 누르고, 서버 지문 검사는 쌍둥이를 구별 못 해 남은 진짜 한 줄이 지워진다.)
-    tombstones.push({ row: fp.row, idx: fp.idx, title: fp.title, left: myTasks.filter(t => fpMatch(t, fp)).length,
+    // stillQueued: 완료 비우기에서 같은 묶음에 아직 안 지워진(또는 실패해 남은) 같은 지문의 수 — 화면에서는 이미 빠졌지만 서버에는 있다.
+    tombstones.push({ row: fp.row, idx: fp.idx, title: fp.title,
+      left: myTasks.filter(t => fpMatch(t, fp)).length + (stillQueued || 0),
       until: now + TOMB_MS, max: now + TOMB_MAX_MS });
+  }
+  // 삭제 ok 뒤 묘비를 세울지 정한다.
+  // ★묘비의 오탐은 **맨 아래 카드**에서만 난다 — 맨 아래를 지우면 그 행이 비고, 새로 등록되는 작업(딸깍·앱)은 「마지막 작업 다음 행」
+  //   = 바로 그 행에 들어간다. 잘못 올려 지우고 곧바로 다시 보내는 흐름이 정확히 이 모양이라, 묘비가 새 카드를 낡은 응답으로 보고
+  //   최대 60초 가린다(그 아래 등록된 카드의 행 번호까지 한 칸 틀어짐). 맨 아래가 아니면 새 작업이 그 행에 올 수 없어 오탐이 없다.
+  //   그래서 맨 아래 카드는 「낡은 캐시가 생겼을 근거」— 이 삭제와 겹친 내 읽기 — 가 있을 때만 묘비를 세운다. 근거가 없으면
+  //   (다른 PC 의 읽기가 겹쳤을 드문 경우) 카드가 잠깐 다시 보일 수 있고, 캐시가 죽은 뒤의 동기화가 스스로 지운다.
+  function buryDeleted(fp, bottom, overlapped, stillQueued){
+    if (bottom && !overlapped) scheduleLateSync(Date.now() + TOMB_MS);
+    else addTombstone(fp, stillQueued);
   }
   // 방금 지운 것과 같은 작업을 앱에서 다시 넣었다 — 맨 아래 행을 지웠다면 새 행이 바로 그 번호라 묘비에 걸린다
   function dropTombstones(reqLink, title){
@@ -2964,14 +2986,25 @@
   // 카드 id 는 시트 행 번호다. 팝업(편집·완료·마감)이 떠 있는 사이 목록을 다시 받으면 — 다른 카드를 지운 직후의
   // 동기화가 대표적 — 아래 카드들이 한 칸씩 당겨져 같은 id 가 **다른 작업**을 가리킨다. 그대로 확정하면 서버 지문
   // 검사(그 작업의 제목을 그대로 보냄)도 통과해 엉뚱한 카드가 완료·수정된다. 열 때의 제목·링크를 적어 두고 확정할 때 대조한다.
-  function pinOf(t){ return { title: String(t.title || "").trim(), link: t.reqLink || "" }; }
+  // 같은 제목·같은 링크가 여러 줄(쌍둥이)이면 열 때 「몇 줄 중 몇 번째」였는지도 적는다 — 줄 수가 달라졌으면 어느 줄인지 알 수 없다.
+  function pinLike(pin){
+    // 방금 추가해 아직 행 번호가 없는 카드(_temp, id 가 음수)는 맨 뒤로 — 서버는 새 작업을 마지막 작업 다음 행에 넣는다
+    const at = x => x._temp ? Infinity : (x._row || x.id);
+    return tasks.filter(x => String(x.title || "").trim() === pin.title && (x.reqLink || "") === pin.link)
+                .sort((a, b) => { const p = at(a), q = at(b); return p === q ? 0 : p < q ? -1 : 1; });
+  }
+  function pinOf(t){
+    const pin = { ref: t, title: String(t.title || "").trim(), link: t.reqLink || "" };
+    const like = pinLike(pin);
+    pin.n = like.length; pin.k = like.indexOf(t);
+    return pin;
+  }
   function findPinned(id, pin){
-    const t = tasks.find(x => x.id === id);
-    if(!pin) return t || null;
-    const same = x => String(x.title || "").trim() === pin.title && (x.reqLink || "") === pin.link;
-    if(t && same(t)) return t;
-    const moved = tasks.filter(same);            // 행만 밀렸다 — 하나뿐일 때만 그것으로 본다
-    return moved.length === 1 ? moved[0] : null;
+    if(!pin) return tasks.find(x => x.id === id) || null;
+    // 목록이 교체되지 않았다 — 같은 객체가 곧 같은 카드다(그 사이 낙관적 편집이 제목을 바꿨다 되돌려도 흔들리지 않는다)
+    if(tasks.includes(pin.ref)) return pin.ref;
+    const like = pinLike(pin);                   // 목록이 새로 들어왔다 — 행은 밀렸을 수 있으니 제목·링크로 다시 찾는다
+    return like.length === pin.n && pin.k >= 0 ? like[pin.k] : null;
   }
   const PIN_LOST = "그 사이 목록이 바뀌었어요 — 다시 눌러 주세요";
   let editingPin = null, duePin = null;
@@ -3176,8 +3209,8 @@
       const r = await postSheetTracked({
         action:"updateTask", member:myName, row: t._row || t.id,
         title, url: reqLink, planLink, dueDate: ymdStr,
-        // ★title 은 '바꿀 새 제목'이라 지문으로 못 쓴다. 편집 **전** 원본을 보낸다.
-        expectTitle: String(prev.title || "").trim()
+        // ★title 은 '바꿀 새 제목'이라 지문으로 못 쓴다. 편집 **전** 원본을 보낸다(링크의 게시글 번호도 편집 전 것).
+        ...writeFp({ reqLink: prev.reqLink, title: prev.title })
       });
       if(r && r.ok){ toast("작업을 수정했어요"); await doSync({ silent:true }); }
       else { afterWriteFail(r, arr, () => Object.assign(t, prev), "수정 실패 — 되돌렸어요"); } // 롤백
@@ -3198,6 +3231,8 @@
       tasks.push(temp);
       setTaskAlarm(reqLink, title, selAlarm); // 알람 시점 로컬 저장(동기화 후 유지)
       render();
+      // 방금 지운 것과 같은 작업을 다시 넣는 중이다 — 응답이 늦어(timeout) 아래 ok 가지에 못 가도 새 카드가 묘비에 가려지지 않게 먼저 걷는다
+      dropTombstones(reqLink, title);
       const r = await postSheetTracked({ // ② 시트 기록 (insert)
         targetMember: myName, title, url: reqLink, planLink, dueDate: ymd, dupCheck: "0"
       });
@@ -3257,6 +3292,14 @@
     const m = String(url || "").match(/idx=(\d+)/);
     return m ? m[1] : "";
   }
+  // 행을 고치는 쓰기(완료·마감·수정)에 실어 보내는 지문. 삭제(postDelete)와 같은 두 가지다.
+  // ★제목만 보내면 「제목은 같고 게시글이 다른」 옆 카드(반복 요청)를 서버가 통과시킨다 — 행 번호가 한 칸 낡은 사이
+  //   완료·마감이 옆 카드에 기록됐다(v1.0.35 검수에서 재현). 서버 v60+ 는 네 액션 모두 expectIdx 를 이미 검사한다.
+  //   게시글 번호를 못 뽑으면 키를 아예 안 보낸다(빈 문자열 아님) — 서버 계약.
+  function writeFp(t){
+    const idx = idxOf(t.reqLink);
+    return { ...(idx ? { expectIdx: idx } : {}), expectTitle: String(t.title || "").trim() };
+  }
   // 관리항목(mgmtItems)용 — 배열 교체 여부 대신 타임아웃만 가른다
   function afterMgmtWriteFail(r, undo, failMsg){
     if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요"); doSync({ silent:true }); return; }
@@ -3277,6 +3320,8 @@
     const twins = arr.filter(x => fpMatch(x, fp));
     const n0 = twins.length, nDone0 = twins.filter(x => !!x.done === fp.done).length;
     const post0 = fp.idx ? arr.filter(x => idxOf(x.reqLink) === fp.idx).length : 0;   // 같은 게시글의 줄 수
+    let bottom = !arr.some(x => x !== t && (x._row || x.id) > fp.row);                // 맨 아래 카드인가(buryDeleted 참조)
+    const drop0 = syncDropSeq, syncing0 = syncInFlight;                               // 이 삭제와 겹친 내 읽기가 있었나
     delInFlight = true;
     pendingDeletes.push(fp);                       // 끝날 때까지 어떤 목록을 받아도 이 작업은 숨긴다
     try {
@@ -3306,18 +3351,21 @@
           const exact = same.filter(x => !!x.done === fp.done);
           if(same.length < n0){
             const retitled = fp.idx && mine.filter(x => idxOf(x.reqLink) === fp.idx).length >= post0;
-            if(!retitled) r = { ok:true, gone:true };
+            // busy 는 「그 행이 달라졌다」는 증거가 아니다 — 새 목록에 없는 것이 낡은 캐시(그 카드가 들어오기 전) 탓일 수 있다.
+            // stale 일 때만 이미 지워진 것으로 본다. 그래도 오판이면 카드가 돌아오도록 캐시가 죽은 뒤 한 번 더 받는다.
+            if(r.stale && !retitled){ r = { ok:true, gone:true }; scheduleLateSync(Date.now() + TOMB_MS); }
           }
           // stale 인데 새 목록에서도 그 행 그대로다 = 받은 목록이 낡았다(서버 읽기 캐시). 같은 행으로 다시 쏘지 않는다.
           else if(nDone0 === 1 && exact.length === 1 && !(r.stale && exact[0]._row === fp.row)){
-            fp.row = exact[0]._row; r = await postDelete(myName, fp);
+            fp.row = exact[0]._row; bottom = !mine.some(x => x._row > fp.row);
+            r = await postDelete(myName, fp);
           }
         }
       }
       // 받아 둔 목록을 숨김 없이 다시 그린다. 가는 중인 쓰기가 있으면 그 낙관적 변경을 덮지 않게 서버 상태로 받는다.
       const redraw = () => { if(writesInFlight) doSync({ silent:true }); else applyView(viewName); };
       if(r && r.ok){
-        if(!r.gone) addTombstone(fp);
+        if(!r.gone) buryDeleted(fp, bottom, syncing0 || syncInFlight || syncDropSeq !== drop0);
         unpendDelete(fp);
         if(!r.gone) await doSync({ silent:true }); // ④ compaction으로 행이 당겨지므로 _row 재정렬
         else redraw();                             // 숨김이 남은 쌍둥이 한 줄을 대신 가리고 있었을 수 있다
@@ -3337,6 +3385,10 @@
       toast(resynced ? "삭제하지 못했어요 — 목록을 다시 불러왔어요. 다시 눌러 주세요"
           : (r && (r.stale || r.busy)) ? "삭제하지 못했어요 — 잠시 후 다시 눌러 주세요"
           : "삭제 실패 — 되돌렸어요");
+      // 화면이 서버와 어긋난 채 남지 않게 한 번 맞춘다. stale·busy 는 방금 받은 목록이 낡았을 수 있으니 캐시가 죽은 뒤에,
+      // 그 밖의 오류(HTTP 5xx 등)는 서버가 실제로 지웠는지조차 모르므로 지금 받는다 — 다시 눌렀을 때 행 번호가 맞아야 지워진다.
+      if(r && (r.stale || r.busy)) scheduleLateSync(Date.now() + TOMB_MS);
+      else doSync({ silent:true });
     } finally { unpendDelete(fp); delInFlight = false; }
   }
   function postDelete(myName, fp){
@@ -3389,7 +3441,7 @@
     const r = await postSheetTracked({                // ② 시트 기록 (체크박스 A/I + G/O 상태열)
       action:"toggleDone", member:myName, row: t._row || t.id,
       done: target ? "1" : "0", status: statusText,
-      expectTitle: String(t.title || "").trim()
+      ...writeFp(t)
     });
     if(r && r.ok){ toast(forceDone === true ? "전달 완료로 보냈어요" : (target ? "완료 처리했어요" : "되돌렸어요")); }
     else { afterWriteFail(r, arr, () => { t.done = prevDone; t._status = prevStatus; }, "처리 실패 — 되돌렸어요"); } // ③ 롤백
@@ -3464,7 +3516,7 @@
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
     const r = await postSheetTracked({ action:"updateDue", member:myName, row: t._row || t.id, dueDate: dateStr,
-      expectTitle: String(t.title || "").trim() });
+      ...writeFp(t) });
     if(r && r.ok){ toast("마감을 변경했어요"); }
     else { afterWriteFail(r, arr, () => { t.deadline = prevTs; }, "변경 실패 — 되돌렸어요"); }
   }
@@ -3490,22 +3542,33 @@
     //   중간에 doSync 를 안 하므로 정렬 순서가 유일한 안전장치다.
     const doneTasks = tasks.filter(t=>t.done).slice().sort((a,b)=>(b._row||b.id)-(a._row||a.id));
     if(!doneTasks.length) return;
+    // 개별 삭제와 서로 잠근다 — 겹치면 행이 서로 당겨져 한쪽이 stale 로 실패하고, 묘비 순서도 서버 반영 순서와 어긋난다
+    if(delInFlight){ toast("앞선 삭제를 처리하고 있어요 — 잠시 후 다시 눌러 주세요"); return; }
     tasks = tasks.filter(t=>!t.done); refreshMyTasks(); render(); // ① 즉시 화면에서 제거 (myTasks 도 새 배열을 가리키게)
     const fps = doneTasks.map(taskFp);
     fps.forEach(fp => pendingDeletes.push(fp));   // 다 끝날 때까지 숨긴다(delTask 와 같은 이유)
-    const okFps = [], badFps = [];
+    const badFps = [];
+    const fpKey = fp => fp.idx + "\n" + fp.title;
+    const queued = {};                            // 지문별로 서버에 아직 남아 있는 이 묶음의 건수(ok 가 올 때마다 줄인다)
+    fps.forEach(fp => { queued[fpKey(fp)] = (queued[fpKey(fp)] || 0) + 1; });
+    const drop0 = syncDropSeq, syncing0 = syncInFlight;
     // 여러 건을 한 번의 쓰기로 묶는다 — 건과 건 사이 틈에 도착한 동기화가 아직 안 지운 완료 카드를 되살리지 않게
+    delInFlight = true;
     beginWrite();
     try {
       for(const fp of fps){
         const r = await postDelete(myName, fp);
-        (r && r.ok ? okFps : badFps).push(fp);
+        if(!(r && r.ok)){ badFps.push(fp); continue; }
+        // 묘비는 ok 가 올 때마다 바로 세운다(세운 순서 = 서버 반영 순서). 같은 지문이 이 묶음에 더 남아 있으면 그만큼은
+        // 정상 응답에도 실려 오므로 left 에 더한다 — 실패해 끝까지 남는 건도 여기에 그대로 들어 있다.
+        queued[fpKey(fp)]--;
+        const bottom = !myTasks.some(x => (x._row || x.id) > fp.row) && !badFps.some(b => b.row > fp.row);
+        buryDeleted(fp, bottom, syncing0 || syncInFlight || syncDropSeq !== drop0, queued[fpKey(fp)]);
       }
-      // 실패한 건과 지문이 같은 묘비는 세우지 않는다 — 살아남은 쌍둥이가 지운 행으로 당겨져 묘비에 걸린다
-      okFps.filter(fp => !badFps.some(b => b.idx === fp.idx && b.title === fp.title)).forEach(addTombstone);
     } finally {
       fps.forEach(unpendDelete);                  // 실패한 건은 아래 동기화에서 다시 보여야 한다
       endWrite();
+      delInFlight = false;
     }
     await doSync({ silent:true }); // ② 시트 기준으로 재정렬
     const failed = badFps.length;
