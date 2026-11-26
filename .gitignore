@@ -4,3 +4,4 @@ dist/
 build-secrets.js
 _audit/
 adpopupblock/win/build/
+adpopupblock/mac/build/
