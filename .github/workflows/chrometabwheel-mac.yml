@@ -25,3 +25,6 @@ jobs:
           name: ChromeTabWheel-mac
           path: chrometabwheel/mac/build/ChromeTabWheel-*-mac.zip
           if-no-files-found: error
+      # 실제 크롬 창을 띄워 탭 줄 판정을 확인한다(러너는 손쉬운 사용 권한이 미리 허용돼 있다).
+      - name: Verify tab strip detection
+        run: bash chrometabwheel/mac/test-ax.sh
