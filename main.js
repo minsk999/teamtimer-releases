@@ -357,6 +357,10 @@ function createWindow() {
     mainWindow.hide();
   });
 
+  // 윈도우 종료·로그오프 때는 바로 끝낸다. 버티면 OS 가 GPU 보조 프로세스를 먼저 죽이고, 본체가 그걸
+  // GPU 고장으로 오인해 1초쯤 뒤 0x80000003 오류창을 띄운다(Electron 42.9+ 에서 고쳐진 문제, electron#52604 와 같은 처리).
+  mainWindow.on('session-end', () => { isQuitting = true; app.exit(0); });
+
   // 외부 링크는 선택한 브라우저/프로필로 열기 (요청글/기획안 링크)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     openUrl(url);
