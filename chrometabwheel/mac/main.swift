@@ -222,17 +222,19 @@ enum TabStrip {
         n.role = v[0] as? String ?? ""
         var origin = CGPoint.zero
         var size = CGSize.zero
-        if axValue(v[1], .cgPoint, &origin), axValue(v[2], .cgSize, &size) {
+        if let p = axValue(v[1], .cgPoint), let s = axValue(v[2], .cgSize),
+           AXValueGetValue(p, .cgPoint, &origin), AXValueGetValue(s, .cgSize, &size) {
             n.frame = CGRect(origin: origin, size: size)
         }
         n.children = v[3] as? [AXUIElement] ?? []
         return n
     }
 
-    private static func axValue<T>(_ object: AnyObject, _ type: AXValueType, _ out: inout T) -> Bool {
-        guard CFGetTypeID(object) == AXValueGetTypeID() else { return false }
+    /// 그 종류의 AXValue 일 때만 돌려준다(속성이 없으면 오류 값이 대신 들어온다).
+    private static func axValue(_ object: AnyObject, _ type: AXValueType) -> AXValue? {
+        guard CFGetTypeID(object) == AXValueGetTypeID() else { return nil }
         let value = object as! AXValue
-        return AXValueGetType(value) == type && AXValueGetValue(value, type, &out)
+        return AXValueGetType(value) == type ? value : nil
     }
 
     private static func near(_ a: CGRect, _ b: CGRect) -> Bool {

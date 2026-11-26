@@ -23,13 +23,21 @@
 
 ## 맥판 (`mac/`)
 - `main.swift` 하나. 메뉴 막대 앱(LSUIElement), macOS 11 이상, 유니버설(arm64 + x86_64).
-- 동작: `NSEvent` 전역 모니터로 휠을 지켜보기만 한다(권한 불필요). 커서 아래 창이 크롬이고 창 위에서
-  `tabStripHeight`(기본 40pt) 안이면, 크롬 AppleScript 로 **그 창**(bounds 로 맞춤)의 `active tab index` 를 바꾼다.
-  포커스를 바꾸지 않는다. 필요한 권한은 「자동화 → Google Chrome」 하나(처음 쓸 때 macOS 가 묻는다).
+- 동작: `NSEvent` 전역 모니터로 휠을 지켜보기만 한다(권한 불필요). 커서 아래 창이 크롬이고 탭 줄 위면,
+  크롬 AppleScript 로 **그 창**(bounds 로 맞춤)의 `active tab index` 를 바꾼다. 포커스를 바꾸지 않는다.
+- **탭 줄 판정(1.0.1~)**: 「손쉬운 사용」 권한이 있으면 크롬에 직접 묻는다 — 그 창(창 번호로 맞춤)의 UI 트리에서
+  창 맨 위의 가로 `AXTabGroup` 을 찾아, 창 맨 위 ~ 그 아래 끝까지를 탭 줄로 본다(가로는 창 전체). 없으면 「탭 줄 없는 창」으로 통과.
+  창 위쪽 150pt 밖(본문)은 크롬에 묻지 않고, 탭 줄보다 아래에서 시작하는 요소(웹 페이지)는 들여다보지 않는다. 결과는 5초 재사용.
+  권한이 없으면 예전 규칙으로 물러난다: 창 위쪽 `tabStripHeight`(기본 40pt, `defaults write kr.co.adef.chrometabwheel tabStripHeight -int 44`).
+- 권한: 「자동화 → Google Chrome」(필수, 처음 쓸 때 macOS 가 묻는다) + 「손쉬운 사용」(선택, 한 번 권하고 메뉴에서 다시 켤 수 있다).
 - 옵션은 윈도우판과 맞춘다: `--autostart=on|off`(`~/Library/LaunchAgents/kr.co.adef.chrometabwheel.plist`), `--quit`, `--debug`, `--dry-run`, `--version`.
+  `--probe [--tree]` 는 떠 있는 크롬 창마다 판정 결과(와 위쪽 UI 트리)를 출력하고 끝난다.
 - 로그: `~/Library/Logs/ChromeTabWheel.log` (오류는 항상, 판정 과정은 `--debug` 때만).
-- 탭 줄 높이 조정: `defaults write kr.co.adef.chrometabwheel tabStripHeight -int 44`
-- ad-hoc 서명이라 **새 버전을 설치하면 자동화 권한을 다시 묻는다**(TCC 가 cdhash 로 기억).
+- ad-hoc 서명이라 **새 버전을 설치하면 두 권한을 다시 줘야 한다**(TCC 가 cdhash 로 기억). 손쉬운 사용은 목록에 켜진 채로 남아 있어도
+  무효다 — 목록에서 ChromeTabWheel 을 지우고(−) 다시 켠다. 그 전까지는 고정 높이 판정으로 동작한다.
+- 검증: `mac/test-ax.sh` 가 실제 크롬을 띄워 `--probe` 결과를 확인한다(CI 가 매번 돌린다 — 러너는 손쉬운 사용 권한이 미리 허용돼 있다).
+  2026-11-27 CI(macOS 26.7, 크롬 157): 탭 줄 41pt, 탭 있는 창·앱 창·겹친 두 창 판정 통과.
+  ⚠️ CI 가 확인하는 것은 판정까지다. 실제 휠 입력 → 탭 전환, 권한 안내 창은 실기에서 확인해야 한다.
 
 ### 빌드
 맥에서 `bash chrometabwheel/mac/build.sh` → `chrometabwheel/mac/build/ChromeTabWheel-<버전>-mac.zip`.
