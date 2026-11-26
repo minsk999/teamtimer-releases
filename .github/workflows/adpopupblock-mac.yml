@@ -1,0 +1,26 @@
+name: AdPopupBlock (mac)
+
+# 광고창 차단 맥판 빌드. 릴리스를 만들지 않고 결과 zip 은 아티팩트로만 올린다
+# (릴리스를 만들면 작업 타이머 업데이트 배너가 고장 난다. 배포본은 docs/ 에 직접 커밋한다.)
+on:
+  push:
+    paths:
+      - 'adpopupblock/mac/**'
+      - '.github/workflows/adpopupblock-mac.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: bash adpopupblock/mac/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AdPopupBlock-mac
+          path: adpopupblock/mac/build/AdPopupBlock-*-mac.zip
+          if-no-files-found: error
