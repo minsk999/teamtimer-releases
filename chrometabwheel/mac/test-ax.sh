@@ -34,6 +34,9 @@ out=$("$BIN" --probe --tree); rc=$?
 echo "$out"; echo "exit=$rc"
 check "앱 창은 탭 줄 없음" "$out" "  탭 줄 없음"
 check "앱 창 맨 위(20pt)는 통과" "$out" "위에서 20pt → 통과 : 탭 줄 없는 창"
+# 두 창이 거의 같은 자리에 겹쳐 뜬다 — 그래도 탭 있는 창은 탭 있는 창으로 읽어야 한다(창을 서로 바꿔 읽지 않는지)
+check "겹친 일반 창은 여전히 탭 줄 있음" "$out" "  탭 줄 ["
+check "겹친 일반 창의 탭 줄(20pt)은 전환" "$out" "위에서 20pt → 전환 : 탭 줄 [크롬 확인"
 
 pkill -f "user-data-dir=$PROFILE" || true
 exit $fail

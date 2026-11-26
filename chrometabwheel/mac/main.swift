@@ -110,6 +110,7 @@ enum Autostart {
 // MARK: - 크롬 창 찾기
 
 struct ChromeWindow {
+    let windowID: CGWindowID
     let pid: pid_t
     let bundleID: String
     let bounds: CGRect   // 전역 좌표(왼쪽 위 원점, 포인트) — AppleScript 의 bounds 와 같은 체계
@@ -160,9 +161,17 @@ enum WindowFinder {
         let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue ?? 0
         if layer != 0 { return (nil, "크롬 일반 창 아님(layer \(layer))") }
         guard let rect = bounds(of: info) else { return (nil, "창 크기 없음") }
-        return (ChromeWindow(pid: pid, bundleID: bid, bounds: rect), viaID ? "창 번호" : "좌표")
+        return (ChromeWindow(windowID: windowID(of: info), pid: pid, bundleID: bid, bounds: rect), viaID ? "창 번호" : "좌표")
+    }
+
+    static func windowID(of info: [String: Any]) -> CGWindowID {
+        (info[kCGWindowNumber as String] as? NSNumber)?.uint32Value ?? 0
     }
 }
+
+// 손쉬운 사용 창 요소 → 화면 창 번호. 공개 API 에는 없지만 창 관리 도구들이 오래 써 온 함수다.
+@_silgen_name("_AXUIElementGetWindow")
+private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
 
 // MARK: - 탭 줄 위치 (손쉬운 사용 API)
 
@@ -183,17 +192,17 @@ enum TabStrip {
     ]
 
     // 휠 한 칸마다 묻지 않도록 마지막 결과를 잠깐 재사용한다(창 위치·크기가 바뀌면 다시 묻는다).
-    private static var cached: (pid: pid_t, bounds: CGRect, at: TimeInterval, result: Lookup)?
+    private static var cached: (windowID: CGWindowID, pid: pid_t, bounds: CGRect, at: TimeInterval, result: Lookup)?
 
     static func lookup(_ window: ChromeWindow) -> Lookup {
         let now = ProcessInfo.processInfo.systemUptime
-        if let c = cached, c.pid == window.pid, c.bounds == window.bounds {
+        if let c = cached, c.windowID == window.windowID, c.pid == window.pid, c.bounds == window.bounds {
             var ttl: TimeInterval = 5
             if case .unavailable = c.result { ttl = 1.5 }
             if now - c.at < ttl { return c.result }
         }
         let result = find(window)
-        cached = (window.pid, window.bounds, now, result)
+        cached = (window.windowID, window.pid, window.bounds, now, result)
         return result
     }
 
@@ -231,13 +240,23 @@ enum TabStrip {
     }
 
     /// 화면의 그 창에 해당하는 손쉬운 사용 창 요소.
-    /// shortcut: 위치·크기로 맞춘다(탭 전환 스크립트와 같은 기준). 똑같은 자리에 겹쳐 놓인 창 둘은 구별 못 한다 — 문제가 되면 창 번호로 맞추도록 바꾼다.
+    /// 창 번호로 맞춘다 — 위치·크기로 맞추면 같은 자리에 겹친 창(탭 있는 창 + 앱 창)을 서로 바꿔 읽는다(CI 에서 실제로 났다).
     static func axWindow(for window: ChromeWindow) -> AXUIElement? {
         let app = AXUIElementCreateApplication(window.pid)
         AXUIElementSetMessagingTimeout(app, 0.3)   // 크롬이 바쁠 때 휠 처리(메인 스레드)가 오래 멈추지 않게
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &value) == .success,
               let windows = value as? [AXUIElement] else { return nil }
+        var sawID = false
+        for w in windows {
+            var id: CGWindowID = 0
+            if _AXUIElementGetWindow(w, &id) == .success, id != 0 {
+                sawID = true
+                if id == window.windowID { return w }
+            }
+        }
+        if sawID && window.windowID != 0 { return nil }   // 번호를 읽을 수 있는데 일치하는 창이 없다 = 그 창이 아니다
+        // 창 번호를 못 읽는 환경에서만: 위치·크기가 같은 맨 앞 창
         return windows.first { w in
             guard let f = node(w).frame else { return false }
             return near(f, window.bounds)
@@ -342,8 +361,8 @@ enum Probe {
             guard layer == 0, let app = NSRunningApplication(processIdentifier: pid),
                   let bid = app.bundleIdentifier, chromeBundleIDs.contains(bid),
                   let rect = WindowFinder.bounds(of: info), rect.width > 100, rect.height > 100 else { continue }
-            let window = ChromeWindow(pid: pid, bundleID: bid, bounds: rect)
-            print("창 [\(Int(rect.minX)),\(Int(rect.minY)) \(Int(rect.width))x\(Int(rect.height))]")
+            let window = ChromeWindow(windowID: WindowFinder.windowID(of: info), pid: pid, bundleID: bid, bounds: rect)
+            print("창 #\(window.windowID) [\(Int(rect.minX)),\(Int(rect.minY)) \(Int(rect.width))x\(Int(rect.height))]")
             switch TabStrip.lookup(window) {
             case .strip(let r):
                 found += 1
