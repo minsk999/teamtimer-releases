@@ -29,6 +29,8 @@
   창 맨 위의 가로 `AXTabGroup` 을 찾아, 창 맨 위 ~ 그 아래 끝까지를 탭 줄로 본다(가로는 창 전체). 없으면 「탭 줄 없는 창」으로 통과.
   창 위쪽 150pt 밖(본문)은 크롬에 묻지 않고, 탭 줄보다 아래에서 시작하는 요소(웹 페이지)는 들여다보지 않는다. 결과는 5초 재사용.
   권한이 없으면 예전 규칙으로 물러난다: 창 위쪽 `tabStripHeight`(기본 40pt, `defaults write kr.co.adef.chrometabwheel tabStripHeight -int 44`).
+  ★권한이 **있는데** 크롬이 그 창을 알려 주지 않으면(막 뜬 창, 크롬이 바빠 0.3초 안에 답이 없을 때) 물러나지 않고 **반응하지 않는다**(1.5초 뒤 다시 묻는다).
+  여기서 고정 높이로 물러났더니 탭 줄 없는 앱 창에서 전환 판정이 났다(CI 에서 간헐 재현).
 - 권한: 「자동화 → Google Chrome」(필수, 처음 쓸 때 macOS 가 묻는다) + 「손쉬운 사용」(선택, 한 번 권하고 메뉴에서 다시 켤 수 있다).
 - 옵션은 윈도우판과 맞춘다: `--autostart=on|off`(`~/Library/LaunchAgents/kr.co.adef.chrometabwheel.plist`), `--quit`, `--debug`, `--dry-run`, `--version`.
   `--probe [--tree]` 는 떠 있는 크롬 창마다 판정 결과(와 위쪽 UI 트리)를 출력하고 끝난다.
