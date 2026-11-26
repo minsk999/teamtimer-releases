@@ -180,7 +180,8 @@ enum TabStrip {
     enum Lookup {
         case strip(CGRect)          // 가로 탭 줄(탭 목록)의 화면 사각형
         case none                   // 탭 줄이 없는 창(앱 창·팝업·전체 화면 영상·세로 탭)
-        case unavailable(String)    // 물어볼 수 없음(권한 없음 등) — 호출 쪽이 고정 높이 규칙으로 물러난다
+        case notReady               // 권한은 있는데 크롬이 그 창을 (아직) 알려 주지 않음 — 확인 못 했으니 반응하지 않는다
+        case unavailable(String)    // 권한이 없어 물어볼 수 없음 — 호출 쪽이 고정 높이 규칙으로 물러난다
     }
 
     static var trusted: Bool { AXIsProcessTrusted() }
@@ -198,7 +199,10 @@ enum TabStrip {
         let now = ProcessInfo.processInfo.systemUptime
         if let c = cached, c.windowID == window.windowID, c.pid == window.pid, c.bounds == window.bounds {
             var ttl: TimeInterval = 5
-            if case .unavailable = c.result { ttl = 1.5 }
+            switch c.result {
+            case .notReady, .unavailable: ttl = 1.5   // 곧 달라질 수 있는 결과는 짧게만 믿는다
+            default: break
+            }
             if now - c.at < ttl { return c.result }
         }
         let result = find(window)
@@ -267,7 +271,8 @@ enum TabStrip {
 
     private static func find(_ window: ChromeWindow) -> Lookup {
         guard trusted else { return .unavailable("손쉬운 사용 권한 없음") }
-        guard let root = axWindow(for: window) else { return .unavailable("창 요소를 못 찾음") }
+        // 막 뜬 창은 크롬이 목록에 올리기 전일 수 있다. 이때 고정 높이로 물러나면 탭 줄 없는 창에서 탭이 넘어간다(CI 에서 실제로 났다).
+        guard let root = axWindow(for: window) else { return .notReady }
         let top = window.bounds.minY
         // 창의 UI 트리를 얕게 훑는다(너비 우선). 탭 줄은 창 맨 위에 있으므로 그 아래에서 시작하는 요소는 들여다보지 않는다.
         var queue: [(element: AXUIElement, depth: Int)] = [(root, 0)]
@@ -340,6 +345,8 @@ enum Judge {
                 : (false, "탭 줄 밖 [크롬 확인, 위에서 \(Int(offset))pt]")
         case .none:
             return (false, "탭 줄 없는 창 [크롬 확인]")
+        case .notReady:
+            return (false, "판정 보류 — 크롬이 이 창을 아직 알려 주지 않음")
         case .unavailable(let why):
             return offset <= fallbackHeight
                 ? (true, "탭 줄 [고정 \(Int(fallbackHeight))pt — \(why)]")
@@ -370,6 +377,7 @@ enum Probe {
                 found += 1
                 print("  탭 줄 [\(Int(r.minX)),\(Int(r.minY)) \(Int(r.width))x\(Int(r.height))]")
             case .none: print("  탭 줄 없음")
+            case .notReady: print("  판정 보류: 크롬이 이 창을 아직 알려 주지 않음")
             case .unavailable(let why): print("  판정 불가: \(why)")
             }
             for dy in [2, 20, 38, 44, 60, 300] as [CGFloat] {
