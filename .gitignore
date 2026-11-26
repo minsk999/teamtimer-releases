@@ -5,3 +5,5 @@ build-secrets.js
 _audit/
 adpopupblock/win/build/
 adpopupblock/mac/build/
+chrometabwheel/win/bin/
+chrometabwheel/win/tools/bin/

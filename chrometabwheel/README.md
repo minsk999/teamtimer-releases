@@ -13,8 +13,9 @@
 | `docs/ChromeTabWheel-1.0.0-win.zip` | 윈도우판 1.0.0. SHA256 `F24B0E561BB614588DF6E41AA8DC4D42CD57FA110307068C091D03303059EE86` — 원본 zip(`BA6D6741…`)과 exe 는 같고, `설치 방법.txt` 에서 MouseWheelTabScroll4Chrome 단계만 뺐다(11-18) |
 | `docs/ChromeTabWheel-1.0.0-mac.zip` | 맥판 1.0.0 (CI 아티팩트를 받아 커밋). SHA256 `7d7a5c1f5f214872822f7a7e3bcf7f55e51ecf80f43f938ebf924164166f8963` |
 
-## 윈도우판
-- 단일 실행 파일(.NET Framework 4.8), 서명 없음. **소스는 이 저장소에 없다**(사용자 집 PC).
+## 윈도우판 (`win/`)
+- 단일 실행 파일(.NET Framework 4.8), 서명 없음. 소스는 `win/src/Program.cs` 하나 — 배포본 1.0.0 을 만든 그대로다(2026-11-27 옮김).
+- 빌드: `win\build.cmd` 더블클릭 → `win\bin\ChromeTabWheel.exe`. 윈도우 내장 컴파일러(csc)만 쓴다. 설계 배경·진단 도구는 `win/README.md`.
 - 동작: Raw Input(RIDEV_INPUTSINK)으로 휠을 지켜보기만 하고, 커서가 크롬(`Chrome_WidgetWin_1`, chrome.exe)의
   탭 줄(UI Automation `TabStripRegionView`, 세로 탭 제외) 위면 `WM_COMMAND IDC_SELECT_NEXT/PREVIOUS_TAB` 을 보낸다. 포커스를 바꾸지 않는다.
 - 옵션: `--autostart=on|off`(HKCU Run 의 `ChromeTabWheel`, 성공 시 종료 코드 0), `--quit`, `--debug`, `--dry-run`, `--no-input`.
