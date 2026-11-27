@@ -1,5 +1,7 @@
 // ============================================================
-//  Google Apps Script v61  (7칸 구조
+//  Google Apps Script v62  (7칸 구조
+//  - v62: LATEST_TTALKAK_VER 1.8 → 1.8.6(기획안 열기), UPDATE_MSG 에 「인트라넷 탭은 F5」 추가. 그 밖은 v61 과 같다.
+//  (구) v61  (7칸 구조
 //  - v61: members 응답(GET/POST ?action=members)에 latestVer·updateMsg 를 항상 실어 보낸다.
 //         딸깍 v1.8.4+ 가 팝업을 열 때 이 값으로 새 버전 알림을 띄운다(예전엔 전송 응답에만 있었다).
 //         비교는 클라이언트가 한다(verLt). 타이머도 members 를 부르지만 members 키만 읽으므로 무해.
@@ -202,9 +204,9 @@ var CHECK_FONT_COLOR = "#434343";
 
 // ── 딸깍 확장 버전 알림 (v57) ───────────────────────────────
 // 딸깍을 새 버전으로 배포하면 이 값을 같이 올린다.
-var LATEST_TTALKAK_VER = "1.8";
+var LATEST_TTALKAK_VER = "1.8.6";
 // 알림에 덧붙일 안내 (빈 문자열이면 "새 버전이 있어요"만 뜬다)
-var UPDATE_MSG = "— 받은 zip 을 기존 폴더에 덮어쓰고 chrome://extensions 에서 ↻ 를 눌러주세요";
+var UPDATE_MSG = "— 받은 zip 을 기존 폴더에 덮어쓰고 chrome://extensions 에서 ↻, 인트라넷 탭은 F5 해 주세요";
 
 // a < b ? — "1.10" 과 "1.9" 를 문자열로 비교하면 틀리므로 자리별 숫자로 본다.
 function verLt(a, b) {
