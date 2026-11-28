@@ -6,7 +6,7 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
-const { cmpVer, isSafeUrl, pickMacAsset: pickMacAssetFor, digestOk, fitWinState, pendingVerdict, pendingWant, pendingHashOk } = require('./main-lib.js');   // 순수 함수(시험: test/main-lib.test.js)
+const { cmpVer, isSafeUrl, tagFromReleaseUrl, pickMacAsset: pickMacAssetFor, digestOk, fitWinState, pendingVerdict, pendingWant, pendingHashOk } = require('./main-lib.js');   // 순수 함수(시험: test/main-lib.test.js)
 const { execFile, spawn } = require('child_process');
 
 // ── Windows 알림 표시 이름/아이콘 ──
@@ -89,18 +89,31 @@ const isDev = process.argv.includes('--dev');
 // (자동 설치 X — 안내만, 다운로드는 웹에서). 트레이·IPC가 공유.
 const GITHUB_OWNER = 'minsk999';
 const GITHUB_REPO = 'teamtimer-releases';
+// ★최신 버전은 github.com 의 「releases/latest → releases/tag/vX.Y.Z」 리다이렉트로 읽는다(v1.0.46).
+//   예전엔 api.github.com 을 불렀는데, 로그인 없는 API 는 **같은 인터넷 주소(IP)당 시간당 60회**라
+//   회사처럼 여러 PC 가 한 주소를 쓰면 한도가 차서 「업데이트 확인에 실패했어요」가 났다(2026-11-28 실측 403 rate limit).
+//   리다이렉트가 안 되면(웹 주소 형식이 바뀌는 등) 예전 API 로 한 번 더 본다.
+async function latestTag() {
+  const get = async (u, opts) => {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 8000);
+    try { return await fetch(u, { signal: ctrl.signal, ...opts }); } finally { clearTimeout(t); }
+  };
+  try {
+    const res = await get(`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, { method: 'HEAD', redirect: 'manual', headers: { 'User-Agent': 'teamtimer' } });
+    const tag = tagFromReleaseUrl(res.headers.get('location'));
+    if (tag) return { tag };
+  } catch (e) {}
+  const res = await get(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+    { headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'teamtimer' } });
+  if (!res.ok) { logError('update-check', 'http-' + res.status + (res.status === 403 ? ' (GitHub API 한도)' : '')); return { error: 'http-' + res.status }; }
+  const json = await res.json();
+  return { tag: String(json.tag_name || '') };
+}
 async function fetchLatestRelease() {
   const cur = app.getVersion();
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 8000);
-  const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-    { signal: ctrl.signal, headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'teamtimer' } }
-  );
-  clearTimeout(t);
-  if (!res.ok) return { ok: false, error: 'http-' + res.status };
-  const json = await res.json();
-  const latest = String(json.tag_name || '').replace(/^v/, '');
+  const r = await latestTag();
+  if (r.error) return { ok: false, error: r.error };
+  const latest = String(r.tag || '').replace(/^v/, '');
   if (!latest) return { ok: false, error: 'no-tag' };
   const hasUpdate = cmpVer(latest, cur) > 0;
   // 업데이트 안내 링크는 설명서(GitHub Pages)로 — 다운로드 카드가 거기 있음

@@ -52,5 +52,13 @@ eq('pendingWant 정보 없음', L.pendingWant(null, '1.0.42', '1.0.43'), null);
 eq('pendingHashOk 둘 다 같음', L.pendingHashOk('F0', 'F0', 'F0'), true);
 eq('pendingHashOk 파일 해시 불일치', L.pendingHashOk('F0', 'XX', 'F0'), false);
 eq('pendingHashOk 기록 해시 불일치', L.pendingHashOk('F0', 'F0', 'XX'), false);
+// 업데이트 확인(v1.0.46): 웹 리다이렉트에서 태그 뽑기
+eq('tag 절대 주소', L.tagFromReleaseUrl('https://github.com/minsk999/teamtimer-releases/releases/tag/v1.0.45'), 'v1.0.45');
+eq('tag 상대 주소', L.tagFromReleaseUrl('/minsk999/teamtimer-releases/releases/tag/v1.0.46'), 'v1.0.46');
+eq('tag 없음(latest 그대로)', L.tagFromReleaseUrl('https://github.com/minsk999/teamtimer-releases/releases'), '');
+eq('tag 다른 저장소', L.tagFromReleaseUrl('https://github.com/evil/teamtimer-releases/releases/tag/v9.9.9'), '');
+eq('tag 다른 호스트', L.tagFromReleaseUrl('https://evil.com/minsk999/teamtimer-releases/releases/tag/v9.9.9'), '');
+eq('tag 이상한 태그', L.tagFromReleaseUrl('https://github.com/minsk999/teamtimer-releases/releases/tag/latest'), '');
+eq('tag 빈 값', L.tagFromReleaseUrl(null), '');
 console.log(`${n - fail} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

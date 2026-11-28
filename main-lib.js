@@ -67,4 +67,14 @@ function pendingHashOk(want, have, infoSha) {
   return !!want && have === want && infoSha === want;
 }
 
-module.exports = { cmpVer, isSafeUrl, pickMacAsset, digestOk, fitWinState, pendingVerdict, pendingWant, pendingHashOk };
+// github.com/minsk999/teamtimer-releases/releases/latest 가 돌려주는 리다이렉트 주소(Location)에서 태그만 뽑는다.
+// 이 저장소의 releases/tag/<버전 태그> 모양일 때만 — 그 밖(로그인 페이지·다른 저장소·이상한 태그)은 빈 값(API 로 넘어감).
+function tagFromReleaseUrl(loc) {
+  if (!loc) return '';
+  let u; try { u = new URL(String(loc), 'https://github.com'); } catch (e) { return ''; }
+  if (u.protocol !== 'https:' || u.hostname !== 'github.com') return '';
+  const m = u.pathname.match(/^\/minsk999\/teamtimer-releases\/releases\/tag\/(v?\d+\.\d+\.\d+)$/);
+  return m ? m[1] : '';
+}
+
+module.exports = { cmpVer, isSafeUrl, tagFromReleaseUrl, pickMacAsset, digestOk, fitWinState, pendingVerdict, pendingWant, pendingHashOk };
