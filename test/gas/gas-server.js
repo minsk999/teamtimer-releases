@@ -82,7 +82,7 @@ function makeGasServer(clock, opts) {
     console: { log() {}, error() {}, warn() {} },
     Logger: { log() {} },
     SpreadsheetApp: {
-      getActiveSpreadsheet: () => ({ getSheets: () => [conf.api, main.api] }),   // 자동화가 앞 — getSheet 가 이름으로 찾는지도 같이 탄다
+      getActiveSpreadsheet: () => ({ getSheets: () => [conf.api, main.api], getId: () => "test-sheet-id" }),   // 자동화가 앞 — getSheet 가 이름으로 찾는지도 같이 탄다
       flush() {}, newRichTextValue: () => { const b = { setText: () => b, setLinkUrl: () => b, build: () => ({}) }; return b; },
       DataValidationCriteria: { CHECKBOX: "CHECKBOX" },
     },
@@ -91,6 +91,7 @@ function makeGasServer(clock, opts) {
       put: (k, v, sec) => { cache.set(k, { v, until: clock.now + (sec || 600) * 1000 }); },
       remove: k => { cache.delete(k); },
     }) },
+    ...(opts.Sheets ? { Sheets: opts.Sheets } : {}),   // v69: 고급 서비스 흉내(없으면 서버는 v68 처럼 동작)
     LockService: { getScriptLock: () => ({ tryLock: () => { if (s.lockBusy > 0) { s.lockBusy--; return false; } return true; }, releaseLock() {} }) },
     ContentService: { MimeType: { JSON: "json" }, createTextOutput: t => { const o = { text: t, setMimeType: () => o, getContent: () => t }; return o; } },
   };
