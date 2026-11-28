@@ -160,7 +160,7 @@ function getEU() {
     _eu.on('download-progress', (p) => sendUpd({ type: 'progress', percent: Math.round(p.percent || 0) }));
     _eu.on('update-downloaded', () => { euDownloaded = true; });
     _eu.on('update-downloaded', (i) => sendUpd({ type: 'ready', version: i && i.version }));
-    _eu.on('error', (e) => { logError('updater', e); sendUpd({ type: 'error', error: String((e && e.message) || e) }); });
+    _eu.on('error', (e) => { logError('updater', e); if (!tidyQuiet) sendUpd({ type: 'error', error: String((e && e.message) || e) }); });
   }
   return _eu;
 }
@@ -326,6 +326,8 @@ function readWinState() {
   try {
     const b = JSON.parse(fs.readFileSync(winStatePath(), 'utf8'));
     if (!(b.width >= 320 && b.height >= 420)) return null;
+    const wa = screen.getPrimaryDisplay().workAreaSize;   // 큰 모니터에서 쓰던 크기가 작은 화면에서 넘치지 않게
+    b.width = Math.min(b.width, wa.width); b.height = Math.min(b.height, wa.height);
     if (typeof b.x !== 'number' || typeof b.y !== 'number') return { width: b.width, height: b.height };
     const onScreen = screen.getAllDisplays().some(d => { const a = d.workArea;
       return b.x + 40 >= a.x && b.y >= a.y && b.x + 120 <= a.x + a.width && b.y + 40 <= a.y + a.height; });
@@ -505,6 +507,7 @@ app.on('before-quit', () => { isQuitting = true; saveWinState(); });
 //   이미 설치된 버전 이하의 대기 파일(79MB 안팎)은 지운다 — electron-updater 는 다음 다운로드 때까지 남겨 둔다.
 //   현재보다 새 버전이 받아져 있으면 「받아 둠」 상태를 되살린다: checkForUpdates → downloadUpdate 가 캐시 해시를 확인하고
 //   맞으면 내려받지 않고 바로 update-downloaded 를 낸다(AppUpdater·DownloadedUpdateHelper 소스 확인, 2026-11-28).
+let tidyQuiet = false;   // 시작 때 받아 둔 업데이트를 되살리는 동안은 오류를 화면에 띄우지 않는다(사용자가 누른 게 아니다)
 async function tidyPendingUpdate() {
   try {
     if (!updaterSupported()) return;
@@ -516,11 +519,19 @@ async function tidyPendingUpdate() {
       for (const f of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, f)); } catch (e) {} }
       return;
     }
-    if (!fs.existsSync(path.join(dir, info.fileName))) return;
+    const file = path.join(dir, info.fileName);
+    if (!fs.existsSync(file)) return;
     const eu = getEU(); if (!eu) return;
+    tidyQuiet = true;
     const r = await eu.checkForUpdates();
-    if (r && r.updateInfo && cmpVer(r.updateInfo.version, app.getVersion()) > 0 && r.updateInfo.version === m[1]) await eu.downloadUpdate();
+    const want = r && r.updateInfo && (r.updateInfo.files && r.updateInfo.files[0] ? r.updateInfo.files[0].sha512 : r.updateInfo.sha512);
+    if (!(r && r.updateInfo && cmpVer(r.updateInfo.version, app.getVersion()) > 0 && r.updateInfo.version === m[1] && want)) return;
+    // ★받아 둔 파일이 그 릴리스와 정확히 같을 때만 — 다르면 downloadUpdate 가 사용자가 누르지 않은 79MB 를 새로 받는다
+    const have = await new Promise((ok, no) => { const h = crypto.createHash('sha512'); fs.createReadStream(file).on('data', d => h.update(d)).on('end', () => ok(h.digest('base64'))).on('error', no); });
+    if (have !== want || info.sha512 !== want) return;
+    await eu.downloadUpdate();
   } catch (e) { if (e && e.code !== 'ENOENT') logError('tidy-pending-update', e); }
+  finally { tidyQuiet = false; }
 }
 
 // ─────────────────────────────────────────────

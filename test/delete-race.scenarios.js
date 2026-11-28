@@ -1189,13 +1189,39 @@
     } },
     { key: "MG2", name: "메모 입력칸이 떠 있는 사이 동기화가 와도 입력하던 글자가 남는다", async run(h) {
       // 편집 화면 자체는 노드 가짜 DOM 이 못 그린다 — editMgmt 가 만드는 상태(입력칸 + mgmtEditing)를 그대로 만든다
-      h.app("(function(){ const i = document.createElement('input'); i.id = 'medit-input'; i.value = '쓰는 중'; document.body.appendChild(i); mgmtEditing = true; document.getElementById('mgmt-host').innerHTML = 'EDITING'; })()");
+      h.app("(function(){ const i = document.createElement('input'); i.id = 'medit-input'; i.value = '쓰는 중'; document.body.appendChild(i); mgmtEditing = { view: viewName }; document.getElementById('mgmt-host').innerHTML = 'EDITING'; })()");
       h.app("doSync({ silent:true })");
       await h.settle();
       h.check("동기화가 메모 칸을 다시 그리지 않음", h.app("document.getElementById('mgmt-host').innerHTML"), "EDITING");
       h.app("mgmtEditing = false; commitMgmt(30, 'b', '쓰는 중')");
       await h.settle();
       h.check("서버 메모", h.server.mgmt[ME][0].b, "쓰는 중");
+    } },
+    // v1.0.40 검수: 편집·삭제 확인 사이 동기화로 메모 행이 밀리면 같은 행 번호의 「다른 메모」에 쓰던 회귀
+    { key: "MG3", name: "메모를 편집하는 사이 위에 메모가 끼어 행이 밀림 → 저장해도 다른 메모를 덮지 않는다", async run(h) {
+      h.server.mgmt[ME].push({ b: "월간 정리", c: "" });
+      h.app("doSync({ silent:true })"); await h.settle();
+      h.app("(function(){ const i = document.createElement('input'); i.id = 'medit-input'; document.body.appendChild(i); mgmtEditing = { view: viewName }; })()");   // 31행 「월간 정리」 편집 시작
+      h.server.mgmt[ME].unshift({ b: "끼어든 메모", c: "" });     // 다른 PC 가 위에 추가 → 31행 = 「주간 보고」
+      h.app("doSync({ silent:true })"); await h.settle();
+      const m = h.mark();
+      h.app("mgmtEditing = false; commitMgmt(31, 'b', '월간 정리 v2', '월간 정리')");
+      await h.settle();
+      h.check("서버 메모(그대로)", h.server.mgmt[ME].map(x => x.b), ["끼어든 메모", "주간 보고", "월간 정리"]);
+      h.check("updateMemo 요청 수", h.posts(m, "updateMemo").length, 0);
+      h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 다시 불러올게요"]);
+    } },
+    { key: "MG4", name: "메모 삭제 확인 창이 떠 있는 사이 행이 밀림 → 확정해도 다른 메모를 지우지 않는다", async run(h) {
+      h.server.mgmt[ME].push({ b: "월간 정리", c: "" });
+      h.app("doSync({ silent:true })"); await h.settle();
+      h.app("askDelMgmt(31, 'b')");                               // 「월간 정리」 삭제 확인
+      h.server.mgmt[ME].unshift({ b: "끼어든 메모", c: "" });
+      h.app("doSync({ silent:true })"); await h.settle();
+      const m = h.mark();
+      h.app("doConfirm()");
+      await h.settle();
+      h.check("서버 메모(그대로)", h.server.mgmt[ME].map(x => x.b), ["끼어든 메모", "주간 보고", "월간 정리"]);
+      h.check("updateMemo 요청 수", h.posts(m, "updateMemo").length, 0);
     } },
     { key: "HL1", name: "게시글 번호 없는 같은 제목 카드 셋 — 위 줄이 빠져 행이 낡은 채 가운데를 지움 → 누른 그 카드만 지워진다",
       opts: { mine: [{ title: "배너 수정", link: "https://hand.invalid/1" }, { title: "배너 수정", link: "https://hand.invalid/2" },

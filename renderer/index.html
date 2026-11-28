@@ -4632,14 +4632,24 @@
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; }
     const m = mgmtFind(row); if(!m) return;
     const text = String(m[col] || "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
-    openConfirm("관리 항목 삭제", `「${text.length > 40 ? text.slice(0, 40) + "…" : text}」을(를) 삭제할까요? 시트에서도 지워져요.`, "삭제", () => deleteMgmt(row, col));
+    const seen = m[col];   // 확인 창이 떠 있는 사이 목록이 바뀌어도 「내가 본 그 메모」만 지운다
+    openConfirm("관리 항목 삭제", `「${text.length > 40 ? text.slice(0, 40) + "…" : text}」을(를) 삭제할까요? 시트에서도 지워져요.`, "삭제", () => deleteMgmt(row, col, seen));
   }
-  async function deleteMgmt(row, col){
+  // seen: 사용자가 화면에서 보고 고른 값. 그 사이 동기화로 같은 행 번호에 다른 메모가 왔으면 쓰지 않는다(엉뚱한 메모 삭제·덮어쓰기 방지).
+  function mgmtSeenGone(m, col, seen){
+    if (seen === undefined) return false;
+    if (m && String(m[col] || "") === String(seen || "")) return false;
+    toast("그 사이 목록이 바뀌었어요 — 다시 불러올게요", "err"); renderMgmt(true); doSync({ silent:true });
+    return true;
+  }
+  async function deleteMgmt(row, col, seen){
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
     if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해 주세요"); return; }
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined") { toast("앱에서만 동작해요"); return; }
-    const m = mgmtFind(row); if(!m) return;
+    const m = mgmtFind(row);
+    if(mgmtSeenGone(m, col, seen)) return;
+    if(!m) return;
     const prev = m[col];               // 롤백용 원본
     m[col] = "";                       // ① 즉시 반영
     renderMgmt();
@@ -4653,6 +4663,7 @@
   function editMgmt(row, col){
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
     if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해 주세요"); return; }
+    if (mgmtEditing) renderMgmt(true);   // 다른 항목을 편집하던 중이면 그 입력칸부터 닫는다(입력칸이 둘 생기지 않게)
     const el = document.querySelector(`.mgmt-item[data-row="${row}"][data-col="${col}"]`);
     const m = mgmtFind(row);
     if(!el || !m) return;
@@ -4666,9 +4677,9 @@
       `<button class="mact" title="취소"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`;
     const input = el.querySelector("#medit-input");
     input.value = cur; input.focus(); input.select();
-    mgmtEditing = true;
-    const save = () => { mgmtEditing = false; commitMgmt(row, col, input.value); };
-    const cancel = () => { mgmtEditing = false; renderMgmt(); };
+    mgmtEditing = { view: viewName };
+    const save = () => { mgmtEditing = false; commitMgmt(row, col, input.value, cur); };
+    const cancel = () => { mgmtEditing = false; renderMgmt(true); };
     acts.children[0].onclick = save;
     acts.children[1].onclick = cancel;
     input.onkeydown = (e) => {
@@ -4677,10 +4688,12 @@
     };
   }
 
-  async function commitMgmt(row, col, text){
+  async function commitMgmt(row, col, text, seen){
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined") { toast("앱에서만 동작해요"); return; }
-    const m = mgmtFind(row); if(!m) return;
+    const m = mgmtFind(row);
+    if(mgmtSeenGone(m, col, seen)) return;
+    if(!m) return;
     const val = String(text).trim();
     const prev = m[col];               // 롤백용 원본
     if(val === String(prev || "")) { renderMgmt(); return; }  // 변경 없으면 그냥 닫기
@@ -4698,6 +4711,7 @@
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
     collapsedState.mgmt = false; // 추가 시 섹션 펼침
     localStorage.setItem("secCollapsed", JSON.stringify(collapsedState));
+    mgmtEditing = false;   // 편집 중이던 입력칸은 닫고 추가 칸을 그린다
     mgmtAdding = true;
     mgmtAddDraft = "";
     renderMgmt(); // 포커스는 renderMgmt가 처리
@@ -4767,7 +4781,8 @@
   let mgmtEditing = false;
   function renderMgmt(force){
     ensureHosts();
-    if (mgmtEditing && !force && document.getElementById("medit-input")) return;
+    // 보드가 바뀌었으면(팀원 보드로 넘김) 편집은 끝난 것 — 그 보드의 목록을 그린다
+    if (mgmtEditing && !force && mgmtEditing.view === viewName && document.getElementById("medit-input")) return;
     mgmtEditing = false;
     $("mgmt-host").innerHTML = mgmtSectionHtml();
     if(mgmtAdding){
@@ -4911,7 +4926,11 @@
   });
   document.addEventListener("keydown", e => {
     if (e.key !== "Tab") return;
-    const ov = [...document.querySelectorAll(".overlay.show:not(.closing)")].pop(); if (!ov) return;
+    // 문서 순서가 아니라 실제로 위에 뜬 창 — 설정 위에 뜨는 단축키·확인 창은 DOM 앞쪽이지만 z-index 가 더 높다
+    const ov = [...document.querySelectorAll(".overlay.show:not(.closing)")]
+      .sort((x, y) => (parseInt(getComputedStyle(x).zIndex, 10) || 0) - (parseInt(getComputedStyle(y).zIndex, 10) || 0)).pop();
+    if (!ov) return;
+    const cp = document.getElementById("cpick"); if (cp && cp.contains(document.activeElement)) return;   // 색상 선택기는 창 밖(body)에 뜬다
     const f = [...ov.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
       .filter(el => !el.disabled && el.offsetParent !== null);
     if (!f.length) return;
@@ -4932,7 +4951,7 @@
   // Tab 으로 온 「버튼 역할 div」는 Enter·Space 로 누른다. ★:focus-visible 일 때만 — 마우스로 누른 div 에도 포커스가 남는다.
   document.addEventListener("keydown", e => {
     const el = document.activeElement;
-    if ((e.key === " " || e.key === "Enter") && el && el.tagName !== "BUTTON" && el.getAttribute && el.getAttribute("role") === "button" && el.matches(":focus-visible")) {
+    if ((e.key === " " || e.key === "Enter") && el && el.tagName !== "BUTTON" && el.getAttribute && /^(button|switch)$/.test(el.getAttribute("role") || "") && el.matches(":focus-visible")) {
       e.preventDefault(); e.stopPropagation(); el.click();
     }
   }, true);
@@ -5120,7 +5139,7 @@
     // 키보드(Tab)로 버튼에 와 있으면 Space·Enter 는 그 버튼을 누르는 키다 — 전역 단축키(동기화)로 가로채지 않는다.
     // ★:focus-visible 일 때만. 마우스로 누른 버튼에도 포커스가 남아서, 그걸 넘기면 Space 가 방금 누른 버튼(완료 비우기 등)을 또 누른다.
     if ((e.key === " " || e.key === "Enter") && ae && ae.matches && ae.matches(":focus-visible")
-        && (ae.tagName === "BUTTON" || ae.tagName === "SELECT" || ae.getAttribute("role") === "button")) return;
+        && (ae.tagName === "BUTTON" || ae.tagName === "SELECT" || /^(button|switch)$/.test(ae.getAttribute("role") || ""))) return;
 
     // Esc / (입력칸 밖)Backspace → 팝업 닫기, 메일 화면이면 타이머로, 아니면 내 보드 복귀
     if (e.key === "Escape" || (e.key === "Backspace" && !inField)) {
