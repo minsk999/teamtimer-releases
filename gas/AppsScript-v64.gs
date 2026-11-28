@@ -1,5 +1,25 @@
 // ============================================================
-//  Google Apps Script v62  (7칸 구조
+//  Google Apps Script v64  (7칸 구조
+//  - v64: 2026-11-28 작업타이머 점검(teamtimer/_audit/SCORE.md) 반영. 함수 계약·응답 키는 그대로, 새 파라미터는 전부 선택.
+//         ① 읽기 캐시 세대 번호: 쓰기마다 세대를 바꾸고, doRead 는 시작 때 세대와 put 직전 세대가 같을 때만 캐시에 넣는다.
+//            락 없는 읽기가 쓰기 전 시트를 읽고 쓰기 뒤에 끝나 옛 목록을 20초 캐시에 되넣던 경합(B-4)을 막는다.
+//         ② updateMemo: expectB/expectC(클라이언트가 읽어 간 B·C 값)가 오면 현재 값과 비교, 다르면 stale.
+//            이름 행·▼업무 구분선이면 거부. (행이 밀린 채 메모를 고치면 위 메모나 이름 칸을 덮을 수 있었다)
+//         ④ (딸깍 부탁) insert 성공 때도 버전 기록 · checkFingerprint 매개변수 linkFormula → linkF(전역 함수와 이름 겹침)
+//            · updateDue 원문·toggleDone 상태 칸에도 textSafe
+//         ③ checkFingerprint: expectLink 가 오면 요청글 링크(C/K 수식의 주소) 전체와 비교.
+//  (구) v63  (7칸 구조
+//  - v63: 2026-11-28 전문가 점검(intranet-ttalkak/SCORE.md) 반영. 함수 계약·응답 키는 그대로.
+//         ① 락을 잡은 직후 그리드 메모(_grid)를 버린다 — 락 전에 읽은 시트로 락 안에서 쓰면
+//            동시에 다른 쓰기가 행을 민 경우 남의 작업 행을 덮어쓸 수 있었다(가드도 같은 낡은 그리드를 봄).
+//         ② insert 는 제목·링크·기획안·마감을 setValues 한 번으로 쓴다 — 중간 실패 시 반쯤 쓴 행 방지.
+//         ③ 수식 주입 차단: '=' 로 시작하는 글자는 글자로 저장, HYPERLINK 주소의 " 이스케이프,
+//            javascript: 같은 다른 스킴은 수식으로 만들지 않는다(스킴 없는 주소는 v62 처럼 수식).
+//         ④ 중복 판정: idx=10 이 idx=103 에 걸리던 부분일치 → 정확 일치.
+//         ⑤ needBlank 의 행 삽입 뒤에도 flush 하고 락을 푼다.
+//         ⑥ ?action=members&name=..&ver=.. 이면 「이름·버전·마지막 접속」을 스크립트 속성에 남긴다.
+//            GET ?action=versions 로 읽는다(읽기 전용). 시트는 건드리지 않는다.
+//  (구) v62  (7칸 구조
 //  - v62: LATEST_TTALKAK_VER 1.8 → 1.8.6(기획안 열기), UPDATE_MSG 에 「인트라넷 탭은 F5」 추가. 그 밖은 v61 과 같다.
 //  (구) v61  (7칸 구조
 //  - v61: members 응답(GET/POST ?action=members)에 latestVer·updateMsg 를 항상 실어 보낸다.
@@ -204,7 +224,7 @@ var CHECK_FONT_COLOR = "#434343";
 
 // ── 딸깍 확장 버전 알림 (v57) ───────────────────────────────
 // 딸깍을 새 버전으로 배포하면 이 값을 같이 올린다.
-var LATEST_TTALKAK_VER = "1.8.6";
+var LATEST_TTALKAK_VER = "1.8.7";
 // 알림에 덧붙일 안내 (빈 문자열이면 "새 버전이 있어요"만 뜬다)
 var UPDATE_MSG = "— 받은 zip 을 기존 폴더에 덮어쓰고 chrome://extensions 에서 ↻, 인트라넷 탭은 F5 해 주세요";
 
@@ -439,7 +459,34 @@ function membersOut(o) {
   o.updateMsg = UPDATE_MSG;
   return respond(o);
 }
-function membersLight() {
+// v63: 딸깍이 팝업을 열 때 이름·버전을 실어 보낸다 — 누가 어느 버전을 쓰는지 남긴다(v1.5 사용자 파악).
+//      스크립트 속성 한 칸(이름당 1키). 같은 버전이면 6시간에 한 번만 쓴다. 실패해도 명단 응답엔 영향 없음.
+function noteClientVersion(e) {
+  try {
+    var q = (e && e.parameter) || {};
+    var name = String(q.name || "").trim(), ver = String(q.ver || "").trim();
+    if (!/^[가-힣A-Za-z]{1,12}$/.test(name) || !/^\d+(\.\d+){0,3}$/.test(ver)) return;
+    var props = PropertiesService.getScriptProperties(), key = "ttalkakVer:" + name;
+    var old = String(props.getProperty(key) || "").split("|");
+    var now = new Date();
+    if (old[0] === ver && old[1] && now - new Date(old[1]) < 6 * 3600 * 1000) return;
+    if (!old[0] && Object.keys(props.getProperties()).filter(function (k) { return k.indexOf("ttalkakVer:") === 0; }).length >= 60) return;
+    props.setProperty(key, ver + "|" + now.toISOString());
+  } catch (err) {}
+}
+function clientVersions() {
+  try {
+    var all = PropertiesService.getScriptProperties().getProperties(), out = {};
+    Object.keys(all).forEach(function (k) {
+      if (k.indexOf("ttalkakVer:") !== 0) return;
+      var v = String(all[k]).split("|");
+      out[k.slice(11)] = { ver: v[0], at: v[1] || "" };
+    });
+    return respond({ ok: true, latestVer: LATEST_TTALKAK_VER, versions: out });
+  } catch (err) { return respond({ ok: false, error: String(err) }); }
+}
+function membersLight(e) {
+  noteClientVersion(e);
   try {
     var cached = CacheService.getScriptCache().get(MEMBER_CACHE_KEY);
     if (cached) {
@@ -515,12 +562,28 @@ function cellToMd(rich, plain, formula) {
   } catch (err) { return plain; }
 }
 
+// v63: 남이 쓴 글자(인트라넷 제목·메모)가 '=' 로 시작하면 시트가 수식으로 실행한다.
+//      앞에 ' 를 붙이면 글자로 저장되고, getValue 는 ' 없이 원문을 돌려준다(읽는 쪽 영향 없음).
+function textSafe(s) {
+  s = String(s == null ? "" : s);
+  return /^=/.test(s) ? "'" + s : s;
+}
+// v63: HYPERLINK 수식은 여기서만 만든다. " 는 "" 로(수식 탈출 차단).
+//      빈 값과 http(s) 가 아닌 스킴(javascript: 등)만 null. 스킴이 없는 주소는 v62 처럼 그대로 수식으로 —
+//      타이머 입력칸이 「intranet.adef.co.kr/...」 형태를 권하고, 이 수식이 있어야 영상작업 행으로 읽힌다.
+function linkFormula(url, label) {
+  url = String(url || "").trim();
+  if (!url) return null;
+  if (/^[a-z][a-z0-9+.\-]*:/i.test(url) && !/^https?:/i.test(url)) return null;
+  return '=HYPERLINK("' + url.replace(/"/g, '""') + '","' + label + '")';
+}
+
 // 쓰기: "[라벨](주소)"가 들어오면 셀에 실제 링크(리치텍스트)로 기록 → 시트에서도 링크로 보임.
 //       링크 패턴이 없으면 일반 setValue.
 function setCellSmart(cell, val) {
   var s = String(val == null ? "" : val);
   var re = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
-  if (!re.test(s)) { cell.setValue(s); return; }
+  if (!re.test(s)) { cell.setValue(textSafe(s)); return; }
   re.lastIndex = 0;
   var display = "", spans = [], m2, last = 0;
   while ((m2 = re.exec(s)) !== null) {
@@ -534,7 +597,7 @@ function setCellSmart(cell, val) {
     var b = SpreadsheetApp.newRichTextValue().setText(display);
     spans.forEach(function (sp) { b.setLinkUrl(sp.start, sp.end, sp.url); });
     cell.setRichTextValue(b.build());
-  } catch (err) { cell.setValue(s); } // 실패 시 원문 텍스트로 폴백
+  } catch (err) { cell.setValue(textSafe(s)); } // 실패 시 원문 텍스트로 폴백
 }
 
 // ── 정렬 기본값 ─────────────────────────────────────────────
@@ -569,8 +632,16 @@ function readGrid(sheet) {
 // ★쓰기가 일어나면 반드시 버려야 한다. 안 버리면 "완료 체크했는데 되돌아옴"이 생긴다.
 var READ_CACHE_KEY = "teamtimer_read_v1";
 var READ_CACHE_SEC = 20;
+var READ_GEN_KEY = "teamtimer_read_gen";   // v64
 function bustReadCache() {
-  try { CacheService.getScriptCache().remove(READ_CACHE_KEY); } catch (e) {}
+  try {
+    var c = CacheService.getScriptCache();
+    c.remove(READ_CACHE_KEY);
+    c.put(READ_GEN_KEY, String(new Date().getTime()) + "-" + Math.random(), 21600);
+  } catch (e) {}
+}
+function readGen() {
+  try { return CacheService.getScriptCache().get(READ_GEN_KEY) || "0"; } catch (e) { return ""; }
 }
 
 // ── 공통 헬퍼 ───────────────────────────────────────────────
@@ -592,15 +663,17 @@ function respond(data) {
 //   linkFormula 는 호출자가 isVideo 판정용으로 이미 읽은 C/K 수식이다. 새로 읽지 않는다.
 //   실패 → {ok:false, stale:true, row, found, foundIdx}. busy 와 달리 재시도로 못 고친다.
 //   ⚠ updateTask 의 title 은 *바꿀 새 제목*이라 지문이 아니다 — 클라이언트가 prev.title 을 expectTitle 로 보낸다.
-function checkFingerprint(p, sheet, row, startCol, linkFormula) {
+function checkFingerprint(p, sheet, row, startCol, linkF) {
   var wantIdx   = (p.expectIdx   == null) ? "" : String(p.expectIdx).trim();
   var wantTitle = (p.expectTitle == null) ? "" : String(p.expectTitle).trim();
-  if (!wantIdx && !wantTitle) return null;
-  var curIdx   = (String(linkFormula == null ? "" : linkFormula).match(/idx=(\d+)/) || [])[1] || "";
+  var wantLink  = (p.expectLink  == null) ? "" : String(p.expectLink).trim();   // v64
+  if (!wantIdx && !wantTitle && !wantLink) return null;
+  var curIdx   = (String(linkF == null ? "" : linkF).match(/idx=(\d+)/) || [])[1] || "";
   var curTitle = String(sheet.getRange(row, startCol + COL.TITLE).getValue()).trim();
   var okIdx    = !wantIdx   || curIdx   === wantIdx;
   var okTitle  = !wantTitle || curTitle === wantTitle;
-  if (okIdx && okTitle) return null;
+  var okLink   = !wantLink  || String(extractUrl(linkF)).trim() === wantLink;   // v64: 앱이 읽어 간 것도 extractUrl 결과다
+  if (okIdx && okTitle && okLink) return null;
   return respond({ ok: false, stale: true, row: row, found: curTitle, foundIdx: curIdx,
                    error: "행이 밀렸어요 — 동기화 후 다시 시도해 주세요" });
 }
@@ -621,8 +694,9 @@ function getSheet() {
 
 // =HYPERLINK("url","label") 에서 url만 추출
 function extractUrl(formula) {
-  var m = String(formula).match(/HYPERLINK\(\s*"([^"]+)"/i);
-  return m ? m[1] : "";
+  // v63: 주소 안의 " 는 linkFormula 가 "" 로 적는다 — 되읽을 때 거기서 잘리지 않게
+  var m = String(formula).match(/HYPERLINK\(\s*"((?:[^"]|"")+)"/i);
+  return m ? m[1].replace(/""/g, '"') : "";
 }
 
 // 마감일을 항상 "MM / DD" 문자열로 통일.
@@ -797,6 +871,7 @@ function doRead(e) {
       if (hit) return ContentService.createTextOutput(hit).setMimeType(ContentService.MimeType.JSON);
     } catch (e0) {}
   }
+  var gen0 = only0 ? "" : readGen();   // v64: 이 세대가 put 직전까지 그대로일 때만 캐시에 넣는다
   var sheet    = getSheet();
   ensureMembers(sheet); // v51: 팀원 목록/읽기범위 확정
   var g        = readGrid(sheet);   // v54: ensureMembers 가 이미 읽었으면 그걸 재사용
@@ -824,7 +899,8 @@ function doRead(e) {
   var payload = JSON.stringify({ ok: true, members: members, memberNames: ALL_MEMBERS, warn: MEMBER_WARN });
   if (!only0) {
     // CacheService 는 키당 100KB 한도 — 넘으면 조용히 실패하므로 미리 거른다.
-    try { if (payload.length < 90000) CacheService.getScriptCache().put(READ_CACHE_KEY, payload, READ_CACHE_SEC); } catch (e4) {}
+    // v64: 읽는 사이 쓰기가 있었으면(세대가 바뀜) 이 응답은 쓰기 전 시트일 수 있다 — 돌려주기만 하고 캐시에는 안 넣는다.
+    try { if (payload.length < 90000 && gen0 && readGen() === gen0) CacheService.getScriptCache().put(READ_CACHE_KEY, payload, READ_CACHE_SEC); } catch (e4) {}
   }
   return ContentService.createTextOutput(payload).setMimeType(ContentService.MimeType.JSON);
 }
@@ -848,6 +924,25 @@ function updateMemo(p) {
 
   // 파라미터 이름: memoB/memoC 사용 (구글이 POST 파라미터 'c'를 차단 → 이름 변경).
   // 옛 b/c도 호환 수용.
+  // v64 ★행 지문 — 이름 행·구분선은 메모가 아니다. 그리고 앱이 읽어 간 B·C 가 지금도 그 행에 있어야 쓴다.
+  //   앱이 읽는 값은 buildMemberData 와 같은 cellToMd 변환이므로 같은 변환으로 비교한다. 안 보내면(옛 앱) 건너뛴다.
+  var g = readGrid(sheet), base = startCol - 1, r0 = row - 1;
+  if (r0 < g.data.length && (nameAtRow(g.data, g.forms, r0, base) || isDividerRow(g.data, g.forms, r0, base))) {
+    // 지문을 보낸 앱이면 stale 로 — 행이 밀린 것이라 다시 받으면 풀린다(앱이 재동기화한다)
+    return respond({ ok: false, stale: (p.expectB != null || p.expectC != null),
+                     error: "이 행은 이름 행·구분선이라 메모 수정 대상이 아닙니다. row=" + row });
+  }
+  if (p.expectB != null || p.expectC != null) {
+    var bCell = sheet.getRange(row, startCol + COL.TITLE), cCell = sheet.getRange(row, startCol + COL.LINK);
+    var curB = cellToMd(bCell.getRichTextValue(), bCell.getValue(), bCell.getFormula());
+    var curC = cellToMd(cCell.getRichTextValue(), cCell.getValue(), "");
+    if ((p.expectB != null && String(p.expectB).trim() !== String(curB).trim()) ||
+        (p.expectC != null && String(p.expectC).trim() !== String(curC).trim())) {
+      return respond({ ok: false, stale: true, row: row, found: String(curB || curC).slice(0, 40),
+                       error: "행이 밀렸어요 — 동기화 후 다시 시도해 주세요" });
+    }
+  }
+
   var bv = (typeof p.memoB !== "undefined") ? p.memoB : p.b;
   var cv = (typeof p.memoC !== "undefined") ? p.memoC : p.c;
   var hasB = (typeof bv !== "undefined");
@@ -1028,7 +1123,7 @@ function toggleDone(p) {
     chkCell.setValue(done);                 // 체크박스 A/I
     chkCell.setFontColor(CHECK_FONT_COLOR); // v50: 체크박스 색 통일
     var statusCell = sheet.getRange(row, startCol + COL.STATUS); // 상태 G/O
-    statusCell.setValue(status);
+    statusCell.setValue(textSafe(status));   // v64: textSafe
     statusCell.setHorizontalAlignment("left"); // G/O 좌측정렬
     SpreadsheetApp.flush();
   } catch (e) {
@@ -1062,7 +1157,7 @@ function updateDue(p) {
       dueCell.setValue(new Date(+dm[1], +dm[2] - 1, +dm[3]));
       dueCell.setNumberFormat("mm / dd"); // 캘린더 작동 + MM/DD 표시
     } else {
-      dueCell.setValue(dueDate); // 형식 다르면 원문
+      dueCell.setValue(textSafe(dueDate)); // 형식 다르면 원문(v64: textSafe)
     }
     dueCell.setHorizontalAlignment("center");
     SpreadsheetApp.flush();
@@ -1096,18 +1191,20 @@ function updateTask(p) {
   try {
     // 제목 (B/J)
     var titleCell = sheet.getRange(row, startCol + COL.TITLE);
-    titleCell.setValue(title);
+    titleCell.setValue(textSafe(title));
     titleCell.setHorizontalAlignment("left"); // B/J 좌측정렬
     // 요청글 링크 (C/K) — HYPERLINK 수식
     var linkCell = sheet.getRange(row, startCol + COL.LINK);
-    if (url) linkCell.setFormula('=HYPERLINK("' + url + '","🔗요청글링크")');
-    else     linkCell.clearContent();
+    var lf = linkFormula(url, "🔗요청글링크");
+    if (lf) linkCell.setFormula(lf);
+    else    linkCell.clearContent();
     linkCell.setHorizontalAlignment("left"); // C/K 좌측정렬
     // 기획안 링크 (D/L) — http면 HYPERLINK, 아니면(NAS 경로·텍스트) 그대로 텍스트
     var planCell = sheet.getRange(row, startCol + COL.PLAN);
     if (planLink) {
-      if (planLink.indexOf("http") === 0) planCell.setFormula('=HYPERLINK("' + planLink + '","🔗기획안링크")');
-      else planCell.setValue(planLink); // NAS 경로(/cr/...)·일반 텍스트는 수식이 아니라 값으로
+      var pf = planLink.indexOf("http") === 0 ? linkFormula(planLink, "🔗기획안링크") : null;   // v62 규칙: 기획안은 http 일 때만 수식
+      if (pf) planCell.setFormula(pf);
+      else planCell.setValue(textSafe(planLink)); // NAS 경로(/cr/...)·일반 텍스트는 수식이 아니라 값으로
     } else {
       planCell.clearContent();
     }
@@ -1116,7 +1213,7 @@ function updateTask(p) {
     var dm = dueDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     var dueCell = sheet.getRange(row, startCol + COL.DATE);
     if (dm) { dueCell.setValue(new Date(+dm[1], +dm[2] - 1, +dm[3])); dueCell.setNumberFormat("mm / dd"); }
-    else if (dueDate) { dueCell.setValue(dueDate); }
+    else if (dueDate) { dueCell.setValue(textSafe(dueDate)); }
     dueCell.setHorizontalAlignment("center");
     SpreadsheetApp.flush();
   } catch (e) {
@@ -1263,7 +1360,8 @@ function fixCheckboxColors() {
 // ── 라우팅 ──────────────────────────────────────────────────
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || "";
-  if (action === "members") return membersLight();  // 업무현황 시트 안 읽음
+  if (action === "members") return membersLight(e);  // 업무현황 시트 안 읽음
+  if (action === "versions") return clientVersions(); // v63: 팀원별 딸깍 버전(읽기 전용)
   if (action === "read")    return doRead(e);       // doRead 안에서 ensureMembers 호출
   return respond({ ok: true, message: "웹앱 정상 동작 중" });
 }
@@ -1274,7 +1372,7 @@ function doPost(e) {
     var p      = e.parameter;
     var action = p.action || "insert";
 
-    if (action === "members")    return membersLight();  // 업무현황 시트 안 읽음
+    if (action === "members")    return membersLight(e);  // 업무현황 시트 안 읽음
     ensureMembers();
     if (action === "read")       return doRead(e);
 
@@ -1290,6 +1388,9 @@ function doPost(e) {
       lock = null;
       return respond({ ok: false, busy: true, error: "다른 저장이 진행 중이에요. 잠시 후 다시 시도해 주세요." });
     }
+    // v63 ★락 전에 ensureMembers 가 읽어 메모한 그리드는 버린다. 그사이 다른 쓰기가 행을 밀었을 수 있다 —
+    //   낡은 그리드로 삽입 위치를 잡으면 목적지 가드도 같은 낡은 값을 봐서 남의 행을 덮어쓴다.
+    _grid = null;
 
     // v54 ★쓰기 경로: 읽기 캐시를 버리고 실행한 뒤 **한 번 더** 버린다.
     //   (v60: 이 bustReadCache 는 락 안쪽이다. 밖에 두면 "버리고 → 남이 옛 데이터 재캐싱 → 쓰기"
@@ -1314,7 +1415,7 @@ function doPost(e) {
     }
     if (out) { bustReadCache(); return out; }
 
-    // ===== 이하 기존 전송(insert) 로직 — 변경 없음 =====
+    // ===== 이하 전송(insert) — v55~v58 경계 판정, v63 한 번에 쓰기·수식 주입 차단 =====
     var target    = p.targetMember || "";
     var title     = p.title        || "(제목 없음)";
     var sourceUrl = p.url          || "";
@@ -1366,10 +1467,11 @@ function doPost(e) {
     // 중복 체크
     if (dupCheck && sourceUrl) {
       var idxNum   = (sourceUrl.match(/idx=(\d+)/) || [])[1];
+      var idxRe    = idxNum ? new RegExp("idx=" + idxNum + "(?!\\d)") : null;   // v63: 10 이 103 에 걸리지 않게
       var formulas = sheet.getRange(scanStart + 1, startCol + COL.LINK, scanLen, 1).getFormulas();
       for (var i = 0; i < scanLen; i++) {
         var hay = String(allData[scanStart + i][startCol - 1 + COL.LINK]) + String(formulas[i][0]);
-        if (idxNum ? hay.indexOf("idx=" + idxNum) !== -1 : hay.indexOf(sourceUrl) !== -1) {
+        if (idxRe ? idxRe.test(hay) : hay.indexOf(sourceUrl) !== -1) {
           return respond(withVer({ ok: false, duplicate: true, message: "이미 등록된 게시글입니다." }, clientVer));
         }
       }
@@ -1427,28 +1529,23 @@ function doPost(e) {
     checkCell.insertCheckboxes();
     checkCell.setFontColor(CHECK_FONT_COLOR); // v50: 윗행 서식복사로 옮아온 연한 회색 차단
 
-    sheet.getRange(insertRow, startCol + COL.TITLE, 1, 4).setValues([[title, "", "", dateValue]]);
+    // v63: 제목·요청글·기획안·마감(B~E / J~M)을 한 번에 쓴다. 예전엔 여러 번 나눠 써서 중간 실패 시
+    //      반쯤 쓴 행이 남았고, 링크 전에 멈추면 재전송이 중복 검사를 지나 두 번째 행을 만들었다.
+    //      setValues 는 '=' 로 시작하는 문자열을 수식으로 넣는다 — 링크만 수식, 나머지는 textSafe.
+    var planVal = !planLink ? "" : (planLink.indexOf("http") === 0 && linkFormula(planLink, "🔗기획안링크")) || textSafe(planLink);   // v62 규칙: 기획안은 http 일 때만 수식
+    sheet.getRange(insertRow, startCol + COL.TITLE, 1, 4).setValues([[
+      textSafe(title),
+      linkFormula(sourceUrl, "🔗요청글링크") || "",
+      planVal,
+      (dateValue instanceof Date) ? dateValue : textSafe(dateValue)
+    ]]);
+    // 메모(F/N)는 있을 때만 — 비어 있으면 그 칸을 건드리지 않는다(v62 와 같음)
+    if (memo) sheet.getRange(insertRow, startCol + COL.MEMO).setValue(textSafe(memo));
     sheet.getRange(insertRow, startCol + COL.CHECK).setValue(false);
     var dueCell = sheet.getRange(insertRow, startCol + COL.DATE);
     if (dateValue instanceof Date) dueCell.setNumberFormat("mm / dd"); // 캘린더 작동 + MM/DD 표시
     dueCell.setHorizontalAlignment("center");
 
-    if (sourceUrl) {
-      sheet.getRange(insertRow, startCol + COL.LINK)
-           .setFormula('=HYPERLINK("' + sourceUrl + '","🔗요청글링크")');
-    }
-    if (planLink) {
-      var planCellIns = sheet.getRange(insertRow, startCol + COL.PLAN);
-      if (planLink.indexOf("http") === 0) {
-        planCellIns.setFormula('=HYPERLINK("' + planLink + '","🔗기획안링크")');
-      } else {
-        planCellIns.setValue(planLink); // NAS 경로(/cr/...)·일반 텍스트는 값으로
-      }
-    }
-    if (memo) {
-      // 메모 → F열(좌측) / N열(우측). 시작열+COL.MEMO(5)
-      sheet.getRange(insertRow, startCol + COL.MEMO).setValue(memo);
-    }
 
     // 새 행 정렬 기본값: 대부분 좌측, E/M·F/N만 중앙 (정렬 어긋남 방지)
     applyDefaultAlignment(sheet, insertRow, startCol);
@@ -1459,9 +1556,11 @@ function doPost(e) {
       sheet.insertRowAfter(insertRow);
       sheet.getRange(insertRow + 1, 1, 1, sheet.getLastColumn())
            .clearContent().clearDataValidations().clearFormat();
+      SpreadsheetApp.flush();   // v63: 행 삽입까지 반영한 뒤 락을 푼다
     }
 
     bustReadCache();   // v54: insert 도 읽기 캐시를 버린다
+    noteClientVersion({ parameter: { name: target, ver: clientVer } });   // v64: 전송할 때도 「누가 어느 버전」 기록
     return respond(withVer({ ok: true, message: target + " " + insertRow + "행 추가됨 (섹션끝:" + scanEnd + ", needBlank:" + needBlank + ")" }, clientVer));
 
   } catch (err) {

@@ -1,7 +1,7 @@
 # GAS (Google Apps Script) — 작업타이머 시트 API
 
 > ## ⚠️ 이 폴더는 **참조 사본**이다
-> **정본: `intranet-ttalkak/server/GoogleAppsScript.v62.gs`** (2026-11-27 배포 확인 — v61 은 09-21, v60 은 09-18)
+> **정본: `intranet-ttalkak/server/GoogleAppsScript.v64.gs`** (2026-11-28 배포 — 웹앱 버전 76. v63 은 같은 날 버전 75, v62 는 11-27)
 > (배포 진실원천은 그대로 Apps Script 편집기)
 >
 > 이 웹앱은 **작업타이머와 인트라넷 딸깍이 공유**한다. 배포본이 하나뿐이라
@@ -20,7 +20,7 @@
 
 | 파일 | 내용 |
 |---|---|
-| `AppsScript-v62.gs` | 배포본의 사본 (정본에서 복사, LF). v61 = v60 + `?action=members` 응답에 `latestVer`·`updateMsg` 상시 포함(딸깍 팝업 알림용, 타이머는 무시). v62 = v61 + 상수 두 줄(`LATEST_TTALKAK_VER` 1.8.6, `UPDATE_MSG` 문구) — 함수는 그대로 |
+| `AppsScript-v64.gs` | 배포본의 사본 (정본에서 복사, LF). v64 = v63(딸깍 세션: 락 직후 그리드 다시 읽기·insert 한 번에 쓰기·수식 주입 차단·딸깍 버전 기록) + 타이머 세션: 읽기 캐시 세대 번호(쓰기와 겹친 읽기는 캐시에 안 넣음) · 메모 지문 expectB/expectC + 이름 행·구분선 거부 · expectLink. 새 키는 전부 선택(안 보내면 v63 과 같다) |
 | `v56-expectTitle-초안.md` | 행 지문 검사 설계 기록 — v60 으로 실현됨 |
 
 ## v60 이 v54 에서 바꾼 것 (v55~v60 누적, 딸깍 세션 작업)
