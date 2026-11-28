@@ -2,7 +2,7 @@
 // 실제 서버 함수(setCellSmart·cellToMd, gas/ 최신 사본)와 왕복시켜 시트 글자·링크가 망가지지 않는지 본다.
 "use strict";
 const fs = require("fs"), vm = require("vm"), path = require("path");
-const lines = fs.readFileSync(path.join(__dirname, "..", "renderer", "index.html"), "utf8").split(/\r?\n/);
+const lines = require("./renderer-src.js")().split(/\r?\n/);
 const grab = name => {
   let s = lines.findIndex(l => new RegExp("^  function " + name + "\\(").test(l));
   if (s < 0) { s = lines.findIndex(l => new RegExp("^  const " + name + " = ").test(l)); if (s >= 0) return lines[s]; }

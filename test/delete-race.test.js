@@ -9,12 +9,9 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const DR = require(path.join(__dirname, "delete-race.scenarios.js"));
 
-const file = process.env.TT_RENDERER || path.join(__dirname, "..", "renderer", "index.html");
-const html = fs.readFileSync(file, "utf8");
-const open = html.indexOf("<script>"), close = html.lastIndexOf("</script>");
-if (open < 0 || close < open) throw new Error("인라인 <script> 를 못 찾았어요: " + file);
-const code = html.slice(open + "<script>".length, close);
-const script = new vm.Script(code, { filename: "index.html(inline)" });
+const file = process.env.TT_RENDERER || path.join(__dirname, "..", "renderer", "app.js");
+const code = require("./renderer-src.js")(process.env.TT_RENDERER);
+const script = new vm.Script(code, { filename: "renderer(app.js)" });
 
 function makeEl(id) {
   const cls = new Set();

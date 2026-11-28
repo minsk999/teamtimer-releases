@@ -15,7 +15,8 @@ Windows 정상. ⚠️ **맥은 v1.0.27~1.0.30 이 실기 미검증**이다(`TOD
 ```
 main.js                 메인 프로세스 (창/트레이/Gmail/공휴일/업데이트확인)
 preload.js              contextBridge (window.timerAPI)
-renderer/index.html     UI 전체 (단일 파일, ~330KB, CSS+JS 인라인)
+renderer/index.html     UI 의 HTML·CSS (스크립트는 v1.0.43 부터 renderer/app.js — 예전 인라인 <script> 를 그대로 옮김)
+renderer/app.js         UI 스크립트 전체(전역 함수 — 인라인 onclick 이 부른다). 시험은 test/renderer-src.js 로 읽는다
 main-lib.js             main.js 의 순수 함수(버전 비교·링크 검사·맥 자산·해시 대조) — ★build.files 에 있어야 한다
 tools/release-notes.js  설명서 변경 내역 → 릴리스 본문(한국어)
 patch-mac-name.js       CI mac job 전용 — productName을 ASCII로
@@ -60,7 +61,8 @@ npm run build:win    # nsis exe
 npx electron .       # 개발모드
 ```
 릴리스: package.json version 올림 → `git tag vX.Y.Z` → 태그 push → CI 자동 빌드.
-빌드 후 릴리스 제목을 `작업 타이머 vX.Y.Z`로 PATCH (API). 검증 전이면 `prerelease:true`로 두면
+릴리스 제목(`작업 타이머 vX.Y.Z`)·본문은 v1.0.43 부터 CI 가 넣는다. ⚠️ 승격하거나 본문을 손으로 고친 뒤 그 태그 실행을 **다시 돌리면**
+제목·본문이 덮이고 prerelease 로 되돌아간다(latest 가 직전 판으로 — 팀 배너가 사라짐). 다시 돌렸으면 승격을 다시 할 것. 검증 전이면 `prerelease:true`로 두면
 앱의 업데이트 배너가 안 뜬다(`releases/latest`가 prerelease를 건너뛰므로).
 
 ## ⚠️ macOS 필수 규칙 — 어기면 앱이 실행되지 않음
@@ -111,7 +113,7 @@ CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lip
 - **커밋 전:** `git config user.name "minsk999" && git config user.email "minsk999@users.noreply.github.com"`
 - **파일 수정은 단계마다 즉시 저장.** 마지막에 한 번에 쓰면 중간 실패 시 앞 작업이 전부 유실됨 (실제로 겪음).
 - **한글 문자열에 `unicode_escape` 변환 금지.** 한글이 mojibake로 깨짐 (실제로 겪음).
-- renderer/index.html 수정 후 검증: `<script>` 블록 추출 → `node --check`
+- 렌더러 수정 후 검증: `node --check renderer/app.js`(`_audit/verify.sh` 가 함께 돈다) + `npm test` · 화면 약속은 `npm run test:ui`(이 PC 의 헤드리스 크롬)
 - `find -delete`로 레포 정리 금지. `grep -c`가 0이면 종료코드 1 → `set -e`에서 분리.
 - 새 레포 첫 푸시: 태그+브랜치 동시 푸시는 워크플로 미발화 → 태그 별도 push.
 - **작업본의 모든 파일이 CRLF다**(`core.autocrlf=true`). Python 으로 치환할 땐 반드시 **바이너리로**
@@ -154,7 +156,8 @@ CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lip
 - **릴리스·승격·되돌리기 절차** (2026-11-28 정리)
   1. main 에서 `npm run bump X.Y.Z` → `git checkout -- docs/index.html` 로 docs 는 되돌리고 package.json 만 커밋(main 의 docs 는 곧바로 공개 페이지다).
   2. `docs-vX.Y.Z` 가지를 직전 docs 가지(또는 main)에서 만들고 main 을 합친 뒤, package.json 을 잠시 직전 버전으로 돌려 `node bump-version.js X.Y.Z` 로 docs 만 올리고 변경 내역을 손으로 쓴다.
-  3. main 에서 `git tag vX.Y.Z` → 태그 푸시 → CI(시험 → 빌드 → **prerelease**). 본문은 `node tools/release-notes.js X.Y.Z <docs 가지의 index.html>` → `gh release edit vX.Y.Z --notes-file`.
+  3. main 에서 `git tag vX.Y.Z` → 태그 푸시 → CI(시험 → 빌드 → **prerelease**). ★`docs-vX.Y.Z` 가지를 **태그보다 먼저 푸시**할 것 — v1.0.43 부터 CI 가 그 가지의 설명서로
+     `tools/release-notes.js` 를 돌려 본문을 넣는다(가지가 없으면 「설명서 참고」 한 줄). STATUS 에 「prerelease」라고 적는 건 **릴리스가 실제로 생긴 걸 확인한 뒤**(`gh release view`).
   4. 승격(사용자 「승격해」): `gh release edit vX.Y.Z --prerelease=false --latest` → docs 가지를 main 에 합쳐 푸시 → 가지 삭제.
   5. **되돌리기**: `allowDowngrade` 가 꺼져 있어 직전 latest 를 다시 latest 로 지정해도 **이미 받은 PC 는 내려가지 않는다**. 고친(또는 되돌린) 코드로 다음 패치 버전을 내서 같은 절차로 올린다.
      1.0.39 부터 윈도 메일 토큰이 암호화돼, 그 아래 판을 손으로 다시 설치하면 메일을 다시 연결해야 한다.
@@ -212,16 +215,21 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 - ★**팝업이 붙잡은 카드는 `findPinned()` 로 다시 찾는다.** 카드 id = 시트 행 번호라, 편집·완료·마감 창이 떠 있는 사이 목록이 당겨지면
   같은 id 가 옆 카드를 가리킨다 — 그대로 확정하면 **옆 카드가 완료·수정됐다**(수정 전 코드로 재현). pin = 카드 객체 + 제목·링크 + 「같은 것 몇 줄 중 몇 번째」.
   목록이 그대로면 같은 객체, 교체됐으면 제목·링크로 찾되 줄 수가 달라졌거나 쌍둥이들이 같은 폭으로 밀린 게 아니면 쓰지 않고 안내한다. 새 팝업을 만들 때도 같은 규칙.
-- **테스트:** `npm test` = 업무시간 계산(`test/workhours.test.js`) · 쓰기↔동기화 경합 시나리오(`test/delete-race.test.js`, 가짜 시트 서버·가짜 시계) · 링크 판정(`test/weburl.test.js`) · **실제 서버 코드**를 vm 에 올린 서버 약속(`test/gas/gas.test.js`, gas/ 의 최신 사본 자동) · main 순수 함수(`test/main-lib.test.js`). 건수는 출력 참조(문서에 숫자를 적지 않는다 — 늘 낡는다). 릴리스 CI 도 같은 `npm test` 를 돈다. 수정 전 코드 재현은 `TT_RENDERER=<옛 파일>`.
+- **테스트:** `npm test` = 업무시간 계산(`test/workhours.test.js`) · 쓰기↔동기화 경합 시나리오(`test/delete-race.test.js`, 가짜 시트 서버·가짜 시계) · 링크 판정(`test/weburl.test.js`) · **실제 서버 코드**를 vm 에 올린 서버 약속(`test/gas/gas.test.js`·스마트 칩 `test/gas/chips.test.js`, gas/ 의 최신 사본 자동, 다른 판은 `TT_GAS=<파일>`) · main 순수 함수(`test/main-lib.test.js`) · 관리항목 링크 변환과 서버 왕복(`test/memolink.test.js`). 정본 목록은 `package.json` 의 `scripts.test`. 건수는 출력 참조(문서에 숫자를 적지 않는다 — 늘 낡는다). 릴리스 CI 도 같은 `npm test` 를 돈다. 수정 전 코드 재현은 `TT_RENDERER=<옛 파일>`.
   실제 DOM 실행은 `test/delete-race.browser.js` 머리말(launch.json `teamtimer-root`, 8733). ⚠️ 실제 Electron·실제 GAS 로는 돌리지 않았다.
-- 남은 한계(전부 검수에서 재현·기록, 빈도는 **재지 못했다** — 실제 시트 요청 금지):
-  · 같은 게시글·같은 제목 두 줄(쌍둥이)은 서버 지문이 구별 못 한다.
+  ⚠️ 실제 Electron 시험에서 `location.reload()` 는 먹지 않는다(`will-navigate` 차단, v1.0.39~) — 이름을 넣은 뒤엔 `doSync()` 를 직접 부를 것(`_audit/realapp/quick.js`).
+- 남은 한계(전부 검수에서 재현·기록). 빈도 실측(2026-11-28, `?action=read` 읽기 전용): 작업 112줄 중 **쌍둥이 0 · 게시글 번호 없는 링크 0**(빈 링크 1).
+  · 같은 게시글·같은 제목 두 줄(쌍둥이)은 서버 지문이 구별 못 한다(실측 0줄).
   · **링크에 게시글 번호(idx)가 없는 카드**(앱에서 손으로 넣은 외부 링크)는 v1.0.38 까지 지문이 제목뿐이었다. v1.0.39 부터 네 액션 모두 링크 전체(`expectLink`)를
     보내고 서버 v64 가 비교한다 — 서버가 v64 미만이면 그 키를 무시하므로 여전히 열려 있다.
   · 관리항목(메모) 수정·삭제는 v1.0.39 부터 고치는 칸의 고치기 전 값(`expectB`/`expectC`)을 보낸다(서버 v64 가 비교, 이름 행·구분선은 거부). v63 까지는
-    행이 밀린 채 메모를 지우면 **팀원 이름 칸이 지워졌다**(실제 서버 코드로 재현, `_audit/gas-v64/v64-test.js`).
-  · 카드를 지운 직후 수 초(삭제 응답 + 확인 동기화가 반영되기 전) 그 아래 카드의 완료·마감·수정은 「…가 그 자리에 있어요」로 한 번 거부된다(v1.0.34 와 같음,
-    옆 카드에 기록되지는 않는다). 삭제처럼 자동 재시도를 넣는 설계는 `TODO.md` B-5.
+    행이 밀린 채 메모를 지우면 **팀원 이름 칸이 지워졌다**(실제 서버 코드로 재현, 지금은 `test/gas/gas.test.js`).
+  · ~~카드를 지운 직후 그 아래 카드의 완료·마감·수정이 한 번 거부되던 것~~ → **v1.0.43 B-5**: stale 이면 다시 받아 같은 지문(완료 여부까지)이
+    누를 때도 지금도 한 줄뿐이고 행이 바뀌었을 때만 새 행으로 **한 번** 재전송(`retryRowWrite`). 쌍둥이·없어짐·같은 행(낡은 캐시)은 예전처럼 안내만. 시나리오 S1·RS3·E6·R1~R5.
+  · 관리 항목 추가가 시간 초과되면 서버엔 들어갔을 수 있다 — v1.0.43 부터 10분 안에 같은 글을 다시 보내면 먼저 새로 받아 보고 이미 있으면 보내지 않는다(`timedOutMemos`, 시나리오 MD1·MD2).
+    서버 addMemo 에는 중복 검사가 없다(앱 쪽 방어뿐).
+  · 시트의 **스마트 칩**이 든 관리 항목을 앱에서 고치면 칩이 일반 셀 링크로 바뀐다(글자·주소는 남음 — setCellSmart 가 칩을 다시 만들지 않는다).
+    칩 읽기(Sheets API)가 실패하면 글자만 넘어오고, 그때 지문이 어긋나 「다시 불러올게요」가 날 수 있다(빈도 미측정).
   · 완료/마감/수정은 「겹침 + 낡은 캐시」가 함께 오면 최대 25초쯤 되돌아가 보였다 스스로 맞춰진다. 쓰기 ok 뒤 새 목록이 반영되기 전에 팀원 보드를 다녀와도 같다.
   · 맨 아래 카드를 지울 때 다른 PC 의 읽기가 겹치면 그 카드가 25~50초쯤 다시 보였다 스스로 사라진다(다시 누르면 바로 정리된다).
   · 끝에서 둘째 → 맨 아래 순서로 지운 뒤 첫 번째 것을 곧바로 다시 보내면 새 카드가 최대 26초 가려진다(묘비 오탐의 남은 모양).
@@ -288,7 +296,7 @@ C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도�
   응답 예: `{"ok":true,"members":[...],"source":"config"}` — `source:"config"` = 자동화 시트에서 읽음
 
 ## 연계 제품
-- **인트라넷 딸깍** (크롬 확장, 현재 **v1.8.9** — 11-28 게시, 팀원은 각자 받아야 한다. 버전 정본은 딸깍 저장소 STATUS) — 인트라넷 게시글 → 시트 전송.
+- **인트라넷 딸깍** (크롬 확장, 현재 **v1.8.11** — 11-28 게시, 팀원은 각자 받아야 한다. 버전 정본은 딸깍 저장소 STATUS) — 인트라넷 게시글 → 시트 전송.
   소스는 `docs/intranet-ddalkkak-extension.zip` 안에만 있음. 수정 시 압축 풀고 → 수정 → 재압축 → manifest version 올림.
 - **BatchRenameComps** (AE CEP 확장) — 별도 레포 `minsk999/batchrenamecomps-releases`
 - **Slate** — 영상팀 work hub, 단일 HTML 프로토타입 (별도 진행)

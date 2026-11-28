@@ -36,4 +36,35 @@ function digestOk(want, haveHex) {
   return { ok: w === 'sha256:' + String(haveHex || '').toLowerCase(), reason: 'mismatch' };
 }
 
-module.exports = { cmpVer, isSafeUrl, pickMacAsset, digestOk };
+// 저장된 창 자리(b)를 지금 화면에 맞춘다. wa = 주 화면 workAreaSize, areas = 모든 화면의 workArea 배열.
+// 크기는 주 화면 작업영역으로 줄이고, 자리는 어느 화면 안에 걸려 있을 때만 쓴다(모니터를 뺀 경우). 못 쓰면 null.
+function fitWinState(b, wa, areas) {
+  if (!b || !(b.width >= 320 && b.height >= 420)) return null;
+  b.width = Math.min(b.width, wa.width); b.height = Math.min(b.height, wa.height);   // 큰 모니터에서 쓰던 크기가 작은 화면에서 넘치지 않게
+  if (typeof b.x !== 'number' || typeof b.y !== 'number') return { width: b.width, height: b.height };
+  const onScreen = (areas || []).some(a =>
+    b.x + 40 >= a.x && b.y >= a.y && b.x + 120 <= a.x + a.width && b.y + 40 <= a.y + a.height);
+  return onScreen ? b : { width: b.width, height: b.height };
+}
+
+// 받아 둔 업데이트 파일 이름 → { act:'skip' }(버전 못 읽음) | { act:'delete', ver }(현재 이하) | { act:'keep', ver }(더 새것)
+function pendingVerdict(fileName, curVer) {
+  const m = String(fileName || '').match(/(\d+\.\d+\.\d+)/);
+  if (!m) return { act: 'skip' };
+  return { act: cmpVer(m[1], curVer) <= 0 ? 'delete' : 'keep', ver: m[1] };
+}
+
+// 받아 둔 버전(pendVer)이 지금 릴리스와 같고 현재보다 새면 그 릴리스의 sha512(files[0] 우선)를, 아니면 null
+function pendingWant(updateInfo, curVer, pendVer) {
+  const u = updateInfo;
+  const want = u && (u.files && u.files[0] ? u.files[0].sha512 : u.sha512);
+  if (!(u && cmpVer(u.version, curVer) > 0 && u.version === pendVer && want)) return null;
+  return want;
+}
+
+// 받아 둔 파일의 실제 해시(have)·기록된 해시(infoSha)가 둘 다 릴리스 해시(want)와 같을 때만 되살린다
+function pendingHashOk(want, have, infoSha) {
+  return !!want && have === want && infoSha === want;
+}
+
+module.exports = { cmpVer, isSafeUrl, pickMacAsset, digestOk, fitWinState, pendingVerdict, pendingWant, pendingHashOk };

@@ -4,7 +4,7 @@
 "use strict";
 const fs = require("fs"), vm = require("vm");
 const path = require("path");
-const html = fs.readFileSync(path.join(__dirname, "..", "renderer", "index.html"), "utf8");
+const html = require("./renderer-src.js")();
 const lines = html.split(/\r?\n/);
 function block(startRe, endRe, from = 0){
   let s = -1; for(let i = from; i < lines.length; i++){ if(startRe.test(lines[i])){ s = i; break; } }

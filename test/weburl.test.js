@@ -1,7 +1,7 @@
 // weburl.test.js — renderer/index.html 의 webUrl(카드 링크를 밖으로 열어도 되는가)을 꺼내 확인한다.
 "use strict";
 const fs = require("fs"), vm = require("vm"), path = require("path");
-const lines = fs.readFileSync(path.join(__dirname, "..", "renderer", "index.html"), "utf8").split(/\r?\n/);
+const lines = require("./renderer-src.js")().split(/\r?\n/);
 const s = lines.findIndex(l => /^  function webUrl\(u\)\{/.test(l));
 const e = lines.findIndex((l, i) => i > s && /^  \}$/.test(l));
 if (s < 0 || e < 0) throw new Error("webUrl 을 찾지 못함");

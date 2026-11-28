@@ -7,11 +7,12 @@ on:
     tags:
       - 'v*'
   release:
-    types: [published]   # 웹 UI에서 "Publish release" 해도 빌드 → 그 릴리스에 파일 자동 첨부
+    types: [published]   # 웹 UI 「Publish release」 — 빌드만 돈다(아래 release 잡은 태그 push 때만이라 파일은 붙지 않는다)
   workflow_dispatch: {}
 
+# 기본은 읽기만. 릴리스를 만드는 Publish Release 잡에만 쓰기 권한을 준다.
 permissions:
-  contents: write   # Releases 생성/업로드 권한
+  contents: read
 
 jobs:
   build:
@@ -27,10 +28,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false   # 빌드 스크립트·의존성이 토큰을 못 줍게
 
       - name: Setup Node 22
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
 
@@ -148,8 +151,11 @@ jobs:
           V=$(node -p "require('./package.json').version")
           case "$P" in *"$V"*) ;; *) echo "::error::latest.yml 의 파일 이름에 버전 $V 이 없습니다"; exit 1;; esac
 
+      # ★GitHub 쪽 일시 장애(CreateArtifact 시간 초과)로 한 번 실패하면 아래 단계가 같은 이름으로 다시 올린다.
       - name: Upload build artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        id: upload1
+        continue-on-error: true
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: build-${{ matrix.os }}
           path: |
@@ -166,6 +172,22 @@ jobs:
           #   릴리스 자산으로 옮겨지고 나면 아티팩트는 쓸모없으므로 하루만 둔다.
           retention-days: 1
 
+      # 첫 시도가 아티팩트를 반쯤 만들고 죽었으면 같은 이름이 남아 409 가 나므로 overwrite 로 지우고 다시 올린다.
+      - name: Upload build artifacts (retry)
+        if: steps.upload1.outcome == 'failure'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: build-${{ matrix.os }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          if-no-files-found: ignore
+          retention-days: 1
+          overwrite: true
+
   release:
     name: Publish Release
     needs: build
@@ -173,19 +195,46 @@ jobs:
     #   그대로 두면 웹 UI 로 승격(Publish)한 릴리스를 이 잡이 다시 prerelease 로 되돌린다.
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 릴리스 생성·자산 업로드
     steps:
+      # tools/release-notes.js 와 docs 를 읽으려고 받는다(공개 저장소라 가지 fetch 에 토큰이 필요 없다).
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      # ★새 버전의 변경 내역은 main 이 아니라 docs-vX.Y.Z 가지의 docs/index.html 에 있다(main 의 docs = 공개 페이지).
+      #   가지가 없으면 main 의 docs 로, 거기에도 항목이 없으면 설명서 링크 한 줄로 대신한다.
+      - name: Build release notes
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          DOCS=docs/index.html
+          if git fetch --depth=1 origin "refs/heads/docs-${TAG}" 2>/dev/null; then
+            git show FETCH_HEAD:docs/index.html > "$RUNNER_TEMP/docs.html" && DOCS="$RUNNER_TEMP/docs.html"
+            echo "변경 내역 출처: docs-${TAG} 가지"
+          else
+            echo "::warning::docs-${TAG} 가지를 못 받았어요 — main 의 docs 로 본문을 만듭니다(가지를 태그보다 먼저 푸시했는지 확인)"
+          fi
+          if ! node tools/release-notes.js "$TAG" "$DOCS" > "$RUNNER_TEMP/notes.md"; then
+            echo "::warning::${TAG} 변경 내역을 설명서에서 못 찾아 본문을 링크 한 줄로 대신합니다 — gh release edit 로 채워 주세요"
+            echo "변경 내역은 [설명서](https://minsk999.github.io/teamtimer-releases/)를 참고해 주세요." > "$RUNNER_TEMP/notes.md"
+          fi
+          cat "$RUNNER_TEMP/notes.md"
+
       - name: Download all build artifacts
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: artifacts
 
       - name: Create / update GitHub Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: artifacts/**/*
           # 릴리스 제목을 여기서 정한다 — 예전엔 빌드 후 사람이 API 로 PATCH 해야 했다.
           name: 작업 타이머 ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/notes.md
           fail_on_unmatched_files: false
           # ★검증 전 빌드가 releases/latest 가 되면 안 된다.
           #   앱의 업데이트 배너는 releases/latest 를 보므로, 그 순간 팀 전원에게 알림이 뜬다.

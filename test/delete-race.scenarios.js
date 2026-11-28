@@ -545,6 +545,46 @@
       await h.app("doSync({ silent:true })"); await h.settle();
       h.check("동기화 뒤 관리 항목", h.app("mgmtItems").map(x => x.row + ":" + x.b), ["30:주간 보고 v2"]);
     } },
+    { key: "MD1", name: "관리 항목 추가 timeout(서버엔 들어감) → 같은 글을 다시 보내면 보내지 않고 이미 있다고 알림", async run(h) {
+      await h.app("doSync({ silent:true })"); await h.settle();
+      h.server.postQueue.push(p => { h.server.apply(p); return { ok: false, timeout: true, error: "응답 지연(타임아웃)" }; });
+      const m = h.mark();
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle();
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle();
+      h.check("addMemo 는 한 번만", h.posts(m).filter(p => p.action === "addMemo").length, 1);
+      h.check("서버 관리 항목", h.server.mgmt[ME].map(x => x.b), ["주간 보고", "회의록 정리"]);
+      h.check("둘째 토스트", h.toastsSince(m).slice(-1), ["앞서 보낸 관리 항목이 이미 들어가 있어요"]);
+    } },
+    { key: "MD2", name: "관리 항목 추가 timeout(서버엔 안 들어감) → 다시 보내면 정상 추가", async run(h) {
+      await h.app("doSync({ silent:true })"); await h.settle();
+      h.server.postQueue.push(() => ({ ok: false, timeout: true, error: "응답 지연(타임아웃)" }));
+      const m = h.mark();
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle();
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle();
+      h.check("addMemo 두 번", h.posts(m).filter(p => p.action === "addMemo").length, 2);
+      h.check("서버 관리 항목", h.server.mgmt[ME].map(x => x.b), ["주간 보고", "회의록 정리"]);
+    } },
+    { key: "MD3", name: "같은 글이 원래 있는데 추가 timeout(서버엔 안 들어감) → 다시 보내면 「이미 있음」으로 삼키지 않고 보낸다", async run(h) {
+      await h.app("doSync({ silent:true })"); await h.settle();
+      h.server.postQueue.push(() => ({ ok: false, timeout: true, error: "응답 지연(타임아웃)" }));
+      const m = h.mark();
+      h.app('submitAddMgmt("주간 보고")'); await h.settle();
+      h.app('submitAddMgmt("주간 보고")'); await h.settle();
+      h.check("addMemo 두 번", h.posts(m).filter(p => p.action === "addMemo").length, 2);
+      h.check("서버 관리 항목", h.server.mgmt[ME].map(x => x.b), ["주간 보고", "주간 보고"]);
+    } },
+    { key: "MD4", name: "중복 확인 동기화를 기다리는 사이 Enter 를 또 눌러도 addMemo 는 한 번", async run(h) {
+      await h.app("doSync({ silent:true })"); await h.settle();
+      h.server.postQueue.push(() => ({ ok: false, timeout: true, error: "응답 지연(타임아웃)" }));
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle();
+      const m = h.mark();
+      h.server.hold("sync");
+      h.app('mgmtAdding = true; submitAddMgmt("회의록 정리")'); await h.tick();
+      h.check("기다리는 동안 입력칸 닫힘", h.app("mgmtAdding"), false);
+      h.server.release("sync"); await h.settle();
+      h.check("addMemo 한 번", h.posts(m).filter(p => p.action === "addMemo").length, 1);
+      h.check("서버 관리 항목", h.server.mgmt[ME].map(x => x.b), ["주간 보고", "회의록 정리"]);
+    } },
     { key: "W3", name: "작업 추가·수정(쓰기 경로 유지)", async run(h) {
       const m = h.mark();
       const $v = (id, v) => h.app('document.getElementById("' + id + '").value = ' + JSON.stringify(v));
@@ -564,6 +604,80 @@
       h.check("수정 요청", h.posts(m2), [{ action: "updateTask", member: ME, row: 7, title: "C 숏폼 4종", url: "https://intranet.invalid/creative/view?idx=1003", planLink: "", dueDate: "2030-03-05", expectIdx: "1003", expectTitle: T.C }]);
       h.check("토스트", h.toastsSince(m), ["작업을 추가했어요", "작업을 수정했어요"]);
       h.check("행 번호가 서버와 일치", h.rowsMatchServer(), true);
+    } },
+    // ── B-5 (v1.0.43): 완료·마감·수정의 stale 자동 재시도 경계 ──
+    { key: "R1", name: "마감 변경 stale(위에 한 줄 끼어듦) → 새 행으로 한 번 재시도", async run(h) {
+      h.server.insertTop({ title: T.Z, idx: "1999" });
+      const m = h.mark();
+      h.app("openTimeEdit(" + h.id(T.B) + ")");
+      h.app('commitDue("2030-02-20", "10:30")');
+      await h.settle();
+      h.check("updateDue 요청 행", h.posts(m, "updateDue").map(p => p.row), [6, 7]);
+      h.check("서버 날짜", h.server.sheet[ME].find(v => v.title === T.B).dueISO, "2030-02-20");
+      h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 확인하고 다시 보낼게요", "마감을 변경했어요"]);
+      h.check("행 번호가 서버와 일치", h.rowsMatchServer(), true);
+    } },
+    { key: "R2", name: "수정 stale → 편집 전 지문으로 새 행을 찾아 한 번 재시도", async run(h) {
+      h.server.insertTop({ title: T.Z, idx: "1999" });
+      const m = h.mark();
+      const $v = (id, v) => h.app('document.getElementById("' + id + '").value = ' + JSON.stringify(v));
+      h.app("openEdit(" + h.id(T.C) + ")");
+      h.app("selAlarm = null; selDl = " + new Date(2030, 2, 5, 15, 0, 0, 0).getTime());
+      $v("f-title", "C 숏폼 4종"); $v("f-reqlink", "https://intranet.invalid/creative/view?idx=1003"); $v("f-planlink", "");
+      h.app("saveTask()");
+      await h.settle();
+      h.check("updateTask 요청(행·지문 제목)", h.posts(m, "updateTask").map(p => [p.row, p.expectTitle]), [[7, T.C], [8, T.C]]);
+      h.check("서버 제목", h.server.has("C 숏폼 4종"), 1);
+      h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 확인하고 다시 보낼게요", "작업을 수정했어요"]);
+      h.check("행 번호가 서버와 일치", h.rowsMatchServer(), true);
+    } },
+    { key: "R3", name: "쌍둥이(같은 게시글·같은 제목 두 줄) 완료 stale → 재시도하지 않는다(어느 줄인지 모름)", opts: TWINS, async run(h) {
+      h.server.insertTop({ title: T.Z, idx: "1999" });
+      const m = h.mark();
+      const first = h.tasks().find(t => t.title === T.B).id;
+      h.app("toggleDone(" + first + ")");
+      await h.clock.advance(40);
+      h.app('confirmDone("전달 완료")');
+      await h.settle();
+      h.check("toggleDone 요청 수", h.posts(m, "toggleDone").length, 1);
+      h.check("서버의 B 두 줄 모두 미완료", h.server.sheet[ME].filter(v => v.title === T.B).map(v => !!v.done), [false, false]);
+      h.check("안내 토스트(확인 중 + 안내)", h.toastsSince(m).length, 2);
+    } },
+    { key: "R6", name: "완료·미완료가 다른 쌍둥이(같은 게시글·같은 제목) stale → 재시도하지 않는다(서버 지문은 완료 여부를 안 본다)",
+      opts: { mine: [{ title: T.A, idx: "1001" }, { title: T.B, idx: "1002", done: true }, { title: T.C, idx: "1003" }, { title: T.B, idx: "1002" }] },
+      async run(h) {
+        h.server.insertTop({ title: T.Z, idx: "1999" });
+        const m = h.mark();
+        const doneB = h.tasks().find(t => t.title === T.B && t.done).id;
+        h.app("toggleDone(" + doneB + ")");
+        await h.clock.advance(40);
+        h.app('confirmDone("수정 진행")');
+        await h.settle();
+        h.check("toggleDone 요청 수", h.posts(m, "toggleDone").length, 1);
+        h.check("서버의 B 두 줄 그대로", h.server.sheet[ME].filter(v => v.title === T.B).map(v => !!v.done), [true, false]);
+      } },
+    { key: "R4", name: "누른 카드가 다른 곳에서 지워져 없음 → 재시도하지 않는다", async run(h) {
+      const id = h.id(T.B);
+      h.server.removeBySheet(T.A);
+      h.server.removeBySheet(T.B);
+      const m = h.mark();
+      h.app("toggleDone(" + id + ")");
+      await h.clock.advance(40);
+      h.app('confirmDone("전달 완료")');
+      await h.settle();
+      h.check("toggleDone 요청 수", h.posts(m, "toggleDone").length, 1);
+      h.check("다른 카드는 그대로 미완료", [T.C, T.D, T.E].map(t => !!h.server.sheet[ME].find(v => v.title === t).done), [false, false, true]);
+      h.check("행 번호가 서버와 일치", h.rowsMatchServer(), true);
+    } },
+    { key: "R5", name: "다시 받은 목록이 낡은 캐시(그 카드가 같은 행 그대로) → 같은 행으로 다시 쏘지 않는다", async run(h) {
+      const old = h.server.snapshot();
+      h.server.insertTop({ title: T.Z, idx: "1999" });
+      h.server.readQueue.push(old);                      // 재시도 전 동기화가 삽입 전 캐시를 받는다
+      const m = h.mark();
+      await h.markDone(T.B);
+      await h.settle();
+      h.check("toggleDone 요청 수", h.posts(m, "toggleDone").length, 1);
+      h.check("서버 B 미완료", !!h.server.sheet[ME].find(v => v.title === T.B).done, false);
     } },
     { key: "B4", name: "stale → 재동기화가 실패 → 되돌리고 안내, 다시 누르면 지워짐", async run(h) {
       h.server.insertTop({ title: T.Z, idx: "1999" });
@@ -682,15 +796,15 @@
       h.check("pill 정지", h.pillSpinning(), false);
       h.check("화면의 B 완료 여부", h.cards().filter(c => c.title === T.B).map(c => c.done), [true]);
     } },
-    { key: "S1", name: "완료 처리의 stale 은 기존대로(되돌리고 안내, 자동 재시도 없음)", async run(h) {
+    { key: "S1", name: "완료 처리의 stale(행이 밀림) → 다시 받아 같은 카드의 새 행으로 한 번 재시도(B-5, v1.0.43)", async run(h) {
       h.server.insertTop({ title: T.Z, idx: "1999" });
       const m = h.mark();
       await h.markDone(T.B);
       await h.settle();
-      h.check("toggleDone 요청 수", h.posts(m, "toggleDone").length, 1);
-      h.check("토스트", h.toastsSince(m), ["'A 런칭 배너'가 그 자리에 있어요 — 목록을 다시 불러올게요"]);
-      h.check("서버 완료 여부(A·B)", [T.A, T.B].map(t => !!h.server.sheet[ME].find(v => v.title === t).done), [false, false]);
-      h.check("화면의 B 완료 여부", h.cards().filter(c => c.title === T.B).map(c => c.done), [false]);
+      h.check("toggleDone 요청(행·게시글)", h.posts(m, "toggleDone").map(p => [p.row, p.expectIdx]), [[6, "1002"], [7, "1002"]]);
+      h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 확인하고 다시 보낼게요", "완료 처리했어요"]);
+      h.check("서버 완료 여부(A·B)", [T.A, T.B].map(t => !!h.server.sheet[ME].find(v => v.title === t).done), [false, true]);
+      h.check("화면의 B 완료 여부", h.cards().filter(c => c.title === T.B).map(c => c.done), [true]);
       h.check("행 번호가 서버와 일치", h.rowsMatchServer(), true);
     } },
     { key: "X1", name: "연타 — 삭제가 끝나기 전 같은 카드·다른 카드 휴지통", async run(h) {
@@ -920,7 +1034,7 @@
         h.app('confirmDone("전달 완료")');
         await h.settle();
         h.check("서버 완료 여부(1002·1003) — 가려진 1002 에 기록되면 안 된다", [done("1002"), done("1003")], [false, false]);
-        h.check("토스트", h.toastsSince(m), ["'주간 배너'가 그 자리에 있어요 — 목록을 다시 불러올게요"]);
+        h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 확인하고 다시 보낼게요", "'주간 배너'가 그 자리에 있어요 — 목록을 다시 불러왔어요"]);
         await h.clock.advance(70000);
         h.check("70초 뒤 화면의 「주간 배너」", h.onScreen("주간 배너"), 2);
         h.check("70초 뒤 행 번호가 서버와 일치", h.rowsMatchServer(), true);
@@ -948,8 +1062,9 @@
         h.server.release("sync");
         await h.settle();
         // 서버에서는 1002 가 5행, 1003 이 6행 — 제목만 보면 6행 요청이 1003 에 통과한다
-        h.check("서버 완료 여부(1002·1003)", [done("1002"), done("1003")], [false, false]);
-        h.check("toggleDone 요청(행·게시글)", h.posts(m, "toggleDone").map(p => [p.row, p.expectIdx]), [[6, "1002"]]);
+        // v1.0.43: 6행(=1003) 은 지문이 달라 거부되고, 다시 받은 목록에서 1002 를 5행으로 찾아 한 번 재시도한다 — 1003 은 그대로
+        h.check("서버 완료 여부(1002·1003)", [done("1002"), done("1003")], [true, false]);
+        h.check("toggleDone 요청(행·게시글)", h.posts(m, "toggleDone").map(p => [p.row, p.expectIdx]), [[6, "1002"], [5, "1002"]]);
       } },
     { key: "E5", name: "위 카드가 다른 곳에서 지워져 한 칸 당겨진 뒤 맨 아래 카드를 삭제 — 서버는 「영상작업 행이 아님」 → 새 행으로 한 번에 지워진다", async run(h) {
       h.server.removeBySheet(T.A);                       // E 는 9행 → 8행, 9행은 이제 빈 행
@@ -961,15 +1076,16 @@
       h.check("다른 작업은 그대로", [T.B, T.C, T.D].map(t => h.server.has(t)), [1, 1, 1]);
       h.check("행 번호가 서버와 일치", h.rowsMatchServer(), true);
     } },
-    { key: "E6", name: "같은 상황에서 맨 아래 카드를 되돌리기 — 「영상작업 행이 아님」도 행 밀림으로 안내하고 목록을 다시 받는다", async run(h) {
+    { key: "E6", name: "같은 상황에서 맨 아래 카드를 되돌리기 — 「영상작업 행이 아님」도 행 밀림으로 보고 다시 받아 새 행으로 한 번 재시도", async run(h) {
       h.server.removeBySheet(T.A);
       const m = h.mark();
       h.app("toggleDone(" + h.id(T.E) + ")");
       await h.clock.advance(40);
       h.app('confirmDone("수정 진행")');
       await h.settle();
-      h.check("토스트", h.toastsSince(m), ["그 자리가 비어 있어요 — 목록을 다시 불러올게요"]);
-      h.check("서버의 E 는 그대로 완료", !!h.server.sheet[ME].find(v => v.title === T.E).done, true);
+      h.check("toggleDone 요청 행", h.posts(m, "toggleDone").map(p => p.row), [9, 8]);
+      h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 확인하고 다시 보낼게요", "되돌렸어요"]);
+      h.check("서버의 E 는 진행 중으로", !!h.server.sheet[ME].find(v => v.title === T.E).done, false);
       h.check("행 번호가 서버와 일치", h.rowsMatchServer(), true);
     } },
     { key: "E7", name: "삭제가 일반 오류(HTTP 500)로 실패 — 되돌리고, 곧바로 목록을 받아 다시 누르면 지워진다", async run(h) {

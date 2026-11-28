@@ -170,18 +170,17 @@ mv /Applications/TeamTimer.app /Applications/.tt-bak.app
 
 ### D-2. macOS 실기 확인
 
-v1.0.27~1.0.30 이 **맥에서 한 번도 실행 검증되지 않았다.** 특히 v1.0.29 가
+v1.0.27~1.0.42 가 **맥에서 한 번도 실행 검증되지 않았다**(CI 의 아키텍처·서명 검사는 통과). 특히 v1.0.29 가
 **처음으로 제대로 된 x64 자산**이라 Intel 맥에서 확인이 필요하다.
 
-### D-3. 업데이트 캐시가 안 지워진다
+### D-3. ~~업데이트 캐시가 안 지워진다~~ — v1.0.40 해결
 
-설치 후 `%LOCALAPPDATA%\team-timer-updater\` 에 **157MB**가 남는다(같은 파일 두 벌).
-electron-updater 가 다음 업데이트 때 덮어쓰지만 정리 로직을 넣는 게 맞다.
+`pending\` 의 설치 파일은 설치본 버전 이하면 시작 때 지운다(`tidyPendingUpdate`).
+상위 폴더의 `installer.exe`·`current.blockmap` 은 **차등 다운로드의 기준 파일이라 남긴다**(지우면 업데이트마다 79MB 를 통째로 받는다 — electron-updater `NsisUpdater` 확인, 3차 채점 반박 검수).
 
-### D-4. 앱을 껐다 켜면 받아둔 것이 초기화된다
+### D-4. ~~앱을 껐다 켜면 받아둔 것이 초기화된다~~ — v1.0.40 해결
 
-파일은 위 폴더에 그대로 있는데 앱이 "받아뒀다"를 기억 못 해 [받기]부터 다시 해야 한다.
-`euDownloaded` 가 프로세스 메모리라서다.
+받아 둔 새 버전 파일의 sha512 가 릴리스의 것과 같을 때만 「받아 둠」을 되살린다(`tidyPendingUpdate`, 판정은 `main-lib.js` 의 `pendingVerdict`·`pendingHashOk`).
 
 ### D-5. 이전 감사에서 미룬 것
 

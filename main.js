@@ -6,7 +6,7 @@ const path = require('path');
 const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
-const { cmpVer, isSafeUrl, pickMacAsset: pickMacAssetFor, digestOk } = require('./main-lib.js');   // 순수 함수(시험: test/main-lib.test.js)
+const { cmpVer, isSafeUrl, pickMacAsset: pickMacAssetFor, digestOk, fitWinState, pendingVerdict, pendingWant, pendingHashOk } = require('./main-lib.js');   // 순수 함수(시험: test/main-lib.test.js)
 const { execFile, spawn } = require('child_process');
 
 // ── Windows 알림 표시 이름/아이콘 ──
@@ -71,7 +71,7 @@ ipcMain.on('log-error', (event, msg) => logError('renderer', String(msg).slice(0
 // 화면 테마를 기억해 다음 시작 때 창 바탕색을 맞춘다 — 어두운 테마인데 뜰 때 흰 바탕이 번쩍이지 않게
 function themePath() { return path.join(app.getPath('userData'), 'theme.txt'); }
 ipcMain.on('theme-bg', (event, dark) => {
-  try { fs.writeFileSync(themePath(), dark ? 'dark' : 'light'); } catch (e) {}
+  try { fs.writeFileSync(themePath(), dark ? 'dark' : 'light'); } catch (e) { logError('theme-write', e); }
   try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setBackgroundColor(dark ? '#0a0a0a' : '#ffffff'); } catch (e) {}   // 실행 중 바꿔도 크기 조절·복원 때 흰 바탕이 안 비치게
 });
 function startDark() {
@@ -334,15 +334,12 @@ function winStatePath() { return path.join(app.getPath('userData'), 'window-stat
 function readWinState() {
   try {
     const b = JSON.parse(fs.readFileSync(winStatePath(), 'utf8'));
-    if (!(b.width >= 320 && b.height >= 420)) return null;
-    const wa = screen.getPrimaryDisplay().workAreaSize;   // 큰 모니터에서 쓰던 크기가 작은 화면에서 넘치지 않게
-    b.width = Math.min(b.width, wa.width); b.height = Math.min(b.height, wa.height);
-    if (typeof b.x !== 'number' || typeof b.y !== 'number') return { width: b.width, height: b.height };
-    const onScreen = screen.getAllDisplays().some(d => { const a = d.workArea;
-      return b.x + 40 >= a.x && b.y >= a.y && b.x + 120 <= a.x + a.width && b.y + 40 <= a.y + a.height; });
-    return onScreen ? b : { width: b.width, height: b.height };
+    return fitWinState(b, screen.getPrimaryDisplay().workAreaSize, screen.getAllDisplays().map(d => d.workArea));
   } catch (e) { return null; }
 }
+// 끌거나 크기를 바꾸는 동안 이벤트가 연달아 오므로 1초 멈춘 뒤 한 번만 쓴다(종료 때 저장은 따로 한다)
+let winSaveTimer = null;
+function saveWinStateSoon() { clearTimeout(winSaveTimer); winSaveTimer = setTimeout(saveWinState, 1000); }
 function saveWinState() {
   try {
     if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized() || mainWindow.isMaximized()) return;
@@ -412,6 +409,9 @@ function createWindow() {
   // 최대화/복원 시 렌더러에 알림 (아이콘 전환)
   mainWindow.on('maximize', () => sendMaxState());
   mainWindow.on('unmaximize', () => sendMaxState());
+  // 창 자리를 옮길 때도 기억한다 — 강제 종료·정전이면 종료 때 저장이 안 돈다(최소화·최대화 중이면 saveWinState 가 건너뜀)
+  mainWindow.on('moved', saveWinStateSoon);
+  mainWindow.on('resized', saveWinStateSoon);
 }
 
 // ── 트레이 아이콘 ──
@@ -486,17 +486,21 @@ if (!gotTheLock) {
 app.whenReady().then(() => {
   // 알림 말고는 화면이 권한(카메라·마이크·위치·클립보드 읽기 등)을 얻을 일이 없다 — 전부 거절
   session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'notifications'));
+  session.defaultSession.setPermissionCheckHandler((wc, perm) => perm === 'notifications');   // 요청 없이 묻는 확인(권한 조회)도 같은 기준
   app.on('child-process-gone', (e, d) => { if (d && d.reason !== 'clean-exit') logError('child-process-gone', JSON.stringify(d)); });
   createWindow();
   createTray();
   startUpdatePolling();
-  // 상주 메모리를 한 번 재서 남긴다(시작 10분 뒤) — 「무겁다」 제보를 수치로 확인하려고
-  setTimeout(() => {
+  // 상주 메모리를 재서 남긴다(시작 10분 뒤·8시간 뒤) — 「무겁다」 제보를 수치로, 오래 켜 둘 때 느는지도 보려고. 오류가 아니라 지표 줄.
+  const logMemory = () => {
     try {
-      const kb = app.getAppMetrics().reduce((n, m) => n + ((m.memory && m.memory.workingSetSize) || 0), 0);
-      logError('memory', 'working set ' + Math.round(kb / 1024) + 'MB, processes ' + app.getAppMetrics().length);
+      const ms = app.getAppMetrics();
+      const kb = ms.reduce((n, m) => n + ((m.memory && m.memory.workingSetSize) || 0), 0);
+      logError('metric:memory', 'working set ' + Math.round(kb / 1024) + 'MB, processes ' + ms.length);
     } catch (e) {}
-  }, 10 * 60 * 1000);
+  };
+  setTimeout(logMemory, 10 * 60 * 1000);
+  setTimeout(logMemory, 8 * 60 * 60 * 1000);
   setTimeout(tidyPendingUpdate, 8000);
 
   app.on('activate', () => {
@@ -522,9 +526,9 @@ async function tidyPendingUpdate() {
     if (!updaterSupported()) return;
     const dir = path.join(process.env.LOCALAPPDATA || '', 'team-timer-updater', 'pending');
     const info = JSON.parse(fs.readFileSync(path.join(dir, 'update-info.json'), 'utf8'));
-    const m = String(info.fileName || '').match(/(\d+\.\d+\.\d+)/);
-    if (!m) return;
-    if (cmpVer(m[1], app.getVersion()) <= 0) {
+    const v = pendingVerdict(info.fileName, app.getVersion());
+    if (v.act === 'skip') return;
+    if (v.act === 'delete') {
       for (const f of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, f)); } catch (e) {} }
       return;
     }
@@ -533,11 +537,11 @@ async function tidyPendingUpdate() {
     const eu = getEU(); if (!eu) return;
     tidyQuiet = true;
     const r = await eu.checkForUpdates();
-    const want = r && r.updateInfo && (r.updateInfo.files && r.updateInfo.files[0] ? r.updateInfo.files[0].sha512 : r.updateInfo.sha512);
-    if (!(r && r.updateInfo && cmpVer(r.updateInfo.version, app.getVersion()) > 0 && r.updateInfo.version === m[1] && want)) return;
+    const want = pendingWant(r && r.updateInfo, app.getVersion(), v.ver);
+    if (!want) return;
     // ★받아 둔 파일이 그 릴리스와 정확히 같을 때만 — 다르면 downloadUpdate 가 사용자가 누르지 않은 79MB 를 새로 받는다
     const have = await new Promise((ok, no) => { const h = crypto.createHash('sha512'); fs.createReadStream(file).on('data', d => h.update(d)).on('end', () => ok(h.digest('base64'))).on('error', no); });
-    if (have !== want || info.sha512 !== want) return;
+    if (!pendingHashOk(want, have, info.sha512)) return;
     await eu.downloadUpdate();
   } catch (e) { if (e && e.code !== 'ENOENT') logError('tidy-pending-update', e); }
   finally { tidyQuiet = false; }
@@ -784,7 +788,19 @@ function tokenPath() { return path.join(app.getPath('userData'), 'gmail-tokens.j
 function canEncrypt() {
   try { return process.platform === 'win32' && safeStorage.isEncryptionAvailable(); } catch (e) { return false; }
 }
+// 메일 탭이 몇 초마다 부르므로 한 번 읽은 값을 기억한다. 파일은 이 앱만 고치므로 writeTokens·clearTokens 때만 바꾼다.
+let tokCache;   // undefined = 아직 안 읽음(또는 읽기 실패 — 다음에 다시 읽는다) · null = 로그아웃
 function readTokens() {
+  if (tokCache === undefined) {
+    const t = loadTokens();
+    // 읽기·복호화가 한 번 실패(백신이 파일을 잡음 등)한 것을 실행 내내 굳히지 않는다 — 다음 폴링에 다시 읽는다.
+    // 파일이 아예 없을 때만 「없음」으로 기억한다.
+    if (t) tokCache = t; else if (!fs.existsSync(tokenPath())) tokCache = null;
+    return t;
+  }
+  return tokCache;
+}
+function loadTokens() {
   let obj;
   try { obj = JSON.parse(fs.readFileSync(tokenPath(), 'utf8')); } catch (e) { return null; }
   if (obj && obj.enc) {
@@ -795,15 +811,17 @@ function readTokens() {
   return obj;
 }
 function writeTokens(obj) {
+  tokCache = obj;   // 파일 쓰기가 실패해도 이번 실행 동안은 새 토큰을 쓴다
   try {
     const data = canEncrypt()
       ? JSON.stringify({ enc: safeStorage.encryptString(JSON.stringify(obj)).toString('base64') })
       : JSON.stringify(obj);
     fs.writeFileSync(tokenPath(), data, { encoding: 'utf8', mode: 0o600 });
     try { fs.chmodSync(tokenPath(), 0o600); } catch (e) {}   // mode 는 새로 만들 때만 먹는다 — 예전부터 있던 파일(맥)도 좁힌다
-  } catch (e) {}
+  } catch (e) { logError('gmail-token-write', e); }
 }
 function clearTokens() {
+  tokCache = null;
   try { fs.unlinkSync(tokenPath()); } catch (e) {}
 }
 
@@ -875,6 +893,8 @@ async function getValidAccessToken() {
     }
     throw e;                               // 네트워크·빌드 문제 등은 그대로 올린다(토큰 보존)
   }
+  // 갱신을 기다리는 사이 로그아웃했거나 다른 계정으로 다시 로그인했으면 옛 토큰을 되살리지 않는다
+  if (readTokens() !== t) throw new Error('not-connected');
   t.access_token = r.access_token;
   t.expiry_date = Date.now() + (r.expires_in || 3600) * 1000 - 60000; // 1분 버퍼
   writeTokens(t);
