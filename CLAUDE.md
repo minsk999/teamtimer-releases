@@ -22,10 +22,8 @@ build/                  아이콘 (icon.icns/ico/png, tray*, trayTemplate*)
 build-secrets.example.js  비밀값 템플릿
 docs/index.html         GitHub Pages 설명서 = 다운로드 페이지
 docs/intranet-ddalkkak-extension.zip   딸깍 크롬 확장 배포본
-AppsScript_읽기API.gs   ⚠️ **폐기된 1단계 사본** — 현행과 계약이 다르다. 붙여넣지 말 것(파일 상단 경고 참조)
 gas/                    GAS **참조 사본**(v62) + 지문 설계 초안(v60 으로 실현) (정본은 intranet-ttalkak/server/)
 bump-version.js         `npm run bump 1.0.31` — package.json + docs 버전 동시 갱신
-_mintest/ _apptest/     과거 진단용. ⚠️ **무해하지 않다** — 아래 참조
 .github/workflows/release.yml   v* 태그 → macOS+Windows 빌드 → Releases
 ```
 
@@ -90,16 +88,22 @@ x64 이름 자산까지 덮어써서 **`-x64.dmg`/`-x64.zip` 안에 arm64 바이
 → `"target": ["dmg", "zip"]` 로 두고 CLI 의 `--x64`/`--arm64` 가 결정하게 한다.
 CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lipo -archs`)가 다르면 빌드가 실패한다.
 
-## ⚠️ `_apptest/` · `_mintest/` — 진단용이지만 무해하지 않다
+## 진단용 포크는 v1.0.39 에서 지웠다
+`_apptest/`·`_mintest/`(앱 전체의 낡은 포크 — 실제 시트에 쓸 수 있었다)·그 워크플로 둘·폐기된 `AppsScript_읽기API.gs` 를 삭제했다(git 이력에는 남음).
+진단용 빌드를 다시 만들 때 주의: 포크가 실제 `WEBAPP_URL` 을 가지면 팀 시트가 바뀌고, `prerelease: true` 없는 태그 릴리스는
+`releases/latest` 를 빼앗아 팀 전원의 업데이트 배너를 죽인다(`cmpVer` 가 버전을 못 읽음).
 
-`_apptest/` 는 **앱 전체의 낡은 포크**다(렌더러가 본체와 169줄 다름).
-`build-secrets.js` 가 없어도 시트 읽기·**쓰기**가 전부 돌고, `post-sheet` 핸들러도 살아 있다.
-`apptest-*` 태그를 밀면 CI 가 이 포크를 맥에서 빌드해 릴리스에 DMG 로 붙인다.
-→ 그 DMG 로 완료 체크·삭제를 눌러 보면 **팀의 실제 업무 시트가 바뀐다**(userData 만 분리돼 있고 시트는 아니다).
-
-조치 완료: `_apptest/main.js` 의 `WEBAPP_URL` 을 **빈 문자열로 비웠다.** 다시 넣지 말 것.
-두 워크플로에 `prerelease: true` 를 넣었다 — 없으면 `apptest-3` 같은 태그가 `releases/latest` 가 되고,
-`cmpVer` 가 그걸 파싱 못 해 **팀 전원의 업데이트 배너가 오류 표시도 없이 영구히 죽는다.**
+## 보안 경계 (v1.0.39)
+- ★**밖으로 여는 길은 전부 `main.js` 의 `openUrl()` 하나를 지난다**(IPC `open-external`·`setWindowOpenHandler`·`will-navigate`). 거기서 http/https/mailto 만 연다.
+  예전엔 카드 링크 아이콘의 `onclick=stopPropagation` 때문에 렌더러의 가로채기가 안 불리고 새 창 요청으로 새서 **검사 없이** `shell.openExternal` 에 닿았다.
+  렌더러는 시트 유래 링크를 `webUrl()` 로 거른다(스킴 없는 `도메인/경로` 는 https 를 붙임 — 입력칸 안내 모양). 시험 `test/weburl.test.js`.
+- 렌더러 CSP(meta): 외부 스크립트·프레임·직접 전송 차단, 글꼴 두 곳만 허용. 인라인 onclick 때문에 `'unsafe-inline'` 이라 **HTML 주입은 못 막는다** — 외부 문자열은 반드시 `esc()`.
+  시험 하네스는 eval 대신 `<script>` 주입으로 돈다(`test/delete-race.browser.js`).
+- Gmail 토큰: 윈도는 `safeStorage`(DPAPI) 암호화, 맥은 평문 + 0600(ad-hoc 서명이라 키체인 허용 창이 업데이트마다 뜰 수 있어 보류). OAuth 는 state + PKCE.
+  ⚠️ 1.0.39 에서 그 전 버전으로 내리면 암호화된 토큰을 못 읽어 메일을 다시 연결해야 한다(데이터 손실은 없음).
+- 오류 기록: `userData/error.log`(256KB 넘으면 뒤 절반만). 메인·렌더러 예외, 동기화 실패 원문, 토큰 복호화 실패가 남는다.
+- ⚠️ **남은 큰 구멍: 공유 GAS 웹앱에 인증이 없다** — 주소(공개 저장소·공개 딸깍 zip 에 있음)만 알면 누구나 읽기·쓰기·삭제가 된다.
+  공유 토큰은 설치본·zip 이 공개라 소용없다. 닫으려면 「회사 구글 계정만」 접근 + 앱·딸깍이 구글 토큰을 실어 보내야 한다(팀 전원 재로그인 — 사용자 결정 대기, 2026-11-28).
 
 ## 작업 규칙
 - **커밋 전:** `git config user.name "minsk999" && git config user.email "minsk999@users.noreply.github.com"`
@@ -203,8 +207,10 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
   실제 DOM 실행은 `test/delete-race.browser.js` 머리말(launch.json `teamtimer-root`, 8733). ⚠️ 실제 Electron·실제 GAS 로는 돌리지 않았다.
 - 남은 한계(전부 검수에서 재현·기록, 빈도는 **재지 못했다** — 실제 시트 요청 금지):
   · 같은 게시글·같은 제목 두 줄(쌍둥이)은 서버 지문이 구별 못 한다.
-  · **링크에 게시글 번호(idx)가 없는 카드**(앱에서 손으로 넣은 외부 링크)는 지문이 제목뿐이다 — 행이 한 칸 낡은 사이 같은 제목의 이웃에 삭제·완료·마감·수정이
-    기록될 수 있다(v1.0.34 와 같음). 서버에 전체 링크 비교가 있어야 닫힌다(`TODO.md` B-4).
+  · **링크에 게시글 번호(idx)가 없는 카드**(앱에서 손으로 넣은 외부 링크)는 v1.0.38 까지 지문이 제목뿐이었다. v1.0.39 부터 네 액션 모두 링크 전체(`expectLink`)를
+    보내고 서버 v64 가 비교한다 — 서버가 v64 미만이면 그 키를 무시하므로 여전히 열려 있다.
+  · 관리항목(메모) 수정·삭제는 v1.0.39 부터 고치는 칸의 고치기 전 값(`expectB`/`expectC`)을 보낸다(서버 v64 가 비교, 이름 행·구분선은 거부). v63 까지는
+    행이 밀린 채 메모를 지우면 **팀원 이름 칸이 지워졌다**(실제 서버 코드로 재현, `_audit/gas-v64/v64-test.js`).
   · 카드를 지운 직후 수 초(삭제 응답 + 확인 동기화가 반영되기 전) 그 아래 카드의 완료·마감·수정은 「…가 그 자리에 있어요」로 한 번 거부된다(v1.0.34 와 같음,
     옆 카드에 기록되지는 않는다). 삭제처럼 자동 재시도를 넣는 설계는 `TODO.md` B-5.
   · 완료/마감/수정은 「겹침 + 낡은 캐시」가 함께 오면 최대 25초쯤 되돌아가 보였다 스스로 맞춰진다. 쓰기 ok 뒤 새 목록이 반영되기 전에 팀원 보드를 다녀와도 같다.
@@ -261,9 +267,6 @@ C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도�
 - **진실원천은 Apps Script 편집기의 코드.** 저장된 옛 파일 기준으로 작업 금지
   (과거 v47/v48 제작 시 베이스 누락으로 기능 유실 사고 있었음).
   수정 전 반드시 사용자에게 현재 편집기 코드를 받을 것.
-- ⚠️ 레포의 `AppsScript_읽기API.gs` 는 **1단계 사본이라 현행과 계약이 완전히 다르다**
-  (`user` 파라미터 요구 · `doPost` 0건 · 이름 하드코딩 · 시트 ID 오기). 참고조차 하지 말 것.
-  쓰기 API 6종은 **어디에도 백업이 없다** — 편집기가 유일본이다.
 - 시트 ID 정본: `18K3NKAkZwGvxS_QMV5boGNJtmay1ZJ_4xBs26SZZ_Bc` (`_4xBs`. `.gs` 의 `_8xBs` 는 틀림)
 - 팀원 명단은 **`🤖자동화` 시트 A열**(세로)에서 자동 인식 → 앱·확장이 API로 수신
 - 좌/우 배치(1=A~G, 9=I~O)는 업무현황 시트에서 이름 검색으로 자동 판별

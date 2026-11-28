@@ -672,7 +672,7 @@
       h.server.release("post");
       await h.clock.advance(3000); await h.settle();
       await h.clock.advance(70000);
-      h.check("토스트", h.toastsSince(m).slice().sort(), ["동기화 실패: HTTP 500", "완료 처리했어요"]);
+      h.check("토스트", h.toastsSince(m).slice().sort(), ["동기화 실패 — 시트 서버가 잠시 응답하지 않아요", "완료 처리했어요"]);
       h.check("읽기 요청 총수(버려진 1 + 다시 받기와 그 자동 재시도 2 + 캐시 만료 뒤 1)", h.syncs(m), 4);
       h.check("pill 정지", h.pillSpinning(), false);
       h.check("화면의 B 완료 여부", h.cards().filter(c => c.title === T.B).map(c => c.done), [true]);
@@ -1169,6 +1169,32 @@
       await h.settle();
       h.check("toggleDone 요청 수", h.posts(m, "toggleDone").length, 0);
       h.check("서버의 D 완료", !!h.server.sheet[ME].find(v => v.title === T.D).done, false);
+      h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 다시 눌러 주세요"]);
+    } },
+    // v1.0.39: 카드 휴지통은 확인 창(askDelTask)을 거친다. 창이 떠 있는 사이 목록이 당겨져도 누른 그 카드를 지운다.
+    { key: "PN8", name: "휴지통 확인 창을 열어 둔 사이 위 카드가 시트에서 빠짐 → 확정하면 당겨진 그 카드가 지워진다", async run(h) {
+      h.app("askDelTask(" + h.id(T.C) + ")");            // C = id 7
+      await h.tick();
+      h.server.removeBySheet(T.B);                       // C 가 6행으로 당겨진다
+      h.app("doSync({ silent:true })");
+      await h.settle();
+      const m = h.mark();
+      h.app("doConfirm()");
+      await h.settle();
+      h.check("deleteTask 요청(행·제목)", h.posts(m, "deleteTask").map(p => [p.row, p.expectTitle]), [[6, T.C]]);
+      h.check("서버에 C 없음 · D 남음", [T.C, T.D].map(t => !!h.server.sheet[ME].find(v => v.title === t)), [false, true]);
+    } },
+    { key: "PN9", name: "휴지통 확인 창을 열어 둔 사이 그 카드가 시트에서 사라짐 → 다른 카드를 지우지 않고 안내한다", async run(h) {
+      h.app("askDelTask(" + h.id(T.C) + ")");
+      await h.tick();
+      h.server.removeBySheet(T.C);                       // D 가 7행으로 당겨진다
+      h.app("doSync({ silent:true })");
+      await h.settle();
+      const m = h.mark();
+      h.app("doConfirm()");
+      await h.settle();
+      h.check("deleteTask 요청 수", h.posts(m, "deleteTask").length, 0);
+      h.check("서버에 D 남음", !!h.server.sheet[ME].find(v => v.title === T.D), true);
       h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 다시 눌러 주세요"]);
     } },
   ];

@@ -63,6 +63,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      # 시험이 깨진 채로는 팀에 배포하지 않는다(가짜 서버·가짜 시계라 네트워크 없음). 한 번이면 충분해 윈도에서만.
+      - name: Test
+        if: matrix.os == 'windows-latest'
+        run: npm test
+
       - name: Patch mac executable name (ASCII path fix)
         if: matrix.os == 'macos-latest'
         run: node patch-mac-name.js

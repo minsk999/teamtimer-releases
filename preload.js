@@ -60,6 +60,9 @@ contextBridge.exposeInMainWorld('timerAPI', {
   setAutostartMinimized: (minimized) => ipcRenderer.invoke('set-autostart-minimized', minimized),
   updateMailUnread: (count, opts) => ipcRenderer.invoke('update-mail-unread', count, opts),
 
+  // 오류 기록(userData/error.log)
+  logError: (msg) => ipcRenderer.send('log-error', msg),
+
   // 플랫폼 정보 (UI 분기용)
   platform: process.platform,
 });

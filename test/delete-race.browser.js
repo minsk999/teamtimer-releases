@@ -12,7 +12,14 @@
   "use strict";
   // 시나리오마다 페이지를 다시 읽지 않는다 → 앞 시나리오의 타이머·진행 중 요청을 다 흘려보내고 다음으로 간다.
   const env = {
-    boot: async () => ({ evalApp: code => (0, eval)(code) }),
+    // 앱의 CSP 가 eval 을 막는다(v1.0.39) — 인라인 스크립트는 허용되므로 <script> 로 식을 평가해 결과를 받는다.
+    // 식만 된다(문장 여러 개는 쉼표 식이나 즉시 실행 함수로).
+    boot: async () => ({ evalApp: code => {
+      const s = document.createElement("script");
+      s.textContent = "window.__drOut = (" + code + "\n);";
+      window.__drOut = undefined; document.head.appendChild(s); s.remove();
+      return window.__drOut;
+    } }),
     // MessageChannel — 패널이 화면에 없으면 setTimeout 은 1초 단위로 늘어진다
     flush: () => new Promise(r => { const ch = new MessageChannel(); ch.port1.onmessage = () => r(); ch.port2.postMessage(0); }),
     quiesce: async h => {

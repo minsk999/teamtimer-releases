@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- 렌더러는 네트워크를 직접 쓰지 않는다(시트·메일은 메인 프로세스 경유). 글꼴 두 곳만 허용하고 외부 스크립트·프레임·직접 전송은 막는다.
+     인라인 onclick 때문에 'unsafe-inline' 이라 HTML 주입은 막지 못한다 — 외부 문자열은 반드시 esc()·webUrl() 을 거칠 것. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>작업 타이머</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -1212,7 +1215,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h2 id="modal-title">작업추가</h2>
-      <button class="close-btn" onclick="closeModal('modal-task')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-task')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="field">
@@ -1265,7 +1268,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h2>가져오기</h2>
-      <button class="close-btn" onclick="closeModal('modal-import')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-import')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
       <p class="setting-desc">인트라넷에서 불러온 요청글이에요. 마감 시간만 정해서 내 작업에 추가하세요.</p>
@@ -1312,7 +1315,7 @@
         <h2 id="done-title">완료 처리</h2>
         <div class="done-sub" id="done-sub"></div>
       </div>
-      <button class="close-btn" onclick="closeModal('modal-done')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-done')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="done-presets" id="done-presets"></div>
@@ -1335,7 +1338,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h2 id="confirm-title">확인</h2>
-      <button class="close-btn" onclick="closeModal('modal-confirm')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-confirm')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
       <p class="setting-desc" id="confirm-msg" style="margin-bottom:22px; line-height:1.6;"></p>
@@ -1365,7 +1368,7 @@
   <div class="modal-inner">
     <div class="modal-head">
       <h2>단축키</h2>
-      <button class="close-btn" onclick="closeModal('modal-keys')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-keys')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
       <p class="setting-desc" style="margin-bottom:14px; line-height:1.6;">바꿀 단축키를 누르고 원하는 키를 입력하세요.</p>
@@ -1388,7 +1391,7 @@
         <h2>마감 편집</h2>
         <div class="done-sub" id="time-sub"></div>
       </div>
-      <button class="close-btn" onclick="closeModal('modal-time')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-time')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <div class="modal-body">
       <div class="field">
@@ -1424,7 +1427,7 @@
   <div class="modal">
     <div class="modal-head">
       <h2><span>설정</span><span class="app-ver" id="app-ver">v1.0.0</span><a class="update-badge" id="update-badge" href="#" style="display:none">업데이트 있음</a></h2>
-      <button class="close-btn" onclick="closeModal('modal-settings')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
+      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-settings')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
     <!-- ★modal-head 는 스크롤 영역 밖이어야 한다 — 안에 두면 설정을 조금만 내려도
          제목·버전·닫기 [X] 가 화면에서 사라진다(탈출구가 ESC 뿐인데 표시가 없다). -->
@@ -1640,7 +1643,7 @@
       </div>
 
       <div class="modal-foot">
-        <button class="cancel" onclick="resetSettings()">초기화</button>
+        <button class="cancel" onclick="openConfirm('설정 초기화', '작업자·메일 연동·단축키를 뺀 설정을 기본값으로 되돌릴까요? 자동 실행도 꺼져요.', '초기화', resetSettings)">초기화</button>
         <button class="save" onclick="saveSettings()">저장</button>
       </div>
     </div>
@@ -1648,7 +1651,7 @@
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
   const $ = id => document.getElementById(id);
@@ -2044,6 +2047,15 @@
   let collapsedState = { active:false, done:false, mgmt:false };
   try { Object.assign(collapsedState, JSON.parse(localStorage.getItem("secCollapsed") || "{}")); } catch(e){}
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  // 시트에서 온 링크는 팀 밖에서도 쓸 수 있다 — 웹 주소만 링크로 만든다(나머지는 아이콘 자체를 안 그림).
+  // 입력칸 안내가 「intranet.adef.co.kr/…」처럼 스킴 없는 주소라 그런 값은 https:// 를 붙여 연다. 다른 스킴(javascript: 등)은 빈 값.
+  function webUrl(u){
+    u = String(u || "").trim();
+    if (/^https?:\/\//i.test(u)) return u;
+    // 「도메인/경로」 모양만. 「기획안.pptx」 같은 파일 이름이 가짜 도메인으로 열리지 않게 경로(/)가 있어야 한다.
+    if (/^[a-z0-9-]+(\.[a-z0-9-]+)+(:\d+)?\//i.test(u)) return "https://" + u;
+    return "";
+  }
 
   // "[라벨](https://...)" 마크다운 링크 → 클릭 가능한 링크로. (시트에서 작성한 하이퍼링크 인식)
   // 전체를 먼저 esc()로 이스케이프한 뒤 변환하므로 XSS 안전. http/https만 허용.
@@ -2285,7 +2297,7 @@
     const loud = !opts.silent;
     const myName = getMyName();
     if (!myName) {
-      if(loud){ toast("설정에서 작업자를 먼저 선택해주세요"); openSettings(); }
+      if(loud){ toast("설정에서 작업자를 먼저 선택해 주세요"); openSettings(); }
       return;
     }
     if (typeof window.timerAPI === "undefined") {
@@ -2375,7 +2387,7 @@
         : `동기화 완료 · 작업 ${cnt}건`);
       return cnt;
     } catch (e) {
-      if(!silent || syncDroppedLoud) toast("동기화 실패: " + (e.message || e));
+      if(!silent || syncDroppedLoud) toast(syncErrText(e));
       // 다시 받기까지 실패했으면 거기서 멈춘다(실패할 때마다 다시 예약하면 끝없이 돈다). 가는 중인 쓰기가 있으면 그 끝에서 한 번 더 시도한다.
       syncDroppedLoud = false;
       if (!writesInFlight) syncDropped = false;
@@ -2421,8 +2433,9 @@
   let tombstones = [];
   const TOMB_MS = 25000;        // 서버 캐시 20초 + 왕복 여유
   const TOMB_MAX_MS = 60000;    // 낡은 응답을 볼 때마다 늘리되 여기까지만 — 잘못 걸린 카드가 영영 숨는 일은 없게
-  function taskFp(t){ return { row: t._row || t.id, idx: idxOf(t.reqLink), title: String(t.title || "").trim(), done: !!t.done }; }
-  function fpMatch(t, fp){ return idxOf(t.reqLink) === fp.idx && String(t.title || "").trim() === fp.title; }
+  // link: 게시글 번호가 없는 손 링크 카드만 링크 전체로 구별한다(번호가 있으면 "" — 같은 게시글의 여러 줄을 쌍둥이로 보는 기존 규칙 유지)
+  function taskFp(t){ const idx = idxOf(t.reqLink); return { row: t._row || t.id, idx, link: idx ? "" : String(t.reqLink || "").trim(), title: String(t.title || "").trim(), done: !!t.done }; }
+  function fpMatch(t, fp){ return idxOf(t.reqLink) === fp.idx && String(t.title || "").trim() === fp.title && (!fp.link || String(t.reqLink || "").trim() === fp.link); }
   function unpendDelete(fp){ const i = pendingDeletes.indexOf(fp); if (i >= 0) pendingDeletes.splice(i, 1); }
   function addTombstone(fp, stillQueued, watch){
     const now = Date.now();
@@ -2696,6 +2709,8 @@
     if(fresh.length){
       if(alarmSettings.sound) playAlarmSound();
       if(alarmSettings.notify) notifyNewMailFor(messages, fresh, fresh.length);
+      // 새 업무 메일 = 시트에도 뭔가 바뀌었을 가능성이 크다 — 10분 주기를 기다리지 않고 한 번 받는다
+      if(typeof doSync === "function" && !isEditingNow()) doSync({ silent:true });
     }
   }
   function openSheet(){
@@ -2779,7 +2794,7 @@
     if(mailMode){ exitMailMode(); return; } // 토글: 이미 메일 화면이면 타이머로
     const st = await window.timerAPI.gmailStatus();
     if(!(st && st.connected)){
-      toast("브라우저에서 로그인해주세요…");
+      toast("브라우저에서 로그인해 주세요…");
       const r = await window.timerAPI.gmailLogin();
       if(!(r && r.ok)){ toast(gmailErrText(r)); return; }
       toast(`메일 연결 완료: ${r.email}`);
@@ -2837,6 +2852,7 @@
   let mailLoadPromise = null, mailSpinOn = false;
   function showMailLoading(){ if(!mailSpinOn){ mailSpinOn = true; spinMailIcon(true); mailCountLoading(); } }
   function hideMailLoading(){ if(mailSpinOn){ mailSpinOn = false; spinMailIcon(false); } }
+  let lastMailSig = "";
   async function loadMail(silent){
     if(mailLoading && mailLoadPromise){
       // 이미 불러오는 중: 요청을 버리지 않고 진행 중인 로딩에 합류.
@@ -2854,14 +2870,21 @@
         mailData = applyLocalRead(res.messages || []);
         setMailBadge();   // 서버 카운트 대신 필터 반영된 목록에서 센다
         lastBadgeCount = res.unreadCount; // 정밀 값으로 폴링 기준 동기화(경량/정밀 불일치 방지)
-        renderMailList();
+        // 10초 폴링이 대부분 같은 목록을 받는다 — 같으면 100건 다시 그리기·캐시 다시 쓰기를 건너뛴다.
+        // 분 단위를 섞는 건 「n분 전」 표시가 바뀌어야 해서.
+        const sig = Math.floor(Date.now() / 60000) + "|" + mailData.map(m => m.id + (m.unread ? "u" : "r")).join(",");
+        if(loud() || sig !== lastMailSig) renderMailList();   // loud: 합류한 수동 새로고침이 있으면 「불러오는 중」 표시를 걷어야 한다
+        lastMailSig = sig;
         maybeNotifyNewMail(mailData); // 정밀 목록 기준 새 메일만 알림(중복 방지)
       } else if(res && res.error === "not-connected"){
-        if(loud()){ setMailCountText(""); $("mail-list").innerHTML = `<div class="mail-empty">메일이 연결되지 않았어요<div class="me-sub">설정에서 메일을 연결해주세요</div></div>`; }
+        lastMailSig = "";   // 안내 문구를 띄웠으면 다음 성공 때 반드시 다시 그린다
+        if(loud()){ setMailCountText(""); $("mail-list").innerHTML = `<div class="mail-empty">메일이 연결되지 않았어요<div class="me-sub">설정에서 메일을 연결해 주세요</div></div>`; }
       } else {
+        lastMailSig = "";
         if(loud()){ setMailCountText(""); $("mail-list").innerHTML = `<div class="mail-empty">불러오기 실패<div class="me-sub">${esc(res && res.error || "")}</div></div>`; }
       }
     } catch(e){
+      lastMailSig = "";
       if(loud()){ setMailCountText(""); $("mail-list").innerHTML = `<div class="mail-empty">불러오기 실패</div>`; }
     } finally {
       mailLoading = false; hideMailLoading();
@@ -3061,7 +3084,7 @@
   //  딸깍 확장의 content.js 파싱 로직을 재사용해 제목/마감/기획안을 추출)
   function fetchFromLink() {
     const url = $("f-reqlink").value.trim();
-    if (!url) { toast("요청글 링크를 입력해주세요"); return; }
+    if (!url) { toast("요청글 링크를 입력해 주세요"); return; }
     if (!url.includes("intranet.adef.co.kr")) { toast("인트라넷 요청글 링크가 아니에요"); return; }
     toast("불러오는 중...");
     // 프로토타입 시연용 더미 응답
@@ -3206,12 +3229,12 @@
     const title=$("f-title").value.trim();
     const reqLink=$("f-reqlink").value.trim();
     const planLink=$("f-planlink").value.trim();
-    if(!title){toast("제목을 입력해주세요");return;}
-    if(!selDl){toast("마감 시간을 선택해주세요");return;}
+    if(!title){toast("제목을 입력해 주세요");return;}
+    if(!selDl){toast("마감 시간을 선택해 주세요");return;}
     if(editingId){
       const t = findPinned(editingId, editingPin);
       if(!t){ closeModal("modal-task"); toast(PIN_LOST); return; }
-      if(!reqLink){ toast("요청글 링크를 입력해주세요"); return; }
+      if(!reqLink){ toast("요청글 링크를 입력해 주세요"); return; }
       const myName = getMyName();
       if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
       closeModal("modal-task");
@@ -3238,7 +3261,7 @@
       if(r && r.ok){ toast("작업을 수정했어요"); await doSync({ silent:true }); }
       else { afterWriteFail(r, arr, () => Object.assign(t, prev), "수정 실패 — 되돌렸어요"); } // 롤백
     } else {
-      if(!reqLink){toast("요청글 링크를 입력해주세요");return;}
+      if(!reqLink){toast("요청글 링크를 입력해 주세요");return;}
       closeModal("modal-task");
       const myName = getMyName();
       if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 추가돼요"); return; }
@@ -3256,9 +3279,17 @@
       render();
       // 방금 지운 것과 같은 작업을 다시 넣는 중이다 — 응답이 늦어(timeout) 아래 ok 가지에 못 가도 새 카드가 묘비에 가려지지 않게 먼저 걷는다
       const lifted = dropTombstones(reqLink, title);
+      // 같은 링크를 여러 번 넣는 건 정상(반복 요청)이라 평소엔 중복 검사를 끈다. 단 방금 시간 초과로 끝난 추가와 같은 것이면
+      // 그 추가가 실제로는 들어갔을 수 있다 — 그때만 서버 중복 검사를 켠다(두 줄 생기는 것 방지).
+      const addKey = reqLink + "\n" + title;
       const r = await postSheetTracked({ // ② 시트 기록 (insert)
-        targetMember: myName, title, url: reqLink, planLink, dueDate: ymd, dupCheck: "0"
+        targetMember: myName, title, url: reqLink, planLink, dueDate: ymd,
+        dupCheck: (timedOutAdds[addKey] || 0) > Date.now() ? "1" : "0"
       });
+      // 서버 중복 검사는 제목 없이 게시글 번호만 본다 — 같은 게시글 줄이 이미 있으면(반복 요청) 구별 못 하므로 그때는 켜지 않는다
+      const sameIdxBefore = idxOf(reqLink) && arrAdd.some(x => x !== temp && idxOf(x.reqLink) === idxOf(reqLink));
+      if(r && r.timeout && !sameIdxBefore) timedOutAdds[addKey] = Date.now() + 10 * 60000;
+      else if(!(r && r.busy)) delete timedOutAdds[addKey];   // busy = 확실히 안 들어감, 앞선 시간 초과의 기억은 그대로 둔다
       if(r && r.ok){
         const dd = new Date(selDl); // 선택한 시간을 개인 저장(요청글 링크 키)
         taskTimes[timeKey(reqLink, title)] = `${String(dd.getHours()).padStart(2,"0")}:${String(dd.getMinutes()).padStart(2,"0")}`;
@@ -3270,12 +3301,14 @@
         // 추가가 안 들어갔다(timeout 은 들어갔을 수 있으니 제외) → 걷어 둔 묘비를 되돌린다. 안 그러면 낡은 응답 속 지운 카드가 다시 보인다
         if(!(r && r.timeout)) tombstones = tombstones.concat(lifted.filter(tb => tb.until > Date.now()));
         const drop = () => { const i = arrAdd.indexOf(temp); if(i >= 0) arrAdd.splice(i, 1); };
-        afterWriteFail(r, arrAdd, drop, r && r.duplicate ? "이미 등록된 작업이에요" : "추가 실패 — 되돌렸어요"); // ④ 롤백
+        afterWriteFail(r, arrAdd, drop, r && r.duplicate ? "방금 추가가 이미 들어가 있어요 — 목록을 다시 불러올게요" : "추가 실패 — 되돌렸어요"); // ④ 롤백
+        if(r && r.duplicate) doSync({ silent:true });
       }
     }
   }
+  const timedOutAdds = {};   // 「링크\n제목」 → 이 시각까지 재추가 때 중복 검사
   function confirmImport() {
-    if(!selDlImport){toast("마감 시간을 선택해주세요");return;}
+    if(!selDlImport){toast("마감 시간을 선택해 주세요");return;}
     tasks.push({id:Date.now(),title:"[더한섬닷컴] 5월 3주차 라이프 스타일 기획전 모션배너",deadline:selDlImport,type:"req",done:false,alarm:60,reqLink:"https://intranet.adef.co.kr/creative/view?idx=49334",planLink:"https://docs.google.com/presentation/d/imported"});
     closeModal("modal-import"); toast("인트라넷 작업을 가져왔어요"); render();
   }
@@ -3285,6 +3318,16 @@
   function rollbackTasks(arr, undo){
     if (tasks === arr) { undo(); render(); }
     else doSync({ silent:true });
+  }
+
+  // 동기화 실패를 팀원이 알아듣는 말로. 원문은 오류 기록(error.log)에 남긴다.
+  function syncErrText(e){
+    const m = String((e && e.message) || e || "");
+    if (window.timerAPI && window.timerAPI.logError) window.timerAPI.logError("sync: " + m);
+    if (/타임아웃|timeout|abort/i.test(m)) return "동기화 실패 — 시트 응답이 늦어요. 잠시 뒤 다시 시도해 주세요";
+    if (/fetch failed|ENOTFOUND|ECONN|network|ETIMEDOUT|EAI_AGAIN/i.test(m)) return "동기화 실패 — 인터넷 연결을 확인해 주세요";
+    if (/HTTP 5\d\d/.test(m)) return "동기화 실패 — 시트 서버가 잠시 응답하지 않아요";
+    return "동기화 실패 — 잠시 뒤 다시 시도해 주세요";
   }
 
   // 쓰기 실패 후처리.
@@ -3323,15 +3366,29 @@
   //   게시글 번호를 못 뽑으면 키를 아예 안 보낸다(빈 문자열 아님) — 서버 계약.
   function writeFp(t){
     const idx = idxOf(t.reqLink);
-    return { ...(idx ? { expectIdx: idx } : {}), expectTitle: String(t.title || "").trim() };
+    // 게시글 번호가 없는 손 링크 카드는 제목만으로는 같은 제목 이웃과 구별이 안 된다 — 링크 전체를 대신 보낸다(서버 v64+ 가 비교, 옛 서버는 무시)
+    return { ...(idx ? { expectIdx: idx } : (t.reqLink ? { expectLink: String(t.reqLink).trim() } : {})), expectTitle: String(t.title || "").trim() };
   }
   // 관리항목(mgmtItems)용 — 배열 교체 여부 대신 타임아웃만 가른다
   function afterMgmtWriteFail(r, undo, failMsg){
     if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요"); doSync({ silent:true }); return; }
+    if (r && r.stale) { undo(); renderMgmt(); toast("그 사이 목록이 바뀌었어요 — 다시 불러올게요"); doSync({ silent:true }); return; }
     undo(); renderMgmt(); toast(failMsg);
   }
 
   let delInFlight = false;   // 연타 방지 — 낡은 _row 로 두 번째 요청이 나가면 엉뚱한 행이 지워진다
+  // 카드 휴지통 = 확인 후 삭제(시트 행이 바로 지워지고 앱 안에서 되돌릴 길이 없다). delTask 는 확인 없이 지우는 본체.
+  function askDelTask(id){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; }
+    if(delInFlight){ toast("앞선 삭제를 처리하고 있어요 — 잠시 후 다시 눌러 주세요"); return; }
+    const t = tasks.find(x=>x.id===id); if(!t) return;
+    // 확인 창이 떠 있는 사이 목록이 당겨지면 id 가 옆 카드를 가리킨다 — 다른 팝업처럼 findPinned 로 다시 찾는다.
+    const pin = pinOf(t);
+    openConfirm("작업 삭제", `「${t.title}」을(를) 삭제할까요? 시트에서도 지워져요.`, "삭제", () => {
+      const cur = findPinned(t.id, pin);
+      if(cur) delTask(cur.id); else toast(PIN_LOST);
+    });
+  }
   async function delTask(id){
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; }
     // 잠금은 재동기화·재시도까지 이어져 몇 초가 될 수 있다 — 말없이 무시하면 고장으로 읽힌다
@@ -3426,7 +3483,7 @@
       //   idx  : 다른 게시글인데 제목이 겹치는 경우(반복 요청)를 잡는다
       //   title: 같은 게시글이 여러 행으로 쪼개진 경우("2종"·"3건")를 잡는다
       //   추출 실패 시엔 키를 아예 안 보낸다(빈 문자열 아님) — 서버 계약
-      ...(fp.idx ? { expectIdx: fp.idx } : {}),
+      ...(fp.idx ? { expectIdx: fp.idx } : (fp.link ? { expectLink: fp.link } : {})),   // 번호 없는 손 링크 카드는 링크 전체(v64+)
       expectTitle: fp.title
     });
   }
@@ -3528,9 +3585,9 @@
   // 날짜+시간 확정: 날짜는 시트, 시간은 로컬. (프리셋·저장 버튼 공통)
   async function commitDue(dateStr, timeStr){
     const t = findPinned(dueCtx, duePin); if(!t){ closeModal("modal-time"); toast(PIN_LOST); return; }
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){ toast("날짜를 선택해주세요"); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){ toast("날짜를 선택해 주세요"); return; }
     timeStr = normalizeTime(timeStr);
-    if(!timeStr){ toast("시간을 입력해주세요 (예: 1800)"); return; }
+    if(!timeStr){ toast("시간을 입력해 주세요 (예: 1800)"); return; }
     const [y,mo,da] = dateStr.split("-").map(Number);
     const [h,mi]    = timeStr.split(":").map(Number);
     const newTs = new Date(y, mo-1, da, h, mi, 0, 0).getTime();
@@ -3549,7 +3606,7 @@
     else { afterWriteFail(r, arr, () => { t.deadline = prevTs; }, "변경 실패 — 되돌렸어요"); }
   }
   function saveDueEdit(){
-    if(!selDlEdit){ toast("마감 시간을 선택해주세요"); return; }
+    if(!selDlEdit){ toast("마감 시간을 선택해 주세요"); return; }
     const d = new Date(selDlEdit);
     commitDue(ymd(d), `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`);
   }
@@ -3611,7 +3668,7 @@
     try {
       localStorage.setItem("alarmSettings", JSON.stringify(alarmSettings)); // 커스텀 음원(dataURL) 포함 영속화
       localStorage.setItem("presets", JSON.stringify(PRESETS));
-    } catch(e){ toast("저장 공간이 부족해 음원을 저장하지 못했어요 — 더 작은 파일을 사용해주세요"); }
+    } catch(e){ toast("저장 공간이 부족해 음원을 저장하지 못했어요 — 더 작은 파일을 사용해 주세요"); }
   }
   let draftAlarm = {};
   let draftWork = {};   // 업무시간만 세기 드래프트 — openSettings 에서 workHours 복사, [저장]에서만 반영
@@ -3971,7 +4028,7 @@
     const e = String((r && r.error) || "");
     if(e === "no-secrets")    return "이 빌드에는 메일 설정이 없어요 — 배포본에서 써주세요";
     if(e === "not-connected") return "메일이 연결되지 않았어요";
-    if(e === "timeout")       return "로그인이 시간 초과됐어요 — 다시 시도해주세요";
+    if(e === "timeout")       return "로그인이 시간 초과됐어요 — 다시 시도해 주세요";
     return "메일 연결 실패" + (e ? " · " + e : "");
   }
   async function renderGmailConn(){
@@ -4000,7 +4057,7 @@
       toast("메일 연결을 해제했어요");
       renderGmailConn();
     } else {
-      toast("브라우저에서 로그인해주세요…");
+      toast("브라우저에서 로그인해 주세요…");
       const r = await window.timerAPI.gmailLogin();
       if(r && r.ok){ toast(`메일 연결 완료: ${r.email}`); renderGmailConn(); loadMail(true); }
       else { toast(gmailErrText(r)); }
@@ -4317,7 +4374,7 @@
   function saveSettings() {
     // 검증: 시간 형식, 이름 빈값
     for (const p of draftPresets) {
-      if (!p.name.trim()) { toast("프리셋 이름을 입력해주세요"); return; }
+      if (!p.name.trim()) { toast("프리셋 이름을 입력해 주세요"); return; }
       const nt = normalizeTime(p.time);
       if (!nt) { toast(`"${p.name}" 시간 형식이 올바르지 않아요 (예: 14:00)`); return; }
       p.time = nt; // 1111 등도 정규화해서 저장
@@ -4579,17 +4636,23 @@
 
   // ── 관리 항목 편집/삭제 (updateMemo) ──
   function mgmtFind(row){ return mgmtItems.find(m => m.row === row); }
+  // 관리항목 행 지문 — 읽어 온 그대로의 B·C(고치기 전 값). 위에서 행이 끼어 밀렸으면 서버(v64+)가 stale 로 거부한다.
+  // 낙관적 반영으로 m[col] 은 이미 새 값이라 고치기 전 값(prev)을 보낸다.
+  function mgmtFp(m, col, prev){
+    // 고치는 칸만 보낸다 — 같은 행 다른 칸의 진행 중 쓰기(낙관적 값)와 얽혀 엉뚱하게 stale 이 나지 않게(검수 지적)
+    return col === "b" ? { expectB: prev || "" } : { expectC: prev || "" };
+  }
 
   async function deleteMgmt(row, col){
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
-    if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해주세요"); return; }
+    if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해 주세요"); return; }
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined") { toast("앱에서만 동작해요"); return; }
     const m = mgmtFind(row); if(!m) return;
     const prev = m[col];               // 롤백용 원본
     m[col] = "";                       // ① 즉시 반영
     renderMgmt();
-    const payload = { action:"updateMemo", targetMember:myName, row };
+    const payload = { action:"updateMemo", targetMember:myName, row, ...mgmtFp(m, col, prev) };
     payload[col === "b" ? "memoB" : "memoC"] = "";
     const r = await postSheetTracked(payload);            // ② 백그라운드 기록
     if(r && r.ok){ toast("관리 항목을 삭제했어요"); }       // ③ 결과 알림
@@ -4598,7 +4661,7 @@
 
   function editMgmt(row, col){
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
-    if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해주세요"); return; }
+    if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해 주세요"); return; }
     const el = document.querySelector(`.mgmt-item[data-row="${row}"][data-col="${col}"]`);
     const m = mgmtFind(row);
     if(!el || !m) return;
@@ -4631,7 +4694,7 @@
     if(val === String(prev || "")) { renderMgmt(); return; }  // 변경 없으면 그냥 닫기
     m[col] = val;                      // ① 즉시 반영
     renderMgmt();
-    const payload = { action:"updateMemo", targetMember:myName, row };
+    const payload = { action:"updateMemo", targetMember:myName, row, ...mgmtFp(m, col, prev) };
     payload[col === "b" ? "memoB" : "memoC"] = val;
     const r = await postSheetTracked(payload);            // ② 백그라운드 기록
     if(r && r.ok){ toast("저장했어요"); }                   // ③ 결과 알림
@@ -4786,8 +4849,9 @@
     // ★제목·링크는 시트에서 온 값이다(팀원 7명이 직접 편집). esc() 없이 넣으면
     //   'A<B' 같은 평범한 제목이 태그로 파싱돼 카드 레이아웃이 무너지고 마감·링크가 제목 안으로 빨려 들어간다.
     //   같은 파일의 다른 렌더러(메일 목록·관리항목·프로필)는 전부 esc() 를 거친다 — 여기만 빠져 있었다.
-    const reqBtn=t.reqLink?`<a class="link-mini" href="${esc(t.reqLink)}" target="_blank" title="요청글 링크" onclick="event.stopPropagation()">${IC.link}</a>`:"";
-    const planBtn=t.planLink?`<a class="link-mini" href="${esc(t.planLink)}" target="_blank" title="기획안 링크" onclick="event.stopPropagation()">${IC.deck}</a>`:"";
+    // href 에는 웹 주소만 넣는다. NAS 경로 같은 글자는 아이콘만 그대로 두고 누르면 안내(아래 클릭 처리).
+    const reqBtn=t.reqLink?`<a class="link-mini" href="${esc(webUrl(t.reqLink))}" target="_blank" title="요청글 링크" aria-label="요청글 링크" onclick="event.stopPropagation()">${IC.link}</a>`:"";
+    const planBtn=t.planLink?`<a class="link-mini" href="${esc(webUrl(t.planLink))}" target="_blank" title="기획안 링크" aria-label="기획안 링크" onclick="event.stopPropagation()">${IC.deck}</a>`:"";
     const links=(reqBtn||planBtn)?`<span class="link-group">${reqBtn}${planBtn}</span>`:"";
     // ★_status·_memo 도 시트 값이다(2186행 매핑, 팀원 7명이 셀을 직접 편집).
     //   제목·링크와 완전히 같은 이유로 esc() 를 거친다 — 상태 셀의 '<수정>' 한 마디가 카드 DOM 을 깨뜨린다.
@@ -4810,7 +4874,7 @@
       <div class="count ${u}">${countInner}</div>
       <div class="actions">
         <button class="act" onclick="openEdit(${t.id})" title="편집">${IC.edit}</button>
-        <button class="act del" onclick="delTask(${t.id})" title="삭제">${IC.trash}</button>
+        <button class="act del" onclick="askDelTask(${t.id})" title="삭제" aria-label="삭제">${IC.trash}</button>
       </div>
     </div>`;
   }
@@ -4819,8 +4883,9 @@
     // 버튼·체크·링크·마감칩 영역 클릭은 각자 동작 유지 (카드 이동 무시)
     if(e && e.target && e.target.closest && e.target.closest(".check, .actions, a.link-mini, .meta-deadline")) return;
     const t = tasks.find(x => x.id === id); if(!t) return;
-    const url = t.reqLink;
-    if(!url){ toast("요청글 링크가 없어요"); return; }
+    if(!t.reqLink){ toast("요청글 링크가 없어요"); return; }
+    const url = webUrl(t.reqLink);
+    if(!url){ toast("웹 주소가 아니라서 앱에서 열 수 없어요"); return; }
     if(typeof window.timerAPI !== "undefined" && window.timerAPI.openExternal) window.timerAPI.openExternal(url);
     else window.open(url, "_blank");
   }
@@ -4838,6 +4903,10 @@
 
   // 창 컨트롤 — Electron이면 실제 동작, 브라우저면 시연 토스트
   const isElectron = typeof window.timerAPI !== "undefined";
+  if (isElectron && window.timerAPI.logError) {
+    window.addEventListener("error", e => window.timerAPI.logError((e.error && e.error.stack) || (e.message + " @" + e.filename + ":" + e.lineno)));
+    window.addEventListener("unhandledrejection", e => window.timerAPI.logError("promise: " + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
+  }
   document.querySelectorAll(".win-btn").forEach(b=>b.addEventListener("click",()=>{
     if (isElectron) {
       if (b.id==="win-min") window.timerAPI.winMinimize();
@@ -5019,6 +5088,10 @@
   window.addEventListener("keydown", (e) => {
     const ae = document.activeElement;
     const inField = ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.isContentEditable);
+    // 키보드(Tab)로 버튼에 와 있으면 Space·Enter 는 그 버튼을 누르는 키다 — 전역 단축키(동기화)로 가로채지 않는다.
+    // ★:focus-visible 일 때만. 마우스로 누른 버튼에도 포커스가 남아서, 그걸 넘기면 Space 가 방금 누른 버튼(완료 비우기 등)을 또 누른다.
+    if ((e.key === " " || e.key === "Enter") && ae && ae.matches && ae.matches(":focus-visible")
+        && (ae.tagName === "BUTTON" || ae.tagName === "SELECT" || ae.getAttribute("role") === "button")) return;
 
     // Esc / (입력칸 밖)Backspace → 팝업 닫기, 메일 화면이면 타이머로, 아니면 내 보드 복귀
     if (e.key === "Escape" || (e.key === "Backspace" && !inField)) {
@@ -5080,13 +5153,16 @@
   // ── Electron 플랫폼별 처리 ──
   if (isElectron) {
     // 카드 안 링크(요청글/기획안)는 기본 브라우저로 열기
+    // ★캡처 단계로 받는다. 링크의 onclick 이 버블을 막아서, 예전엔 여기가 안 불리고 새 창 요청으로 샜다.
     document.addEventListener("click", e => {
       const a = e.target.closest("a.link-mini");
-      if (a && a.href) {
+      if (a) {
         e.preventDefault();
-        window.timerAPI.openExternal(a.href);
+        const url = webUrl(a.getAttribute("href"));
+        if (url) window.timerAPI.openExternal(url);
+        else toast("웹 주소가 아니라서 앱에서 열 수 없어요");
       }
-    });
+    }, true);
   }
 
   // ── 커스텀 오버레이 스크롤바 ──

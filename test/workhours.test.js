@@ -160,9 +160,9 @@ check("E31 isOffDay 9/24 추석·9/26 토·9/28 월", [isOffDay(2026,8,24), isOf
 // E32 fmtDl 은 바뀌지 않는다(마감 칩) — 금 17:00 기준
 check("E32 fmtDl 오늘/내일/모레/요일", [fmtDl(D26(9,18,21),false,D26(9,18,17)), fmtDl(D26(9,19,14),false,D26(9,18,17)), fmtDl(D26(9,20,18),false,D26(9,18,17)), fmtDl(D26(9,21,10),false,D26(9,18,17))],
   ["오늘 21:00", "내일 14:00", "모레 18:00", "9/21(월) 10:00"]);
-// E33 tick 성능 — 카드 28 × (urgency + cdText) × 30일 마감이 1ms 급인지(실측 0.23ms/tick). 임계 5ms = 실측의 20배(회귀 감지용)
+// E33 tick 성능 — 카드 28 × (urgency + cdText) × 30일 마감이 1ms 급인지(실측 0.23ms/tick). 임계 5ms = 실측의 20배(회귀 감지용). 다섯 번 재서 가장 빠른 값으로 본다 — 첫 실행의 JIT·CI 기계의 잡음으로 떨어지지 않게
 check("E33 28카드 tick 1회 < 5ms",
-  (() => { const now = D26(9,18,17); const ds = []; for(let i=0;i<28;i++) ds.push(now + (i+1)*26*H); const t0 = process.hrtime.bigint(); for(let r=0;r<10;r++) ds.forEach(ts => { urgency(now, ts, DEF); cdText(now, ts, DEF); }); const ms = Number(process.hrtime.bigint() - t0) / 1e6 / 10; return ms < 5; })(), true);
+  (() => { const now = D26(9,18,17); const ds = []; for(let i=0;i<28;i++) ds.push(now + (i+1)*26*H); let ms = Infinity; for(let k=0;k<5;k++){ const t0 = process.hrtime.bigint(); for(let r=0;r<10;r++) ds.forEach(ts => { urgency(now, ts, DEF); cdText(now, ts, DEF); }); ms = Math.min(ms, Number(process.hrtime.bigint() - t0) / 1e6 / 10); } return ms < 5; })(), true);
 
 log("\n── 검수 반영 — cfg 방어·표기 규칙 ──");
 // E34 makeCfg 가 유일한 관문: 역전·동일·NaN 입력은 on 이어도 null (saveSettings 가 parseWorkHours 없이 만든 workHours 재현)

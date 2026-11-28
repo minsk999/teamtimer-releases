@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────
 //  작업 타이머 — Electron 메인 프로세스
 // ─────────────────────────────────────────────
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, session, dialog } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
+const crypto = require('crypto');
 const { execFile, spawn } = require('child_process');
 
 // ── Windows 알림 표시 이름/아이콘 ──
@@ -48,6 +49,24 @@ app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
   } catch (e) { /* 이관 실패해도 앱은 새 폴더로 정상 시작 */ }
 })();
 app.setPath('userData', path.join(app.getPath('appData'), 'teamtimer'));
+
+// ── 오류 기록: 팀원 PC 에서 난 오류를 나중에 볼 수 있게 userData/error.log 에 남긴다(256KB 넘으면 뒤 절반만 남김) ──
+function logError(where, err) {
+  try {
+    const f = path.join(app.getPath('userData'), 'error.log');
+    const line = new Date().toISOString() + ' v' + app.getVersion() + ' [' + where + '] '
+      + String((err && (err.stack || err.message)) || err).slice(0, 2000).replace(/\r?\n/g, ' | ') + '\n';
+    try { if (fs.statSync(f).size > 262144) fs.writeFileSync(f, fs.readFileSync(f, 'utf8').slice(-131072)); } catch (e) {}
+    fs.appendFileSync(f, line, 'utf8');
+  } catch (e) {}
+}
+// 리스너를 달면 Electron 기본 오류 창이 안 뜬다. 창이 아직 없을 때(시작 실패)만은 창으로도 알린다 — 안 그러면 아무것도 안 뜬 채 남는다.
+process.on('uncaughtException', (e) => {
+  logError('main', e);
+  try { if (!mainWindow && app.isReady()) dialog.showErrorBox('작업 타이머 오류', String((e && e.message) || e)); } catch (_) {}   // try: 아래 let mainWindow 선언 전이면 접근 자체가 오류
+});
+process.on('unhandledRejection', (e) => logError('main-promise', e));
+ipcMain.on('log-error', (event, msg) => logError('renderer', String(msg).slice(0, 2000)));
 
 let mainWindow = null;
 let tray = null;
@@ -359,13 +378,16 @@ function createWindow() {
 
   // 윈도우 종료·로그오프 때는 바로 끝낸다. 버티면 OS 가 GPU 보조 프로세스를 먼저 죽이고, 본체가 그걸
   // GPU 고장으로 오인해 1초쯤 뒤 0x80000003 오류창을 띄운다(Electron 42.9+ 에서 고쳐진 문제, electron#52604 와 같은 처리).
-  mainWindow.on('session-end', () => { isQuitting = true; app.exit(0); });
+  // localStorage(설정·알람 시점 등)를 디스크에 내리기를 시도한다(완료를 기다리지는 못한다 — app.exit 은 바로 끝낸다).
+  mainWindow.on('session-end', () => { isQuitting = true; try { session.defaultSession.flushStorageData(); } catch (e) {} app.exit(0); });
 
   // 외부 링크는 선택한 브라우저/프로필로 열기 (요청글/기획안 링크)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    openUrl(url);
+    openUrl(url);                                  // 스킴 검사는 openUrl 안에서 한다
     return { action: 'deny' };
   });
+  // 창 자체가 다른 주소로 넘어가는 일은 없어야 한다(링크 클릭·끌어 놓기 등). 막고 밖에서 연다.
+  mainWindow.webContents.on('will-navigate', (e, url) => { e.preventDefault(); openUrl(url); });
 
   // 최대화/복원 시 렌더러에 알림 (아이콘 전환)
   mainWindow.on('maximize', () => sendMaxState());
@@ -506,13 +528,12 @@ function sendMaxState() {
 // ★스킴을 반드시 거른다. 여기로 오는 값의 상당수는 시트에서 읽어 온 요청글 링크인데,
 //   시트는 팀 밖에서도 편집될 수 있다. file:/ms-msdt:/javascript: 같은 게 섞여 들어오면
 //   shell.openExternal 이 그대로 OS 핸들러에 넘긴다.
-ipcMain.handle('open-external', (event, url) => {
+function isSafeUrl(url) {
   let p;
   try { p = new URL(String(url)).protocol; } catch (e) { return false; }
-  if (p !== 'http:' && p !== 'https:' && p !== 'mailto:') return false;
-  openUrl(url);
-  return true;
-});
+  return p === 'http:' || p === 'https:' || p === 'mailto:';
+}
+ipcMain.handle('open-external', (event, url) => openUrl(url));
 
 // ── 링크를 특정 Chrome 프로필로 열기 (회사 계정 프로필 등) ──
 let linkProfileDir = ''; // '' = 기본 브라우저 사용
@@ -551,7 +572,11 @@ function listChromeProfiles() {
     return arr;
   } catch (e) { return []; }
 }
+// ★밖으로 여는 길은 전부 여기를 지난다(IPC·새 창 요청·창 이동). 검사도 여기 한 곳에서.
+//   크롬 실행 인자로도 넘어가므로, 검사 없이 '--' 로 시작하는 값이 오면 크롬 옵션이 된다.
 function openUrl(url) {
+  if (!isSafeUrl(url)) return false;
+  url = new URL(String(url)).href;
   if (linkProfileDir) {
     const exe = chromeExecutable();
     if (exe) {
@@ -563,11 +588,12 @@ function openUrl(url) {
         const child = spawn(exe, ['--profile-directory=' + linkProfileDir, url], { detached: true, stdio: 'ignore' });
         child.on('error', () => shell.openExternal(url));
         child.unref();
-        return;
+        return true;
       } catch (e) { /* 폴백 */ }
     }
   }
   shell.openExternal(url);
+  return true;
 }
 ipcMain.handle('list-chrome-profiles', () => ({ ok: true, chrome: !!chromeExecutable(), profiles: listChromeProfiles() }));
 ipcMain.handle('set-link-profile', (event, dir) => { linkProfileDir = dir || ''; return { ok: true, dir: linkProfileDir }; });
@@ -696,21 +722,39 @@ ipcMain.handle('fetch-intranet', async (event, url) => {
 // ─────────────────────────────────────────────
 function tokenPath() { return path.join(app.getPath('userData'), 'gmail-tokens.json'); }
 
+// 윈도우는 OS 암호화(DPAPI)로 저장한다. 맥은 키체인을 쓰는데, ad-hoc 서명이라 업데이트마다
+// 「키체인 접근 허용」 창이 뜰 수 있어(실기 미확인) 평문 그대로 둔다 — 파일 권한만 본인으로 좁힌다.
+function canEncrypt() {
+  try { return process.platform === 'win32' && safeStorage.isEncryptionAvailable(); } catch (e) { return false; }
+}
 function readTokens() {
-  try { return JSON.parse(fs.readFileSync(tokenPath(), 'utf8')); }
-  catch (e) { return null; }
+  let obj;
+  try { obj = JSON.parse(fs.readFileSync(tokenPath(), 'utf8')); } catch (e) { return null; }
+  if (obj && obj.enc) {
+    try { return JSON.parse(safeStorage.decryptString(Buffer.from(obj.enc, 'base64'))); }
+    catch (e) { logError('gmail-token-decrypt', e); return null; }   // 파일은 그대로 — 다시 로그인하면 덮어쓴다
+  }
+  if (obj && canEncrypt()) writeTokens(obj);       // 예전 평문 파일은 읽은 김에 암호화해 다시 쓴다
+  return obj;
 }
 function writeTokens(obj) {
-  try { fs.writeFileSync(tokenPath(), JSON.stringify(obj), 'utf8'); } catch (e) {}
+  try {
+    const data = canEncrypt()
+      ? JSON.stringify({ enc: safeStorage.encryptString(JSON.stringify(obj)).toString('base64') })
+      : JSON.stringify(obj);
+    fs.writeFileSync(tokenPath(), data, { encoding: 'utf8', mode: 0o600 });
+    try { fs.chmodSync(tokenPath(), 0o600); } catch (e) {}   // mode 는 새로 만들 때만 먹는다 — 예전부터 있던 파일(맥)도 좁힌다
+  } catch (e) {}
 }
 function clearTokens() {
   try { fs.unlinkSync(tokenPath()); } catch (e) {}
 }
 
 // 인증 코드 → 토큰 교환
-async function exchangeCode(code, redirectUri) {
+async function exchangeCode(code, redirectUri, codeVerifier) {
   const body = new URLSearchParams({
     code,
+    code_verifier: codeVerifier,
     client_id: GMAIL_CLIENT_ID,
     client_secret: GMAIL_CLIENT_SECRET,
     redirect_uri: redirectUri,
@@ -792,10 +836,15 @@ async function gmailProfile(accessToken) {
 
 // OAuth 로그인 — 시스템 브라우저 + 로컬 콜백 서버
 function startGmailLogin() {
+  // state = 이 로그인에서 시작한 응답만 받는다 · PKCE = 가로챈 인증 코드만으로는 토큰을 못 바꾼다
+  const state = crypto.randomBytes(16).toString('hex');
+  const codeVerifier = crypto.randomBytes(32).toString('base64url');
+  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
   return new Promise((resolve, reject) => {
     const server = http.createServer(async (req, res) => {
       try {
         const u = new URL(req.url, 'http://127.0.0.1');
+        if (u.searchParams.get('state') !== state) { res.statusCode = 400; res.end('bad state'); return; }
         const code = u.searchParams.get('code');
         const err = u.searchParams.get('error');
         if (err) {
@@ -807,7 +856,7 @@ function startGmailLogin() {
 
         const port = server.address().port;
         const redirectUri = 'http://127.0.0.1:' + port;
-        const tok = await exchangeCode(code, redirectUri);
+        const tok = await exchangeCode(code, redirectUri, codeVerifier);
         const email = await gmailProfile(tok.access_token);
         writeTokens({
           access_token: tok.access_token,
@@ -838,6 +887,9 @@ function startGmailLogin() {
         scope: GMAIL_SCOPE,
         access_type: 'offline',
         prompt: 'consent',
+        state,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
       }).toString();
       openUrl(authUrl);
     });
