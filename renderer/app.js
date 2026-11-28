@@ -2615,7 +2615,16 @@
     const lt = $("work-labels-toggle"); if(lt) lt.classList.toggle("on", draftWork.labels !== false);
     const s = $("work-start"), e = $("work-end"); if(s) s.value = draftWork.start; if(e) e.value = draftWork.end;
     // 주 토글이 꺼지면 하위 필드 통째로 흐림(.field.disabled = opacity .4 + pointer-events none). 접기 모션 없음.
-    const f = $("field-workhours"); if(f) f.classList.toggle("disabled", !draftWork.on);
+    const f = $("field-workhours"); if(f) setFieldOff(f, !draftWork.on);
+  }
+  // 흐리게 꺼 둔 설정 묶음은 Tab 으로도 못 들어가게 — 마우스는 pointer-events 로 이미 막혀 있다(들어가면 커서도 안 보였다, v1.0.45)
+  function setFieldOff(f, off){
+    f.classList.toggle("disabled", off);
+    f.querySelectorAll('input, select, textarea, button, [tabindex]').forEach(el => {
+      if (off) { if (!el.hasAttribute("data-tab0")) el.setAttribute("data-tab0", el.getAttribute("tabindex") ?? ""); el.tabIndex = -1; }
+      else if (el.hasAttribute("data-tab0")) { const t = el.getAttribute("data-tab0"); if (t === "") el.removeAttribute("tabindex"); else el.setAttribute("tabindex", t); el.removeAttribute("data-tab0"); }
+    });
+    if (off && f.contains(document.activeElement)) document.activeElement.blur();
   }
   // blur/Enter 즉시 정규화 — normalizePresetTime 과 같은 규칙('9' → 09:00, '1830' → 18:30). 실패하면 그대로 두고 [저장]에서 걸린다.
   function normalizeWorkTime(el, key){ const n = normalizeTime(el.value); if(n){ el.value = n; draftWork[key] = n; } }
@@ -2630,7 +2639,7 @@
     });
   }
   function updateAlarmFieldStates() {
-    $("field-sound").classList.toggle("disabled", !draftAlarm.sound);
+    setFieldOff($("field-sound"), !draftAlarm.sound);
   }
 
   // 세그먼트 클릭 (이벤트 위임)
