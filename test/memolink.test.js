@@ -60,7 +60,7 @@ const gasFile = fs.readdirSync(gasDir).filter(f => /^AppsScript-v\d+\.gs$/.test(
 const gs = fs.readFileSync(process.env.TT_GAS || path.join(gasDir, gasFile), "utf8");   // 다른 판: TT_GAS=<파일>
 const gfn = nm => { const i = gs.indexOf("function " + nm + "("); let d = 0, j = gs.indexOf("{", i); for (; ; j++) { if (gs[j] === "{") d++; else if (gs[j] === "}" && --d === 0) break; } return gs.slice(i, j + 1); };
 const sb = { SpreadsheetApp: { newRichTextValue: () => { const b = { links: [] }; b.setText = t => (b.text = t, b); b.setLinkUrl = (s, e, u) => (b.links.push({ s, e, u }), b); b.build = () => ({ text: b.text, links: b.links }); return b; } } };
-vm.runInNewContext([gfn("cellToMd"), gfn("textSafe"), gfn("setCellSmart")].join("\n") + "\n__g = { cellToMd, setCellSmart };", sb);
+vm.runInNewContext([gfn("cellToMd"), gfn("textSafe"), gs.includes("function litSafe(") ? gfn("litSafe") : "", gfn("setCellSmart")].join("\n") + "\n__g = { cellToMd, setCellSmart };", sb);
 const { cellToMd, setCellSmart } = sb.__g;
 function cellRoundTrip(val) {
   const c = { text: "", links: [] };
@@ -80,5 +80,7 @@ for (const typed of ["일정 https://a.b/c 확인", "https://a.b/c를 봐", "위
   const saved = linkifyMemo(typed);
   eq("새로 쓴 값 왕복: " + typed, cellRoundTrip(saved), saved);
 }
+// 숫자·날짜 모양 메모(서버 v71+ 는 ' 를 붙여 글자로 둔다 — 가짜 칸은 시트처럼 앞의 ' 를 떼고 보여 준다): 왕복해도 글자가 그대로
+for (const typed of ["6", "3-5", "0012", "12/24 10:30"]) eq("숫자 모양 왕복: " + typed, cellRoundTrip(linkifyMemo(typed)), typed);
 console.log(`${n - fail} passed, ${fail} failed  (서버 사본 ${process.env.TT_GAS ? path.basename(process.env.TT_GAS) : gasFile})`);
 process.exit(fail ? 1 : 0);
