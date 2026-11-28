@@ -1,6 +1,6 @@
 {
   "name": "team-timer",
-  "version": "1.0.43",
+  "version": "1.0.44",
   "description": "작업 타이머 - 마감까지 남은 시간을 한눈에",
   "main": "main.js",
   "author": "ADEF Video Team",
@@ -17,11 +17,13 @@
     "build:all": "electron-builder --mac --win --publish never"
   },
   "devDependencies": {
+    "@electron/fuses": "^1.8.0",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "kr.co.adef.jakeop-timer",
+    "afterPack": "tools/fuses.js",
     "productName": "작업 타이머",
     "directories": {
       "output": "dist",

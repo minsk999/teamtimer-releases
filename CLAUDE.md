@@ -101,7 +101,8 @@ CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lip
 - ★**밖으로 여는 길은 전부 `main.js` 의 `openUrl()` 하나를 지난다**(IPC `open-external`·`setWindowOpenHandler`·`will-navigate`). 거기서 http/https/mailto 만 연다.
   예전엔 카드 링크 아이콘의 `onclick=stopPropagation` 때문에 렌더러의 가로채기가 안 불리고 새 창 요청으로 새서 **검사 없이** `shell.openExternal` 에 닿았다.
   렌더러는 시트 유래 링크를 `webUrl()` 로 거른다(스킴 없는 `도메인/경로` 는 https 를 붙임 — 입력칸 안내 모양). 시험 `test/weburl.test.js`.
-- 렌더러 CSP(meta): 외부 스크립트·프레임·직접 전송 차단, 글꼴 두 곳만 허용. 인라인 onclick 때문에 `'unsafe-inline'` 이라 **HTML 주입은 못 막는다** — 외부 문자열은 반드시 `esc()`.
+- 렌더러 CSP(meta): 바깥 출처 전부 차단(글꼴도 v1.0.44 부터 `renderer/fonts` — 예전 CDN 과 같은 파일, OFL). CDN 을 다시 쓰지 말 것.
+- 패키지 퓨즈(v1.0.44, `tools/fuses.js` = afterPack): RunAsNode·NODE_OPTIONS·inspect 인자 끔, app.asar 에서만 로드. 맥은 --dir 단계에서 바뀌고 sign-mac.js 가 다시 서명. ⚠️ dist 의 패키지 앱을 띄우지 말 것(자동 실행 레지스트리를 건드린다) — 확인은 `npx @electron/fuses read --app <exe>`. 인라인 onclick 때문에 `'unsafe-inline'` 이라 **HTML 주입은 못 막는다** — 외부 문자열은 반드시 `esc()`.
   시험 하네스는 eval 대신 `<script>` 주입으로 돈다(`test/delete-race.browser.js`).
 - Gmail 토큰: 윈도는 `safeStorage`(DPAPI) 암호화, 맥은 평문 + 0600(ad-hoc 서명이라 키체인 허용 창이 업데이트마다 뜰 수 있어 보류). OAuth 는 state + PKCE.
   ⚠️ 1.0.39 에서 그 전 버전으로 내리면 암호화된 토큰을 못 읽어 메일을 다시 연결해야 한다(데이터 손실은 없음).

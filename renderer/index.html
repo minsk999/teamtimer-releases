@@ -3,18 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- 렌더러는 네트워크를 직접 쓰지 않는다(시트·메일은 메인 프로세스 경유). 글꼴 두 곳만 허용하고 외부 스크립트·프레임·직접 전송은 막는다.
+<!-- 렌더러는 네트워크를 직접 쓰지 않는다(시트·메일은 메인 프로세스 경유). 글꼴도 앱 안(renderer/fonts, v1.0.44)이라 바깥 출처는 하나도 허용하지 않는다.
      인라인 onclick 때문에 'unsafe-inline' 이라 HTML 주입은 막지 못한다 — 외부 문자열은 반드시 esc()·webUrl() 을 거칠 것. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>작업 타이머</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-  @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+  @import url('fonts/fonts.css');   /* v1.0.44: 글꼴 3종을 앱에 실었다(예전 CDN 과 같은 파일) — 인터넷이 느려도 바로 나온다 */
   /* ★@import 는 스타일 맨 앞에만 둘 수 있다 — 그 위에 규칙을 두면 글꼴을 조용히 못 불러온다 */
   /* v1.0.39: 한글은 낱말 단위로 줄을 바꾼다(「연/결하세요」 방지). 긴 주소·영문은 넘치지 않게 끊는다. */
   body { word-break: keep-all; overflow-wrap: break-word; }
 
   :root {
+    --accent: #1A73E8;          /* 링크 — 흰 바탕 대비 4.5:1 이상(v1.0.44, 예전 #2E96FF 는 3:1) */
     /* 라이트 (기본) */
     --hairline: 1px; /* JS가 devicePixelRatio 기준 1 디바이스 픽셀로 설정 (배율 화면 또렷) */
     --bg: #ffffff;
@@ -47,6 +47,7 @@
     --st-soon-ink: var(--st-soon);
   }
   .dark {
+    --accent: #2E96FF;
     --bg: #0a0a0a;
     --bg-soft: #18181b;
     --surface: #161616;
@@ -85,7 +86,7 @@
     margin: 0; padding: 0;
   }
   body {
-    font-family: 'Inter Tight', 'Pretendard', sans-serif;
+    font-family: 'Inter Tight', 'Pretendard', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
     background: var(--bg);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
@@ -277,7 +278,7 @@
   .mgmt-item.done { opacity: 0.5; }
   .mgmt-item .pin { width: 4px; height: 4px; border-radius: 50%; background: var(--ink-3); flex-shrink: 0; }
   .mgmt-text { flex: 1; min-width: 0; font-size: 13px; color: var(--ink); font-weight: 500; letter-spacing: -0.01em; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mdlink { color: var(--accent, #2E96FF); text-decoration: none; border-bottom: 1px solid transparent; cursor: pointer; transition: border-color 0.13s; }
+  .mdlink { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; cursor: pointer; transition: border-color 0.13s; }
   .mdlink:hover { border-bottom-color: currentColor; }
   .mgmt-item.done .mdlink { color: inherit; opacity: 0.8; text-decoration: underline; }
 
@@ -364,7 +365,7 @@
     white-space: nowrap; flex-shrink: 0;
   }
   .chip-tag.req { border-color: transparent; background: var(--pill); color: var(--pill-text); }
-  .meta-text { font-size: 12.5px; color: var(--ink-3); font-family: 'Inter Tight', 'Pretendard', sans-serif; font-weight: 500; display: flex; align-items: center; gap: 5px; letter-spacing: -0.01em; white-space: nowrap; flex-shrink: 0; transition: font-size 0.3s ease; }
+  .meta-text { font-size: 12.5px; color: var(--ink-3); font-family: 'Inter Tight', 'Pretendard', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 500; display: flex; align-items: center; gap: 5px; letter-spacing: -0.01em; white-space: nowrap; flex-shrink: 0; transition: font-size 0.3s ease; }
   .meta-text svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.6; }
   .link-group { display: inline-flex; gap: 2px; align-items: center; flex-shrink: 0; }
   .link-mini {
@@ -415,7 +416,7 @@
   .count .l {
     position: absolute; top: 100%; right: 0; margin-top: 2px;
     white-space: nowrap; pointer-events: none;
-    font-family: 'Inter Tight', 'Pretendard', sans-serif;
+    font-family: 'Inter Tight', 'Pretendard', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
     font-size: 9.5px; color: var(--ink-2); font-weight: 600; letter-spacing: 0.02em;
   }
   .count.over .l { color: var(--st-urgent-ink); }
@@ -424,7 +425,7 @@
      .task.done{opacity:.45} 가 곱해져 --ink-3 은 실효 1.46:1 이라 --ink-2(1.83:1)로 올렸다
      — 같은 카드의 제목이 3.15:1 이라 위계는 맞다. */
   .count .cst {
-    font-family: 'Inter Tight', 'Pretendard', sans-serif;
+    font-family: 'Inter Tight', 'Pretendard', 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
     font-size: 12px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25;
     color: var(--ink-2); text-align: right; max-width: 100%;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -459,6 +460,8 @@
   .empty { text-align: center; padding: 60px 20px; color: var(--ink-3); }
   .empty svg { width: 44px; height: 44px; stroke: var(--ink-3); fill: none; stroke-width: 1.3; opacity: 0.5; margin-bottom: 12px; }
   .empty .msg { font-size: 14px; letter-spacing: -0.01em; }
+  .empty .doc-link { display: inline-block; margin-top: 10px; color: var(--accent); text-decoration: none; font-size: 12.5px; font-weight: 600; }
+  .empty .doc-link:hover { text-decoration: underline; }
 
   /* ── 모달 ── */
   .overlay {
