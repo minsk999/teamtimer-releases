@@ -1,5 +1,18 @@
 // ============================================================
-//  Google Apps Script v69  (7칸 구조
+//  Google Apps Script v70  (7칸 구조
+//  - v70: 2026-11-28 딸깍 세션(5차 점검 — 전문가 9명 + 반박 재현).
+//         ① textSafe 가 '=' 뿐 아니라 '+'·'-'·'@' 로 시작하는 글도 글자로(앞에 ') — 「-수정 요청」「+1 추가」가
+//            시트에서 수식으로 읽혀 #ERROR! 가 되던 것. getValue 는 ' 없이 원문을 주므로 읽기·지문 비교는 그대로.
+//            타이머 경로(updateTask·addMemo·updateMemo·deleteTask 당김)에도 같이 적용된다.
+//         ② insert 가 행을 쓴 뒤(메모·서식·빈 줄 삽입) 실패하면 ok:true 에 partial:true 를 싣는다(withVer 포함).
+//            v68 은 ok:true 만 줘서 딸깍이 성공으로 알고 메모 칸을 비웠고(메모 조용히 유실), 빈 줄 삽입이 실패한 것도
+//            몰라 그 팀원의 다음 전송이 「멈췄습니다」로 막힐 때까지 아무도 몰랐다. 딸깍 v1.8.11 은 partial 이면
+//            메모를 지우지 않고 「시트를 확인해 주세요」를 띄운다. 옛 딸깍은 partial 을 모르므로 v68 과 같다.
+//         ③ partial 반환 전에도 읽기 캐시를 버린다 — 행은 들어갔는데 캐시가 살아 타이머 목록에 최대 20초 안 보이던 것(v69 부터 있던 구멍).
+//            (글번호 앞 경계 [?&] 는 검토 중 뺐다 — 타이머 idxOf·지문 curIdx 와 규칙이 갈라져 재추가가 「이미 등록」으로 막힐 수 있어
+//             양쪽을 한 판에서 같이 바꿀 때 하기로)
+//         ④ LATEST_TTALKAK_VER 1.8.10 → 1.8.11.
+//  (구) v69  (7칸 구조
 //  - v69: 2026-11-28 타이머 세션(사용자 승인). 관리항목(B·C / J·K)의 **스마트 칩 링크**를 읽는다.
 //         시트에 문서 주소를 붙여 넣으면 칩이 되는데, 칩의 주소는 RichTextValue 에 안 실려 앱에 글자만 갔다(그 메모를 앱에서
 //         고쳐 저장하면 칩 링크가 사라졌다). Sheets 고급 서비스(chipRuns)로 관리항목 칸만 한 번에 읽어 「[칩 글자](주소)」로 넘긴다.
@@ -246,7 +259,7 @@ var CHECK_FONT_COLOR = "#434343";
 
 // ── 딸깍 확장 버전 알림 (v57) ───────────────────────────────
 // 딸깍을 새 버전으로 배포하면 이 값을 같이 올린다.
-var LATEST_TTALKAK_VER = "1.8.10";
+var LATEST_TTALKAK_VER = "1.8.11";
 // 알림에 덧붙일 안내 (빈 문자열이면 "새 버전이 있어요"만 뜬다)
 var UPDATE_MSG = "— 받은 zip 을 기존 폴더에 덮어쓰고 chrome://extensions 에서 ↻, 인트라넷 탭은 F5 해 주세요";
 
@@ -588,7 +601,7 @@ function cellToMd(rich, plain, formula) {
 //      앞에 ' 를 붙이면 글자로 저장되고, getValue 는 ' 없이 원문을 돌려준다(읽는 쪽 영향 없음).
 function textSafe(s) {
   s = String(s == null ? "" : s);
-  return /^=/.test(s) ? "'" + s : s;
+  return /^[=+\-@]/.test(s) ? "'" + s : s;   // v70: + - @ 도 시트가 수식으로 읽는다
 }
 // v63: HYPERLINK 수식은 여기서만 만든다. " 는 "" 로(수식 탈출 차단).
 //      빈 값과 http(s) 가 아닌 스킴(javascript: 등)만 null. 스킴이 없는 주소는 v62 처럼 그대로 수식으로 —
@@ -1665,7 +1678,10 @@ function doPost(e) {
 
   } catch (err) {
     // v68: 행을 쓴 뒤의 실패(서식·빈 줄 삽입)는 ok:true — ok:false 면 딸깍이 다시 보내 같은 글이 두 줄 된다
-    if (written) return respond({ ok: true, message: written + " 추가됨 (서식 일부 실패: " + String(err).slice(0, 80) + ")" });
+    // v70: partial 을 실어 딸깍이 메모를 지키고 시트 확인을 권하게 한다(빈 줄 삽입 실패면 다음 전송이 막히므로 꼭 알려야 한다)
+    if (written) { try { bustReadCache(); } catch (e3) {} }   // v70: 방금 쓴 행이 낡은 캐시에 가려지지 않게
+    if (written) return respond(withVer({ ok: true, partial: true,
+      message: written + " 추가됨 (마무리 일부 실패: " + String(err).slice(0, 80) + ")" }, clientVer));
     return respond({ ok: false, error: err.toString() });
   } finally {
     if (lock) { try { lock.releaseLock(); } catch (e2) {} }
