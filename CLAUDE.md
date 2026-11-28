@@ -16,6 +16,7 @@ Windows 정상. ⚠️ **맥은 v1.0.27~1.0.30 이 실기 미검증**이다(`TOD
 main.js                 메인 프로세스 (창/트레이/Gmail/공휴일/업데이트확인)
 preload.js              contextBridge (window.timerAPI)
 renderer/index.html     UI 의 HTML·CSS (스크립트는 v1.0.43 부터 renderer/app.js — 예전 인라인 <script> 를 그대로 옮김)
+renderer/caret.js       부드러운 커서(v1.0.45, 글꼴함 ui/caret.js 를 값 그대로 — 고칠 땐 BannerNode·글꼴함·라이트 다운로더와 값을 맞출 것). 검사 test/caret.browser.js
 renderer/app.js         UI 스크립트 전체(전역 함수 — 인라인 onclick 이 부른다). 시험은 test/renderer-src.js 로 읽는다
 main-lib.js             main.js 의 순수 함수(버전 비교·링크 검사·맥 자산·해시 대조) — ★build.files 에 있어야 한다
 tools/release-notes.js  설명서 변경 내역 → 릴리스 본문(한국어)

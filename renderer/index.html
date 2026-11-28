@@ -462,6 +462,12 @@
   .empty .msg { font-size: 14px; letter-spacing: -0.01em; }
   .empty .doc-link { display: inline-block; margin-top: 10px; color: var(--accent); text-decoration: none; font-size: 12.5px; font-weight: 600; }
   .empty .doc-link:hover { text-decoration: underline; }
+  /* 부드러운 커서(caret.js, v1.0.45) — 그 칸의 기본 커서는 .scr 로 감추고 #scaret 을 그린다. 색은 기본 커서와 같은 글자색 */
+  .scr { caret-color: transparent; }
+  #scaret { position: fixed; left: 0; top: 0; width: 2px; border-radius: 1px; background: var(--ink); pointer-events: none; z-index: 2147483000; display: none; will-change: transform; }
+  #scaret.bl { animation: scaretBl 1.06s steps(1, end) 0.53s infinite; }
+  @keyframes scaretBl { 0% { opacity: 0; } 50% { opacity: 1; } }
+  #scaretRuler { position: fixed; left: -99999px; top: 0; white-space: pre; visibility: hidden; }
 
   /* ── 모달 ── */
   .overlay {
@@ -1622,5 +1628,6 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="app.js"></script>
+<script src="caret.js"></script>
 </body>
 </html>
