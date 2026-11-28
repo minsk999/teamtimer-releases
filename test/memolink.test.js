@@ -39,7 +39,7 @@ eq("저장 뒤 표시도 짧게", links(mdLinks(linkifyMemo("https://www.youtube
 // ── 실제 서버 함수와 왕복: 저장값 → setCellSmart → 셀(글자+링크) → cellToMd → 앱이 다시 받는 값 ──
 const gasDir = path.join(__dirname, "..", "gas");
 const gasFile = fs.readdirSync(gasDir).filter(f => /^AppsScript-v\d+\.gs$/.test(f)).sort((a, b) => parseInt(a.match(/\d+/)) - parseInt(b.match(/\d+/))).pop();
-const gs = fs.readFileSync(path.join(gasDir, gasFile), "utf8");
+const gs = fs.readFileSync(process.env.TT_GAS || path.join(gasDir, gasFile), "utf8");   // 다른 판: TT_GAS=<파일>
 const gfn = nm => { const i = gs.indexOf("function " + nm + "("); let d = 0, j = gs.indexOf("{", i); for (; ; j++) { if (gs[j] === "{") d++; else if (gs[j] === "}" && --d === 0) break; } return gs.slice(i, j + 1); };
 const sb = { SpreadsheetApp: { newRichTextValue: () => { const b = { links: [] }; b.setText = t => (b.text = t, b); b.setLinkUrl = (s, e, u) => (b.links.push({ s, e, u }), b); b.build = () => ({ text: b.text, links: b.links }); return b; } } };
 vm.runInNewContext([gfn("cellToMd"), gfn("textSafe"), gfn("setCellSmart")].join("\n") + "\n__g = { cellToMd, setCellSmart };", sb);
@@ -62,5 +62,5 @@ for (const typed of ["일정 https://a.b/c 확인", "https://a.b/c를 봐", "위
   const saved = linkifyMemo(typed);
   eq("새로 쓴 값 왕복: " + typed, cellRoundTrip(saved), saved);
 }
-console.log(`${n - fail} passed, ${fail} failed  (서버 사본 ${gasFile})`);
+console.log(`${n - fail} passed, ${fail} failed  (서버 사본 ${process.env.TT_GAS ? path.basename(process.env.TT_GAS) : gasFile})`);
 process.exit(fail ? 1 : 0);
