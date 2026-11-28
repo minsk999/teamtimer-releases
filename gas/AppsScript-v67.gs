@@ -1,5 +1,8 @@
 // ============================================================
-//  Google Apps Script v66  (7칸 구조
+//  Google Apps Script v67  (7칸 구조
+//  - v67: findSectionEnd 의 구분어(참고사항·공지사항·팀 업무) 판정을 영상작업 행·📌 관리 행에서는 하지 않는다.
+//         작업 제목에 그 단어가 들어가면 구역이 끊겨 아래 작업이 중복 검사·타이머 목록에서 빠지던 것. 지금 시트 해당 0건(11-28 실측) — 판정 변화 없음.
+//  (구) v66  (7칸 구조
 //  - v66: LATEST_TTALKAK_VER 1.8.8 → 1.8.9(딸깍 게시 뒤). 그 밖은 v65 와 같다.
 //  (구) v65  (7칸 구조
 //  - v65: LATEST_TTALKAK_VER 1.8.7 → 1.8.8(딸깍 게시 뒤). 그 밖은 v64 와 같다.
@@ -782,8 +785,15 @@ function findSectionEnd(allData, formulas, member, startCol, nameRow) {
   var dividers = 0;
   for (var r = nameRow; r < allData.length; r++) { // r=0-based → 시트행 r+1 (이름행 다음부터)
     var combined = String(allData[r][base]) + String(allData[r][base + COL.TITLE]);
-    for (var k = 0; k < BOUNDARY_WORDS.length; k++) {
-      if (combined.indexOf(BOUNDARY_WORDS[k]) !== -1) return r + 1;
+    // v67: 영상작업 행(링크·기획안 칸에 HYPERLINK)과 📌 관리 행은 구분어로 보지 않는다.
+    //      예전엔 작업 제목에 「공지사항」·「팀 업무」가 들어가면 그 행에서 구역이 끊겨, 아래 작업이
+    //      중복 검사와 타이머 목록에서 빠졌다(점수표 R-1). 실제 경계 행은 링크도 📌 도 없다(11-28 실측: 참고사항·공지사항 두 줄).
+    var isTaskRow = /HYPERLINK/i.test(String(formulas[r][base + COL.LINK])) || /HYPERLINK/i.test(String(formulas[r][base + COL.PLAN]));
+    var isPinRow  = String(allData[r][base + COL.CHECK]).indexOf("📌") !== -1;
+    if (!isTaskRow && !isPinRow) {
+      for (var k = 0; k < BOUNDARY_WORDS.length; k++) {
+        if (combined.indexOf(BOUNDARY_WORDS[k]) !== -1) return r + 1;
+      }
     }
     // 같은 단에서 '다른 사람의 이름 행'을 만나면 거기가 경계 (명단 등재 여부 무관)
     var n = nameAtRow(allData, formulas, r, base);
