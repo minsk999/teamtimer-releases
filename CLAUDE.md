@@ -15,7 +15,9 @@ Windows 정상. ⚠️ **맥은 v1.0.27~1.0.30 이 실기 미검증**이다(`TOD
 ```
 main.js                 메인 프로세스 (창/트레이/Gmail/공휴일/업데이트확인)
 preload.js              contextBridge (window.timerAPI)
-renderer/index.html     UI 전체 (단일 파일, ~200KB, CSS+JS 인라인)
+renderer/index.html     UI 전체 (단일 파일, ~330KB, CSS+JS 인라인)
+main-lib.js             main.js 의 순수 함수(버전 비교·링크 검사·맥 자산·해시 대조) — ★build.files 에 있어야 한다
+tools/release-notes.js  설명서 변경 내역 → 릴리스 본문(한국어)
 patch-mac-name.js       CI mac job 전용 — productName을 ASCII로
 sign-mac.js             CI mac job 전용 — ad-hoc 서명 (필수, 아래 참조)
 build/                  아이콘 (icon.icns/ico/png, tray*, trayTemplate*)
@@ -149,6 +151,13 @@ CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lip
 - 릴리스 자산의 `digest: sha256:...` 필드를 그대로 쓴다 → 해시를 따로 배포할 필요가 없다.
 - 전개는 **반드시 `ditto -x -k`**. `unzip`/zip 모듈은 심볼릭 링크·실행 비트를 잃어
   ad-hoc 서명이 깨지고 arm64 에서 `killed: 9` 가 난다.
+- **릴리스·승격·되돌리기 절차** (2026-11-28 정리)
+  1. main 에서 `npm run bump X.Y.Z` → `git checkout -- docs/index.html` 로 docs 는 되돌리고 package.json 만 커밋(main 의 docs 는 곧바로 공개 페이지다).
+  2. `docs-vX.Y.Z` 가지를 직전 docs 가지(또는 main)에서 만들고 main 을 합친 뒤, package.json 을 잠시 직전 버전으로 돌려 `node bump-version.js X.Y.Z` 로 docs 만 올리고 변경 내역을 손으로 쓴다.
+  3. main 에서 `git tag vX.Y.Z` → 태그 푸시 → CI(시험 → 빌드 → **prerelease**). 본문은 `node tools/release-notes.js X.Y.Z <docs 가지의 index.html>` → `gh release edit vX.Y.Z --notes-file`.
+  4. 승격(사용자 「승격해」): `gh release edit vX.Y.Z --prerelease=false --latest` → docs 가지를 main 에 합쳐 푸시 → 가지 삭제.
+  5. **되돌리기**: `allowDowngrade` 가 꺼져 있어 직전 latest 를 다시 latest 로 지정해도 **이미 받은 PC 는 내려가지 않는다**. 고친(또는 되돌린) 코드로 다음 패치 버전을 내서 같은 절차로 올린다.
+     1.0.39 부터 윈도 메일 토큰이 암호화돼, 그 아래 판을 손으로 다시 설치하면 메일을 다시 연결해야 한다.
 - 버전 올릴 땐 **`npm run bump 1.0.28`** — package.json 과 docs/index.html 을 같이 고친다.
   CI 에 태그↔package.json 버전 일치 가드가 있어 어긋나면 빌드가 실패한다.
 
@@ -203,7 +212,7 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 - ★**팝업이 붙잡은 카드는 `findPinned()` 로 다시 찾는다.** 카드 id = 시트 행 번호라, 편집·완료·마감 창이 떠 있는 사이 목록이 당겨지면
   같은 id 가 옆 카드를 가리킨다 — 그대로 확정하면 **옆 카드가 완료·수정됐다**(수정 전 코드로 재현). pin = 카드 객체 + 제목·링크 + 「같은 것 몇 줄 중 몇 번째」.
   목록이 그대로면 같은 객체, 교체됐으면 제목·링크로 찾되 줄 수가 달라졌거나 쌍둥이들이 같은 폭으로 밀린 게 아니면 쓰지 않고 안내한다. 새 팝업을 만들 때도 같은 규칙.
-- **테스트: `npm test`** 가 `test/delete-race.test.js`(시나리오 63건, 가짜 시트 서버·가짜 시계)까지 돈다. 수정 전 코드 재현은 `TT_RENDERER=<옛 파일>`.
+- **테스트:** `npm test` = 업무시간 계산(`test/workhours.test.js`) · 쓰기↔동기화 경합 시나리오(`test/delete-race.test.js`, 가짜 시트 서버·가짜 시계) · 링크 판정(`test/weburl.test.js`) · **실제 서버 코드**를 vm 에 올린 서버 약속(`test/gas/gas.test.js`, gas/ 의 최신 사본 자동) · main 순수 함수(`test/main-lib.test.js`). 건수는 출력 참조(문서에 숫자를 적지 않는다 — 늘 낡는다). 릴리스 CI 도 같은 `npm test` 를 돈다. 수정 전 코드 재현은 `TT_RENDERER=<옛 파일>`.
   실제 DOM 실행은 `test/delete-race.browser.js` 머리말(launch.json `teamtimer-root`, 8733). ⚠️ 실제 Electron·실제 GAS 로는 돌리지 않았다.
 - 남은 한계(전부 검수에서 재현·기록, 빈도는 **재지 못했다** — 실제 시트 요청 금지):
   · 같은 게시글·같은 제목 두 줄(쌍둥이)은 서버 지문이 구별 못 한다.
@@ -279,7 +288,7 @@ C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도�
   응답 예: `{"ok":true,"members":[...],"source":"config"}` — `source:"config"` = 자동화 시트에서 읽음
 
 ## 연계 제품
-- **인트라넷 딸깍** (크롬 확장, 현재 **v1.8.6** — 11-27 게시, 팀원은 각자 받아야 한다) — 인트라넷 게시글 → 시트 전송.
+- **인트라넷 딸깍** (크롬 확장, 현재 **v1.8.9** — 11-28 게시, 팀원은 각자 받아야 한다. 버전 정본은 딸깍 저장소 STATUS) — 인트라넷 게시글 → 시트 전송.
   소스는 `docs/intranet-ddalkkak-extension.zip` 안에만 있음. 수정 시 압축 풀고 → 수정 → 재압축 → manifest version 올림.
 - **BatchRenameComps** (AE CEP 확장) — 별도 레포 `minsk999/batchrenamecomps-releases`
 - **Slate** — 영상팀 work hub, 단일 HTML 프로토타입 (별도 진행)

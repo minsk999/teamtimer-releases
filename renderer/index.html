@@ -1141,7 +1141,7 @@
         <div class="stat-item orange"><span class="sdot"></span><span class="n" id="s-orange">0</span><span class="l">오늘마감</span></div>
         <div class="stat-item green"><span class="sdot"></span><span class="n" id="s-green">0</span><span class="l">여유있음</span></div>
       </div>
-      <div class="mail-stat" id="mail-stat" onclick="loadMail()" title="클릭하면 새로고침">
+      <div class="mail-stat" id="mail-stat" role="button" tabindex="0" onclick="loadMail()" title="클릭하면 새로고침">
         <div class="ms-ic" id="ms-ic">
           <svg id="ms-ic-svg" viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.6 7l8.4 6 8.4-6"/></svg>
         </div>
@@ -1198,7 +1198,7 @@
         <div class="mail-view" id="mail-view">
           <div class="mail-head">
             <div class="mail-head-ctrl">
-              <div class="mh-toggle on" id="mh-toggle" onclick="toggleMailSort()" title="정렬 방식">
+              <div class="mh-toggle on" id="mh-toggle" role="button" tabindex="0" onclick="toggleMailSort()" title="정렬 방식">
                 <span>최신순</span>
                 <div class="mh-switch"></div>
               </div>
@@ -1267,50 +1267,6 @@
 </div>
 
 <!-- 가져오기 모달 -->
-<div class="overlay" id="modal-import">
-  <div class="modal">
-  <div class="modal-inner">
-    <div class="modal-head">
-      <h2>가져오기</h2>
-      <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-import')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <p class="setting-desc">인트라넷에서 불러온 요청글이에요. 마감 시간만 정해서 내 작업에 추가하세요.</p>
-      <div class="imp-card">
-        <div class="it">[더한섬닷컴] 5월 3주차 라이프 스타일 기획전 모션배너</div>
-        <div class="ir"><span class="k">희망완료</span> <span>2026-06-05</span></div>
-        <div class="ir"><span class="k">처리자</span> <span>구민석</span></div>
-        <div class="ir"><span class="k">기획안</span> <span>docs.google.com/presentation/...</span></div>
-      </div>
-      <div class="field">
-        <label>마감 시간 설정</label>
-        <div class="dl-box">
-          <div class="chip-grid" id="chip-grid-import"></div>
-          <div class="custom-toggle" role="button" tabindex="0" onclick="toggleCustom('import')">+ 직접 입력</div>
-          <div class="custom-row" id="custom-row-import">
-            <button class="cal-trigger" id="cal-trig-import" onclick="toggleCal('import')">
-              <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8h13M7 3v3M13 3v3"/></svg>
-              <span id="cal-trig-text-import">날짜 선택</span>
-            </button>
-            <input type="text" class="time-input" id="time-import" placeholder="14:00">
-          </div>
-          <div class="cal-pop" id="cal-pop-import"></div>
-          <div class="dl-preview" id="dl-prev-import" style="display:none;">
-            <svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v4l2.5 2"/></svg>
-            <span id="dl-prev-text-import"></span>
-          </div>
-        </div>
-      </div>
-      <div class="modal-foot">
-        <button class="cancel" onclick="closeModal('modal-import')">취소</button>
-        <button class="save" onclick="confirmImport()">내 작업에 추가</button>
-      </div>
-    </div>
-  </div>
-  </div>
-</div>
-
-<!-- 완료/되돌림 팝업 -->
 <div class="overlay" id="modal-done" onclick="if(event.target===this) closeModal('modal-done')">
   <div class="modal">
   <div class="modal-inner">
@@ -1658,6 +1614,11 @@
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
+  // 오류 기록(userData/error.log) — 스크립트 맨 앞에 둬서 초기화 중 오류도 남긴다
+  if (window.timerAPI && window.timerAPI.logError) {
+    window.addEventListener("error", e => window.timerAPI.logError((e.error && e.error.stack) || (e.message + " @" + e.filename + ":" + e.lineno)));
+    window.addEventListener("unhandledrejection", e => window.timerAPI.logError("promise: " + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
+  }
   const $ = id => document.getElementById(id);
 
   // 아이콘
@@ -1861,7 +1822,7 @@
           });
       } else {
         const res = await window.timerAPI.updaterReveal();
-        if (!res || !res.ok) toast("받아둔 파일을 찾지 못했어요 — 다시 받아 주세요");
+        if (!res || !res.ok) toast("받아둔 파일을 찾지 못했어요 — 다시 받아 주세요", "err");
       }
       return;
     }
@@ -2137,9 +2098,12 @@
     const inner = dark ? TH_MOON : TH_SUN;
     svg.innerHTML = need ? '<g transform="rotate(180 12 12)">' + inner + "</g>" : inner;
   }
+  // 사용자가 고른 테마를 기억했다가 켤 때 되살린다(고른 적 없으면 지금처럼 라이트)
+  try { if (localStorage.getItem("theme") === "dark") { document.body.classList.add("dark"); setThemeIcon(); } } catch (e) {}
   function toggleTheme() {
     document.body.classList.toggle("dark");
     const dark = document.body.classList.contains("dark");
+    try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (e) {}
     // 메일 아이콘과 동일한 모션: 180° 회전 + 중간점(210ms)에서 글리프 교체
     const svg = $("theme-icon");
     themeIconState.rot += 180;
@@ -2161,7 +2125,7 @@
       PRESETS.forEach(p => {
         const el = document.createElement("button");
         el.className = "dchip";
-        el.innerHTML = `<div class="d">${day} ${p.name}</div><div class="t">${p.time}</div>`;
+        el.innerHTML = `<div class="d">${day} ${esc(p.name)}</div><div class="t">${esc(p.time)}</div>`;
         el.onclick = () => {
           grid.querySelectorAll(".dchip").forEach(x => x.classList.remove("on"));
           el.classList.add("on"); onPick(dlChip(day, p.name));
@@ -2395,6 +2359,7 @@
       const cnt = applyView(viewName);
       lastSyncOkAt = Date.now(); // 포커스 프리싱크 기준 시각
       syncPillState(true);
+      if (_el >= 8000 && window.timerAPI && window.timerAPI.logError) window.timerAPI.logError("sync-slow " + _el + "ms, tasks " + cnt);
       if(!silent || owedToast) toast(_el >= 8000
         ? `동기화 완료 · 작업 ${cnt}건 (${(_el/1000).toFixed(1)}초 — 시트가 느려요)`
         : `동기화 완료 · 작업 ${cnt}건`);
@@ -2810,7 +2775,7 @@
     if(!(st && st.connected)){
       toast("브라우저에서 로그인해 주세요…");
       const r = await window.timerAPI.gmailLogin();
-      if(!(r && r.ok)){ toast(gmailErrText(r)); return; }
+      if(!(r && r.ok)){ toast(gmailErrText(r), "err"); return; }
       toast(`메일 연결 완료: ${r.email}`);
     }
     enterMailMode();
@@ -2885,8 +2850,8 @@
         setMailBadge();   // 서버 카운트 대신 필터 반영된 목록에서 센다
         lastBadgeCount = res.unreadCount; // 정밀 값으로 폴링 기준 동기화(경량/정밀 불일치 방지)
         // 10초 폴링이 대부분 같은 목록을 받는다 — 같으면 100건 다시 그리기·캐시 다시 쓰기를 건너뛴다.
-        // 분 단위를 섞는 건 「n분 전」 표시가 바뀌어야 해서.
-        const sig = Math.floor(Date.now() / 60000) + "|" + mailData.map(m => m.id + (m.unread ? "u" : "r")).join(",");
+        // 「n분 전」 글자는 아래 1분 타이머가 따로 고친다(목록 전체를 다시 그리지 않음).
+        const sig = mailData.map(m => m.id + (m.unread ? "u" : "r")).join(",");
         if(loud() || sig !== lastMailSig) renderMailList();   // loud: 합류한 수동 새로고침이 있으면 「불러오는 중」 표시를 걷어야 한다
         lastMailSig = sig;
         maybeNotifyNewMail(mailData); // 정밀 목록 기준 새 메일만 알림(중복 방지)
@@ -2907,6 +2872,7 @@
     return mailLoadPromise;
   }
 
+  setInterval(() => { document.querySelectorAll(".mail-time[data-ts]").forEach(el => { const v = fmtMailTime(+el.dataset.ts); if (el.textContent !== v) el.textContent = v; }); }, 60000);
   function toggleMailSort(){
     mailLatestFirst = !mailLatestFirst;
     $("mh-toggle").classList.toggle("on", mailLatestFirst);
@@ -2971,7 +2937,7 @@
           <div class="mail-meta">${m.requester ? `<span class="mail-requester">${esc(m.requester)}님</span> 업무요청` : "업무요청"}</div>
         </div>
         <div class="mail-right">
-          <div class="mail-time">${esc(fmtMailTime(m.ts))}</div>
+          <div class="mail-time" data-ts="${+m.ts || 0}">${esc(fmtMailTime(m.ts))}</div>
           <button class="mail-trash" title="삭제" onclick="event.stopPropagation(); trashMail('${m.id}')">${IC.trash}</button>
         </div>
       </div>
@@ -3011,7 +2977,7 @@
           window.timerAPI.openExternal(r.url);
         } else if(mode === "intranet"){
           // 인트라넷 전용인데 링크를 못 찾음 → Gmail로 폴백
-          toast("요청글 링크를 못 찾아 Gmail을 열어요");
+          toast("요청글 링크를 못 찾아 Gmail을 열어요", "err");
           window.timerAPI.openExternal(gmailLink);
         }
       } catch(e){
@@ -3112,13 +3078,7 @@
     }, 600);
   }
 
-  function openImport() {
-    selDlImport=null;
-    $("dl-prev-import").style.display="none"; $("custom-row-import").classList.remove("show");
-    resetCal("import");
-    renderChips("chip-grid-import", ts=>{selDlImport=ts; showPrev(ts,"import");});
-    openModal("modal-import");
-  }
+
   // 퇴장 모션 — 등장은 fade 0.2s + up 0.3s 인데 닫을 때는 0ms 하드컷이었다.
   // .show 를 유지한 채 .closing 을 얹고(오버레이가 display:flex 로 남아야 애니메이션이 보인다),
   // 끝나면 둘 다 뗀다. ★.closing 은 pointer-events:none 이라 그 사이 [저장]이 두 번 눌리지 않는다.
@@ -3331,11 +3291,7 @@
     }
   }
   const timedOutAdds = {};   // 「링크\n제목」 → 이 시각까지 재추가 때 중복 검사
-  function confirmImport() {
-    if(!selDlImport){toast("마감 시간을 선택해 주세요");return;}
-    tasks.push({id:Date.now(),title:"[더한섬닷컴] 5월 3주차 라이프 스타일 기획전 모션배너",deadline:selDlImport,type:"req",done:false,alarm:60,reqLink:"https://intranet.adef.co.kr/creative/view?idx=49334",planLink:"https://docs.google.com/presentation/d/imported"});
-    closeModal("modal-import"); toast("인트라넷 작업을 가져왔어요"); render();
-  }
+
   // 롤백 유틸 — 되돌리는 사이에 동기화가 tasks 배열을 통째로 갈아끼웠을 수 있다.
   // 그 상태에서 옛 배열에 splice 하면 화면에 없는 '유령' 객체를 고치거나
   // 같은 data-id 카드가 두 장 생겨 FLIP 애니메이션까지 엉킨다. → 그 경우엔 서버 상태를 다시 받는다.
@@ -3396,6 +3352,9 @@
   // 관리항목(mgmtItems)용 — 배열 교체 여부 대신 타임아웃만 가른다
   function afterMgmtWriteFail(r, undo, failMsg){
     if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요", "err"); doSync({ silent:true }); return; }
+    if (r && r.error && window.timerAPI && window.timerAPI.logError) window.timerAPI.logError("mgmt-write: " + r.error);
+    // 서버가 「그 행은 작업 행·이름 행·구분선」이라고 거부했다 = 내 행 번호가 낡았다(지문 없는 경로). stale 과 같게 다시 받는다.
+    if (r && !r.stale && /영상작업\(링크 보유\)|이름 행·구분선/.test(String(r.error || ""))) r = Object.assign({}, r, { stale: true });
     if (r && r.stale) { undo(); renderMgmt(); toast("그 사이 목록이 바뀌었어요 — 다시 불러올게요", "err"); doSync({ silent:true }); return; }
     undo(); renderMgmt(); toast(failMsg);
   }
@@ -3493,7 +3452,7 @@
       else redraw();
       toast(resynced ? "삭제하지 못했어요 — 목록을 다시 불러왔어요. 다시 눌러 주세요"
           : (r && (r.stale || r.busy)) ? "삭제하지 못했어요 — 잠시 후 다시 눌러 주세요"
-          : "삭제 실패 — 되돌렸어요");
+          : "삭제 실패 — 되돌렸어요", "err");
       // 화면이 서버와 어긋난 채 남지 않게 한 번 맞춘다. stale·busy 는 방금 받은 목록이 낡았을 수 있으니 캐시가 죽은 뒤에,
       // 그 밖의 오류(HTTP 5xx 등)는 서버가 실제로 지웠는지조차 모르므로 지금 받는다 — 다시 눌렀을 때 행 번호가 맞아야 지워진다.
       if(r && (r.stale || r.busy)) scheduleLateSync(Date.now() + TOMB_MS);
@@ -3692,7 +3651,7 @@
     try {
       localStorage.setItem("alarmSettings", JSON.stringify(alarmSettings)); // 커스텀 음원(dataURL) 포함 영속화
       localStorage.setItem("presets", JSON.stringify(PRESETS));
-    } catch(e){ toast("저장 공간이 부족해 음원을 저장하지 못했어요 — 더 작은 파일을 사용해 주세요"); }
+    } catch(e){ toast("저장 공간이 부족해 음원을 저장하지 못했어요 — 더 작은 파일을 사용해 주세요", "err"); }
   }
   let draftAlarm = {};
   let draftWork = {};   // 업무시간만 세기 드래프트 — openSettings 에서 workHours 복사, [저장]에서만 반영
@@ -4084,7 +4043,7 @@
       toast("브라우저에서 로그인해 주세요…");
       const r = await window.timerAPI.gmailLogin();
       if(r && r.ok){ toast(`메일 연결 완료: ${r.email}`); renderGmailConn(); loadMail(true); }
-      else { toast(gmailErrText(r)); }
+      else { toast(gmailErrText(r), "err"); }
     }
   }
 
@@ -4108,7 +4067,7 @@
     const nameEl = $("custom-sound-name");
     if (draftAlarm.customSoundName) {
       nameEl.style.display = "flex";
-      nameEl.innerHTML = `${IC.bell}<span class="csn-text" title="클릭하면 미리 들어봐요" onclick="previewCustomSound()">${draftAlarm.customSoundName}</span>`
+      nameEl.innerHTML = `${IC.bell}<span class="csn-text" title="클릭하면 미리 들어봐요" onclick="previewCustomSound()">${esc(draftAlarm.customSoundName)}</span>`
         + `<button type="button" class="csn-remove" title="음원 삭제" onclick="removeCustomSound(event)"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`;
     } else {
       nameEl.style.display = "none";
@@ -4340,8 +4299,8 @@
       const row = document.createElement("div");
       row.className = "preset-row";
       row.innerHTML = `
-        <input type="text" size="1" class="preset-name" value="${p.name}" placeholder="예: 오전" oninput="updatePreset(${i},'name',this.value)">
-        <input type="text" size="1" class="preset-time" value="${p.time}" placeholder="00:00" oninput="updatePreset(${i},'time',this.value)" onblur="normalizePresetTime(${i}, this)" onkeydown="if(event.key==='Enter'){event.preventDefault(); normalizePresetTime(${i}, this); this.blur();}">
+        <input type="text" size="1" class="preset-name" value="${esc(p.name)}" placeholder="예: 오전" oninput="updatePreset(${i},'name',this.value)">
+        <input type="text" size="1" class="preset-time" value="${esc(p.time)}" placeholder="00:00" oninput="updatePreset(${i},'time',this.value)" onblur="normalizePresetTime(${i}, this)" onkeydown="if(event.key==='Enter'){event.preventDefault(); normalizePresetTime(${i}, this); this.blur();}">
         <button class="preset-del" onclick="delPreset(${i})" title="삭제">${IC.trash}</button>
       `;
       wrap.appendChild(row);
@@ -4400,12 +4359,12 @@
     for (const p of draftPresets) {
       if (!p.name.trim()) { toast("프리셋 이름을 입력해 주세요"); return; }
       const nt = normalizeTime(p.time);
-      if (!nt) { toast(`"${p.name}" 시간 형식이 올바르지 않아요 (예: 14:00)`); return; }
+      if (!nt) { toast(`"${p.name}" 시간 형식이 올바르지 않아요 (예: 14:00)`, "err"); return; }
       p.time = nt; // 1111 등도 정규화해서 저장
     }
     // 업무시간 검증 — 토글 상태와 무관하게 항상(꺼진 채 저장된 값도 다음에 켤 때 그대로 쓰이므로). 실패 시 저장 중단·모달 유지(프리셋과 같은 방식).
     const ws = normalizeTime(draftWork.start), we = normalizeTime(draftWork.end);
-    if(!ws || !we){ toast("업무시간 형식이 올바르지 않아요 (예: 09:00)"); return; }
+    if(!ws || !we){ toast("업무시간 형식이 올바르지 않아요 (예: 09:00)", "err"); return; }
     if(hmToMin(we) <= hmToMin(ws)){ toast("퇴근 시간은 출근 시간보다 늦어야 해요"); return; }
     PRESETS = JSON.parse(JSON.stringify(draftPresets));
     alarmSettings = { ...draftAlarm, mailKinds: { ...(draftAlarm.mailKinds || {}) } };
@@ -4604,8 +4563,9 @@
     updateStats();
     checkAlarms();
     let reorder=false;
+    const byId = new Map(tasks.map(x => [x.id, x]));
     document.querySelectorAll(".task[data-id]").forEach(card=>{
-      const id=+card.dataset.id; const t=tasks.find(x=>x.id===id);
+      const id=+card.dataset.id; const t=byId.get(id);
       if(!t||t.done)return;
       const u=urgency(t.deadline), cd=cdText(t.deadline);
       const cEl=card.querySelector(".count");
@@ -4667,6 +4627,13 @@
     return col === "b" ? { expectB: prev || "" } : { expectC: prev || "" };
   }
 
+  // 관리항목 휴지통도 확인 후 삭제(카드 휴지통과 같게). 창이 떠 있는 사이 행이 바뀌면 지문(expectB/C)이 서버에서 막는다.
+  function askDelMgmt(row, col){
+    if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; }
+    const m = mgmtFind(row); if(!m) return;
+    const text = String(m[col] || "").replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+    openConfirm("관리 항목 삭제", `「${text.length > 40 ? text.slice(0, 40) + "…" : text}」을(를) 삭제할까요? 시트에서도 지워져요.`, "삭제", () => deleteMgmt(row, col));
+  }
   async function deleteMgmt(row, col){
     if(isReadonly()){ toast("다른 팀원 보드는 읽기 전용이에요"); return; } 
     if(!row || row < 1){ toast("추가 반영 중이에요. 잠시 후 다시 시도해 주세요"); return; }
@@ -4680,7 +4647,7 @@
     payload[col === "b" ? "memoB" : "memoC"] = "";
     const r = await postSheetTracked(payload);            // ② 백그라운드 기록
     if(r && r.ok){ toast("관리 항목을 삭제했어요"); }       // ③ 결과 알림
-    else { afterMgmtWriteFail(r, () => { m[col] = prev; }, "삭제 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
+    else { afterMgmtWriteFail(r, () => { m[col] = prev; }, "삭제 실패 — 되돌렸어요"); }
   }
 
   function editMgmt(row, col){
@@ -4699,8 +4666,9 @@
       `<button class="mact" title="취소"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`;
     const input = el.querySelector("#medit-input");
     input.value = cur; input.focus(); input.select();
-    const save = () => commitMgmt(row, col, input.value);
-    const cancel = () => renderMgmt();
+    mgmtEditing = true;
+    const save = () => { mgmtEditing = false; commitMgmt(row, col, input.value); };
+    const cancel = () => { mgmtEditing = false; renderMgmt(); };
     acts.children[0].onclick = save;
     acts.children[1].onclick = cancel;
     input.onkeydown = (e) => {
@@ -4722,7 +4690,7 @@
     payload[col === "b" ? "memoB" : "memoC"] = val;
     const r = await postSheetTracked(payload);            // ② 백그라운드 기록
     if(r && r.ok){ toast("저장했어요"); }                   // ③ 결과 알림
-    else { afterMgmtWriteFail(r, () => { m[col] = prev; }, "저장 실패 — 되돌렸어요" + ((r&&r.error)?(" ("+r.error+")"):"")); }
+    else { afterMgmtWriteFail(r, () => { m[col] = prev; }, "저장 실패 — 되돌렸어요"); }
   }
 
   // ── 관리 항목 추가 (addMemo) ──
@@ -4766,7 +4734,7 @@
         ? `<div class="mgmt-acts"><span class="mgmt-pending">반영 중…</span></div>`
         : `<div class="mgmt-acts">`
           +   `<button class="mact" onclick="editMgmt(${it.row},'${it.col}')" title="편집">${IC.edit}</button>`
-          +   `<button class="mact del" onclick="deleteMgmt(${it.row},'${it.col}')" title="삭제">${IC.trash}</button>`
+          +   `<button class="mact del" onclick="askDelMgmt(${it.row},'${it.col}')" title="삭제" aria-label="삭제">${IC.trash}</button>`
           + `</div>`;
       rows += `<div class="mgmt-item${it.done?' done':''}${it.temp?' pending':''}" data-row="${it.row}" data-col="${it.col}">`
         + `<span class="pin"></span>`
@@ -4794,8 +4762,13 @@
       list.innerHTML = '<div id="mgmt-host"></div><div id="task-host"></div>';
     }
   }
-  function renderMgmt(){
+  // 메모를 고치는 중(입력칸이 떠 있음)이면 동기화가 와도 다시 그리지 않는다 — 다시 그리면 입력하던 글자가 사라진다.
+  // 저장·취소 때 mgmtEditing 을 풀고 그 자리에서 다시 그린다.
+  let mgmtEditing = false;
+  function renderMgmt(force){
     ensureHosts();
+    if (mgmtEditing && !force && document.getElementById("medit-input")) return;
+    mgmtEditing = false;
     $("mgmt-host").innerHTML = mgmtSectionHtml();
     if(mgmtAdding){
       const inp = $("madd-input");
@@ -4907,7 +4880,7 @@
     // 버튼·체크·링크·마감칩 영역 클릭은 각자 동작 유지 (카드 이동 무시)
     if(e && e.target && e.target.closest && e.target.closest(".check, .actions, a.link-mini, .meta-deadline")) return;
     const t = tasks.find(x => x.id === id); if(!t) return;
-    if(!t.reqLink){ toast("요청글 링크가 없어요"); return; }
+    if(!t.reqLink){ toast("요청글 링크가 없어요", "err"); return; }
     const url = webUrl(t.reqLink);
     if(!url){ toast("웹 주소가 아니라서 앱에서 열 수 없어요", "err"); return; }
     if(typeof window.timerAPI !== "undefined" && window.timerAPI.openExternal) window.timerAPI.openExternal(url);
@@ -4931,6 +4904,31 @@
 
   // 창 컨트롤 — Electron이면 실제 동작, 브라우저면 시연 토스트
   const isElectron = typeof window.timerAPI !== "undefined";
+  // 모달: dialog 의미를 붙이고(제목 연결), 열린 창 안에서 Tab 이 창 밖(뒤 카드의 완료 체크 등)으로 빠지지 않게 돌린다.
+  document.querySelectorAll(".overlay > .modal").forEach((md, i) => {
+    md.setAttribute("role", "dialog"); md.setAttribute("aria-modal", "true");
+    const h = md.querySelector("h2, h3"); if (h) { if (!h.id) h.id = "modal-title-" + i; md.setAttribute("aria-labelledby", h.id); }
+  });
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Tab") return;
+    const ov = [...document.querySelectorAll(".overlay.show:not(.closing)")].pop(); if (!ov) return;
+    const f = [...ov.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')]
+      .filter(el => !el.disabled && el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1], a = document.activeElement;
+    if (!ov.contains(a)) { e.preventDefault(); (e.shiftKey ? last : first).focus(); }
+    else if (e.shiftKey && a === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && a === last) { e.preventDefault(); first.focus(); }
+  }, true);
+  // 설정 스위치(opt-row 안 .mh-toggle)와 선택 버튼(.seg-btn)의 켜짐을 읽기 프로그램에도 알린다 — 클래스가 바뀔 때 따라간다.
+  (function(){
+    const sync = el => {
+      if (el.classList.contains("seg-btn")) el.setAttribute("aria-pressed", el.classList.contains("on") ? "true" : "false");
+      else { const row = el.closest(".opt-row"); if (row) { row.setAttribute("role", "switch"); row.setAttribute("aria-checked", el.classList.contains("on") ? "true" : "false"); } }
+    };
+    const mo = new MutationObserver(ms => ms.forEach(m => sync(m.target)));
+    document.querySelectorAll(".opt-row .mh-toggle, .seg-btn").forEach(el => { sync(el); mo.observe(el, { attributes: true, attributeFilter: ["class"] }); });
+  })();
   // Tab 으로 온 「버튼 역할 div」는 Enter·Space 로 누른다. ★:focus-visible 일 때만 — 마우스로 누른 div 에도 포커스가 남는다.
   document.addEventListener("keydown", e => {
     const el = document.activeElement;
@@ -4938,10 +4936,6 @@
       e.preventDefault(); e.stopPropagation(); el.click();
     }
   }, true);
-  if (isElectron && window.timerAPI.logError) {
-    window.addEventListener("error", e => window.timerAPI.logError((e.error && e.error.stack) || (e.message + " @" + e.filename + ":" + e.lineno)));
-    window.addEventListener("unhandledrejection", e => window.timerAPI.logError("promise: " + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
-  }
   document.querySelectorAll(".win-btn").forEach(b=>b.addEventListener("click",()=>{
     if (isElectron) {
       if (b.id==="win-min") window.timerAPI.winMinimize();
@@ -5056,7 +5050,7 @@
     const ae = document.activeElement;
     if (ae && (ae.tagName === "INPUT" || ae.tagName === "TEXTAREA")) return true; // 입력 중
     if (mgmtAdding) return true; // 관리항목 추가 입력 모드
-    for (const id of ["modal-done","modal-task","modal-import","modal-settings","modal-confirm","modal-time","modal-keys"]) {
+    for (const id of ["modal-done","modal-task","modal-settings","modal-confirm","modal-time","modal-keys"]) {
       if (modalShown($(id))) return true; // 팝업/모달 열림
     }
     return false;
@@ -5094,7 +5088,7 @@
   window.addEventListener("mousedown", (e) => { if(e.button===3||e.button===4) e.preventDefault(); }); // 기본 뒤로/앞으로 막기
 
   // 전역 단축키 — 입력/모달/캘린더 중에는 비활성(타이핑 충돌 방지)
-  const MODAL_IDS = ["modal-done","modal-task","modal-import","modal-settings","modal-confirm","modal-time","modal-keys"];
+  const MODAL_IDS = ["modal-done","modal-task","modal-settings","modal-confirm","modal-time","modal-keys"];
   function anyModalOpen(){ return MODAL_IDS.some(id => modalShown($(id))); }
   function closeTopModal(){ MODAL_IDS.forEach(id => { const el=$(id); if(el && el.classList.contains("show")) closeModal(id); }); }
   function backToMyBoard(){ const mine=getMyName(); if(mine && viewName!==mine) applyView(mine); }

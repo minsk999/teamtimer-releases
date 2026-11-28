@@ -97,7 +97,8 @@
         const cur = rows[i];
         const wantIdx = String(p.expectIdx == null ? "" : p.expectIdx).trim();
         const wantTitle = String(p.expectTitle == null ? "" : p.expectTitle).trim();
-        if ((wantIdx && String(cur.idx || "") !== wantIdx) || (wantTitle && cur.title.trim() !== wantTitle)) {
+        const wantLink = String(p.expectLink == null ? "" : p.expectLink).trim();   // 서버 v64+ : 링크 전체 비교
+        if ((wantIdx && String(cur.idx || "") !== wantIdx) || (wantTitle && cur.title.trim() !== wantTitle) || (wantLink && url(cur) !== wantLink)) {
           return { ok: false, stale: true, row: p.row, found: cur.title, foundIdx: cur.idx || "", error: "행이 밀렸어요" };
         }
         if (act === "deleteTask") rows.splice(i, 1);
@@ -118,6 +119,10 @@
       if (act === "updateMemo") {
         const m = s.mgmt[who][Number(p.row) - MG_BASE];
         if (!m) return { ok: false, error: "행 번호 오류: " + p.row };
+        // 서버 v64+ : 보낸 칸의 고치기 전 값이 지금 값과 다르면 stale(쓰지 않음)
+        if (("expectB" in p && String(p.expectB).trim() !== String(m.b || "").trim()) ||
+            ("expectC" in p && String(p.expectC).trim() !== String(m.c || "").trim()))
+          return { ok: false, stale: true, row: p.row, found: m.b || m.c, error: "행이 밀렸어요" };
         if ("memoB" in p) m.b = p.memoB;
         if ("memoC" in p) m.c = p.memoC;
         return { ok: true };
@@ -1171,6 +1176,39 @@
       h.check("서버의 D 완료", !!h.server.sheet[ME].find(v => v.title === T.D).done, false);
       h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 다시 눌러 주세요"]);
     } },
+    // v1.0.40: 서버 v64 지문 — 메모(expectB/C)와 번호 없는 손 링크 카드(expectLink)
+    { key: "MG1", name: "메모를 고치는 사이 다른 사람이 같은 메모를 바꿈 → 덮지 않고 되돌린 뒤 다시 받는다", async run(h) {
+      h.server.mgmt[ME][0].b = "남이 고친 보고";        // 내 화면은 아직 「주간 보고」
+      const m = h.mark();
+      h.app("commitMgmt(30, 'b', '내가 고친 보고')");
+      await h.settle();
+      h.check("서버 메모", h.server.mgmt[ME][0].b, "남이 고친 보고");
+      h.check("보낸 지문", h.posts(m, "updateMemo").map(p => p.expectB), ["주간 보고"]);
+      h.check("토스트", h.toastsSince(m), ["그 사이 목록이 바뀌었어요 — 다시 불러올게요"]);
+      h.check("화면 메모(다시 받은 값)", h.app("mgmtItems.map(x => x.b)"), ["남이 고친 보고"]);
+    } },
+    { key: "MG2", name: "메모 입력칸이 떠 있는 사이 동기화가 와도 입력하던 글자가 남는다", async run(h) {
+      // 편집 화면 자체는 노드 가짜 DOM 이 못 그린다 — editMgmt 가 만드는 상태(입력칸 + mgmtEditing)를 그대로 만든다
+      h.app("(function(){ const i = document.createElement('input'); i.id = 'medit-input'; i.value = '쓰는 중'; document.body.appendChild(i); mgmtEditing = true; document.getElementById('mgmt-host').innerHTML = 'EDITING'; })()");
+      h.app("doSync({ silent:true })");
+      await h.settle();
+      h.check("동기화가 메모 칸을 다시 그리지 않음", h.app("document.getElementById('mgmt-host').innerHTML"), "EDITING");
+      h.app("mgmtEditing = false; commitMgmt(30, 'b', '쓰는 중')");
+      await h.settle();
+      h.check("서버 메모", h.server.mgmt[ME][0].b, "쓰는 중");
+    } },
+    { key: "HL1", name: "게시글 번호 없는 같은 제목 카드 셋 — 위 줄이 빠져 행이 낡은 채 가운데를 지움 → 누른 그 카드만 지워진다",
+      opts: { mine: [{ title: "배너 수정", link: "https://hand.invalid/1" }, { title: "배너 수정", link: "https://hand.invalid/2" },
+                     { title: "배너 수정", link: "https://hand.invalid/3" }, { title: T.D, idx: "1004" }] },
+      async run(h) {
+        const id2 = h.app("tasks.find(t => t.reqLink === 'https://hand.invalid/2').id");
+        h.server.removeBySheet("배너 수정");            // 다른 PC 가 맨 위 줄(링크 1)을 지움 — 앱은 아직 모름
+        const m = h.mark();
+        h.app("delTask(" + id2 + ")");
+        await h.settle();
+        h.check("남은 손 링크", h.server.sheet[ME].filter(v => v.title === "배너 수정").map(v => v.link), ["https://hand.invalid/3"]);
+        h.check("첫 요청이 링크 지문을 실었다", (h.posts(m, "deleteTask")[0] || {}).expectLink, "https://hand.invalid/2");
+      } },
     // v1.0.39: 카드 휴지통은 확인 창(askDelTask)을 거친다. 창이 떠 있는 사이 목록이 당겨져도 누른 그 카드를 지운다.
     { key: "PN8", name: "휴지통 확인 창을 열어 둔 사이 위 카드가 시트에서 빠짐 → 확정하면 당겨진 그 카드가 지워진다", async run(h) {
       h.app("askDelTask(" + h.id(T.C) + ")");            // C = id 7

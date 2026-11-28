@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────
 //  작업 타이머 — Electron 메인 프로세스
 // ─────────────────────────────────────────────
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, session, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, session, dialog, screen } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
 const crypto = require('crypto');
+const { cmpVer, isSafeUrl, pickMacAsset: pickMacAssetFor, digestOk } = require('./main-lib.js');   // 순수 함수(시험: test/main-lib.test.js)
 const { execFile, spawn } = require('child_process');
 
 // ── Windows 알림 표시 이름/아이콘 ──
@@ -79,16 +80,6 @@ const isDev = process.argv.includes('--dev');
 // (자동 설치 X — 안내만, 다운로드는 웹에서). 트레이·IPC가 공유.
 const GITHUB_OWNER = 'minsk999';
 const GITHUB_REPO = 'teamtimer-releases';
-function cmpVer(a, b) {
-  // "1.0.2" vs "1.0.10" 정확 비교 (숫자 파트별)
-  const pa = String(a).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
-  const pb = String(b).replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d !== 0) return d > 0 ? 1 : -1;
-  }
-  return 0;
-}
 async function fetchLatestRelease() {
   const cur = app.getVersion();
   const ctrl = new AbortController();
@@ -169,7 +160,7 @@ function getEU() {
     _eu.on('download-progress', (p) => sendUpd({ type: 'progress', percent: Math.round(p.percent || 0) }));
     _eu.on('update-downloaded', () => { euDownloaded = true; });
     _eu.on('update-downloaded', (i) => sendUpd({ type: 'ready', version: i && i.version }));
-    _eu.on('error', (e) => sendUpd({ type: 'error', error: String((e && e.message) || e) }));
+    _eu.on('error', (e) => { logError('updater', e); sendUpd({ type: 'error', error: String((e && e.message) || e) }); });
   }
   return _eu;
 }
@@ -212,13 +203,7 @@ function setMacUpd(patch) {
 
 // 이번 플랫폼/아키텍처에 맞는 zip 자산을 릴리스에서 고른다.
 // ★자산 URL·해시는 **여기서 정한다.** 렌더러가 준 값을 믿으면 임의 바이너리를 받게 된다.
-function pickMacAsset(release) {
-  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
-  const list = (release && release.assets) || [];
-  const hit = list.find(a => /\.zip$/i.test(a.name) && a.name.indexOf(arch) !== -1);
-  if (!hit) return null;
-  return { name: hit.name, url: hit.browser_download_url, size: hit.size, digest: hit.digest || '' };
-}
+function pickMacAsset(release) { return pickMacAssetFor(release, process.arch); }
 
 async function macDownloadAndStage(asset, version) {
   const os = require('os');
@@ -282,10 +267,9 @@ async function macDownloadAndStage(asset, version) {
 
   // 무결성 — GitHub 릴리스 응답의 digest 를 그대로 쓴다. 별도 해시 배포가 필요 없다.
   setMacUpd({ state: 'verify', msg: '파일을 확인하는 중이에요' });
-  const want = String(asset.digest || '').toLowerCase();
-  const have = 'sha256:' + hash.digest('hex');
-  if (!want.startsWith('sha256:')) throw new Error('검증용 해시가 없어요');
-  if (have !== want) { try { fs.unlinkSync(tmp); } catch (e) {} throw new Error('파일 검증에 실패했어요 — 다시 시도해 주세요'); }
+  const dg = digestOk(asset.digest, hash.digest('hex'));
+  if (!dg.ok && dg.reason === 'no-digest') throw new Error('검증용 해시가 없어요');
+  if (!dg.ok) { try { fs.unlinkSync(tmp); } catch (e) {} throw new Error('파일 검증에 실패했어요 — 다시 시도해 주세요'); }
 
   // ★전개는 반드시 ditto 다. zip 모듈로 풀면 심볼릭 링크와 실행 비트를 잃어
   //   번들의 ad-hoc 서명이 무효가 되고 arm64 에서 'killed: 9' 가 난다.
@@ -336,10 +320,31 @@ function writeStartupCfg(obj) {
 }
 
 // ── 메인 창 생성 ──
+// ── 창 크기·위치 기억(userData/window-state.json). 저장된 자리가 지금 화면들 안에 있을 때만 쓴다(모니터를 뺀 경우 대비). ──
+function winStatePath() { return path.join(app.getPath('userData'), 'window-state.json'); }
+function readWinState() {
+  try {
+    const b = JSON.parse(fs.readFileSync(winStatePath(), 'utf8'));
+    if (!(b.width >= 320 && b.height >= 420)) return null;
+    if (typeof b.x !== 'number' || typeof b.y !== 'number') return { width: b.width, height: b.height };
+    const onScreen = screen.getAllDisplays().some(d => { const a = d.workArea;
+      return b.x + 40 >= a.x && b.y >= a.y && b.x + 120 <= a.x + a.width && b.y + 40 <= a.y + a.height; });
+    return onScreen ? b : { width: b.width, height: b.height };
+  } catch (e) { return null; }
+}
+function saveWinState() {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed() || mainWindow.isMinimized() || mainWindow.isMaximized()) return;
+    fs.writeFileSync(winStatePath(), JSON.stringify(mainWindow.getBounds()));
+  } catch (e) {}
+}
+
 function createWindow() {
+  const ws = readWinState() || {};
   mainWindow = new BrowserWindow({
-    width: 440,
-    height: 720,
+    width: ws.width || 440,
+    height: ws.height || 720,
+    ...(typeof ws.x === 'number' ? { x: ws.x, y: ws.y } : {}),
     minWidth: 320,
     minHeight: 420,
     icon: path.join(__dirname, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
@@ -353,6 +358,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,   // 보안: 렌더러와 Node 분리
       nodeIntegration: false,
+      sandbox: true,            // 기본값이지만 명시 — preload 는 contextBridge·ipcRenderer·process.platform 만 쓴다
     },
   });
 
@@ -371,6 +377,7 @@ function createWindow() {
 
   // 닫기 = 항상 트레이로 최소화 (완전 종료는 트레이 우클릭 → 종료)
   mainWindow.on('close', (e) => {
+    saveWinState();
     if (isQuitting) return;
     e.preventDefault();
     mainWindow.hide();
@@ -379,7 +386,9 @@ function createWindow() {
   // 윈도우 종료·로그오프 때는 바로 끝낸다. 버티면 OS 가 GPU 보조 프로세스를 먼저 죽이고, 본체가 그걸
   // GPU 고장으로 오인해 1초쯤 뒤 0x80000003 오류창을 띄운다(Electron 42.9+ 에서 고쳐진 문제, electron#52604 와 같은 처리).
   // localStorage(설정·알람 시점 등)를 디스크에 내리기를 시도한다(완료를 기다리지는 못한다 — app.exit 은 바로 끝낸다).
-  mainWindow.on('session-end', () => { isQuitting = true; try { session.defaultSession.flushStorageData(); } catch (e) {} app.exit(0); });
+  mainWindow.on('session-end', () => { isQuitting = true; saveWinState(); try { session.defaultSession.flushStorageData(); } catch (e) {} app.exit(0); });
+  // 화면 쪽이 죽으면(메모리 부족·GPU 등) 원인을 남긴다 — 사용자에게는 흰 창만 보여 원인을 알 수 없다
+  mainWindow.webContents.on('render-process-gone', (e, d) => logError('render-process-gone', JSON.stringify(d)));
 
   // 외부 링크는 선택한 브라우저/프로필로 열기 (요청글/기획안 링크)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -464,9 +473,20 @@ if (!gotTheLock) {
   });
 
 app.whenReady().then(() => {
+  // 알림 말고는 화면이 권한(카메라·마이크·위치·클립보드 읽기 등)을 얻을 일이 없다 — 전부 거절
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(perm === 'notifications'));
+  app.on('child-process-gone', (e, d) => { if (d && d.reason !== 'clean-exit') logError('child-process-gone', JSON.stringify(d)); });
   createWindow();
   createTray();
   startUpdatePolling();
+  // 상주 메모리를 한 번 재서 남긴다(시작 10분 뒤) — 「무겁다」 제보를 수치로 확인하려고
+  setTimeout(() => {
+    try {
+      const kb = app.getAppMetrics().reduce((n, m) => n + ((m.memory && m.memory.workingSetSize) || 0), 0);
+      logError('memory', 'working set ' + Math.round(kb / 1024) + 'MB, processes ' + app.getAppMetrics().length);
+    } catch (e) {}
+  }, 10 * 60 * 1000);
+  setTimeout(tidyPendingUpdate, 8000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -479,7 +499,29 @@ app.on('window-all-closed', () => {
   // 맥은 Dock 아이콘 클릭 시 위 activate 핸들러가 창을 다시 표시
 });
 
-app.on('before-quit', () => { isQuitting = true; });
+app.on('before-quit', () => { isQuitting = true; saveWinState(); });
+
+// ── 받아 둔 업데이트(윈도) ──
+//   이미 설치된 버전 이하의 대기 파일(79MB 안팎)은 지운다 — electron-updater 는 다음 다운로드 때까지 남겨 둔다.
+//   현재보다 새 버전이 받아져 있으면 「받아 둠」 상태를 되살린다: checkForUpdates → downloadUpdate 가 캐시 해시를 확인하고
+//   맞으면 내려받지 않고 바로 update-downloaded 를 낸다(AppUpdater·DownloadedUpdateHelper 소스 확인, 2026-11-28).
+async function tidyPendingUpdate() {
+  try {
+    if (!updaterSupported()) return;
+    const dir = path.join(process.env.LOCALAPPDATA || '', 'team-timer-updater', 'pending');
+    const info = JSON.parse(fs.readFileSync(path.join(dir, 'update-info.json'), 'utf8'));
+    const m = String(info.fileName || '').match(/(\d+\.\d+\.\d+)/);
+    if (!m) return;
+    if (cmpVer(m[1], app.getVersion()) <= 0) {
+      for (const f of fs.readdirSync(dir)) { try { fs.unlinkSync(path.join(dir, f)); } catch (e) {} }
+      return;
+    }
+    if (!fs.existsSync(path.join(dir, info.fileName))) return;
+    const eu = getEU(); if (!eu) return;
+    const r = await eu.checkForUpdates();
+    if (r && r.updateInfo && cmpVer(r.updateInfo.version, app.getVersion()) > 0 && r.updateInfo.version === m[1]) await eu.downloadUpdate();
+  } catch (e) { if (e && e.code !== 'ENOENT') logError('tidy-pending-update', e); }
+}
 
 // ─────────────────────────────────────────────
 //  IPC 핸들러 — 렌더러(앱 UI)에서 호출
@@ -528,11 +570,6 @@ function sendMaxState() {
 // ★스킴을 반드시 거른다. 여기로 오는 값의 상당수는 시트에서 읽어 온 요청글 링크인데,
 //   시트는 팀 밖에서도 편집될 수 있다. file:/ms-msdt:/javascript: 같은 게 섞여 들어오면
 //   shell.openExternal 이 그대로 OS 핸들러에 넘긴다.
-function isSafeUrl(url) {
-  let p;
-  try { p = new URL(String(url)).protocol; } catch (e) { return false; }
-  return p === 'http:' || p === 'https:' || p === 'mailto:';
-}
 ipcMain.handle('open-external', (event, url) => openUrl(url));
 
 // ── 링크를 특정 Chrome 프로필로 열기 (회사 계정 프로필 등) ──
@@ -1016,6 +1053,7 @@ ipcMain.handle('updater-download', async () => {
     } finally { macUpdBusy = false; }
   } catch (e) {
     const m = String((e && e.message) || e);
+    logError('mac-updater', m);
     setMacUpd({ state: 'error', err: m.slice(0, 300), msg: '' });
     return { ok: false, error: m };
   }

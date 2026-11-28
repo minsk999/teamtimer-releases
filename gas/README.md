@@ -1,7 +1,7 @@
 # GAS (Google Apps Script) — 작업타이머 시트 API
 
 > ## ⚠️ 이 폴더는 **참조 사본**이다
-> **정본: `intranet-ttalkak/server/GoogleAppsScript.v67.gs`** (2026-11-28 배포 — 웹앱 버전 76. v63 은 같은 날 버전 75, v62 는 11-27)
+> **정본: `intranet-ttalkak/server/GoogleAppsScript.v67.gs`** (2026-11-28 13:36 배포 — 웹앱 버전 79. v64 = 76, v63 = 75, v62 는 11-27)
 > (배포 진실원천은 그대로 Apps Script 편집기)
 >
 > 이 웹앱은 **작업타이머와 인트라넷 딸깍이 공유**한다. 배포본이 하나뿐이라

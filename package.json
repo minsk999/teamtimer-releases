@@ -12,7 +12,7 @@
     "build:mac": "electron-builder --mac --x64 --dir --publish never && node sign-mac.js x64 && electron-builder --mac --x64 --prepackaged dist/mac/TeamTimer.app --publish never && electron-builder --mac --arm64 --dir --publish never && node sign-mac.js arm64 && electron-builder --mac --arm64 --prepackaged dist/mac-arm64/TeamTimer.app --publish never",
     "build:win": "electron-builder --win --publish never",
     "bump": "node bump-version.js",
-    "test": "node test/workhours.test.js && node test/delete-race.test.js && node test/weburl.test.js",
+    "test": "node test/workhours.test.js && node test/delete-race.test.js && node test/weburl.test.js && node test/gas/gas.test.js && node test/main-lib.test.js",
     "build:all": "electron-builder --mac --win --publish never"
   },
   "devDependencies": {
@@ -29,6 +29,7 @@
     "files": [
       "node_modules/**/*",
       "main.js",
+      "main-lib.js",
       "preload.js",
       "build-secrets.js",
       "renderer/**/*",

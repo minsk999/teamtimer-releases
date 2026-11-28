@@ -27,10 +27,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
 
@@ -60,8 +60,9 @@ jobs:
             exit 1
           fi
 
+      # npm ci = package-lock 그대로 설치(빌드마다 의존성이 달라지지 않게). 액션도 커밋 SHA 로 고정했다.
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # 시험이 깨진 채로는 팀에 배포하지 않는다(가짜 서버·가짜 시계라 네트워크 없음). 한 번이면 충분해 윈도에서만.
       - name: Test
@@ -136,8 +137,19 @@ jobs:
           done
           [ "$fail" = "0" ] || { echo "::error::자산 이름과 실제 아키텍처가 다릅니다"; exit 1; }
 
+      # ★latest.yml 이 가리키는 설치 파일이 실제로 있는지 — 어긋나면 팀 전원의 자동 업데이트가 조용히 실패한다.
+      - name: Verify Windows latest.yml
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          P=$(grep -E '^path:' dist/latest.yml | sed 's/^path: *//')
+          echo "latest.yml path=$P"
+          [ -n "$P" ] && [ -f "dist/$P" ] || { echo "::error::latest.yml 의 path($P) 와 같은 파일이 dist 에 없습니다"; exit 1; }
+          V=$(node -p "require('./package.json').version")
+          case "$P" in *"$V"*) ;; *) echo "::error::latest.yml 의 파일 이름에 버전 $V 이 없습니다"; exit 1;; esac
+
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: build-${{ matrix.os }}
           path: |
@@ -163,12 +175,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           path: artifacts
 
       - name: Create / update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: artifacts/**/*
           # 릴리스 제목을 여기서 정한다 — 예전엔 빌드 후 사람이 API 로 PATCH 해야 했다.

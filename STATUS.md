@@ -169,7 +169,7 @@ gh release edit v1.0.31 --prerelease=false --latest    # 실기 확인 후 승�
 - `on: release: [published]` 재발화가 승격한 릴리스를 다시 prerelease 로 되돌리던 것 → 차단됨
 - 설명서는 **자산이 올라간 뒤** 커밋한다(먼저 올리면 다운로드 링크가 몇 분간 404)
 - `npm run bump` 는 **변경 내역 절을 안 건드린다** — 새 버전 항목은 손으로 추가(09-18 이전엔 옛 항목 이름까지 바꿔 버렸다)
-- 릴리스 전 `npm test`(업무시간 계산 125벡터, index.html 에서 추출)
+- 릴리스 전 `npm test` = 업무시간 계산(`test/workhours.test.js`) · 쓰기↔동기화 경합 시나리오(`test/delete-race.test.js`, 가짜 시트 서버·가짜 시계) · 링크 판정(`test/weburl.test.js`) · **실제 서버 코드**를 vm 에 올린 서버 약속(`test/gas/gas.test.js`, gas/ 의 최신 사본 자동) · main 순수 함수(`test/main-lib.test.js`). 건수는 출력 참조(문서에 숫자를 적지 않는다 — 늘 낡는다). 릴리스 CI 도 같은 `npm test` 를 돈다.
 
 ---
 
