@@ -12,7 +12,7 @@ const grab = name => {
   return lines.slice(s, e + 1).join("\n");
 };
 const box = { URL };   // 브라우저에는 있는 URL 을 격리 실행 환경에도
-vm.runInNewContext(["esc", "shortUrl", "BARE_URL", "splitUrlTail", "mdLink", "mdLinks", "linkifyMemo"].map(grab).join("\n") + "\n__f = { mdLinks, linkifyMemo };", box);
+vm.runInNewContext(["esc", "shortUrl", "hostOf", "FILE_EXT", "urlLikeLabel", "BARE_URL", "splitUrlTail", "mdLink", "mdLinks", "linkifyMemo"].map(grab).join("\n") + "\n__f = { mdLinks, linkifyMemo };", box);
 const { mdLinks, linkifyMemo } = box.__f;
 const links = h => [...h.matchAll(/data-url="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map(m => [m[1], m[2]]);
 let fail = 0, n = 0;
@@ -26,6 +26,24 @@ eq("꺾쇠는 이스케이프", mdLinks("<b>굵게</b>").includes("<b>"), false)
 eq("붙은 한글은 주소 밖(표시)", links(mdLinks("https://a.com/x에서 확인")), [["https://a.com/x", "a.com/…"]]);
 eq("끝 마침표는 주소 밖(표시)", links(mdLinks("끝 https://a.com/x.")), [["https://a.com/x", "a.com/…"]]);
 eq("괄호 안 주소(표시)", links(mdLinks("회의록(https://a.com/x)")), [["https://a.com/x", "a.com/…"]]);
+// v1.0.44 ④ 같은 사이트 링크가 둘 이상이면 경로 첫 마디로 구별, 하나면 예전처럼
+eq("같은 사이트 둘 → 경로 한 마디", links(mdLinks("https://docs.google.com/spreadsheets/d/1/edit 와 https://docs.google.com/document/d/2/edit")),
+  [["https://docs.google.com/spreadsheets/d/1/edit", "docs.google.com/spreadsheets…"], ["https://docs.google.com/document/d/2/edit", "docs.google.com/document…"]]);
+eq("다른 사이트 둘 → 예전처럼", links(mdLinks("https://a.com/x 와 https://b.com/y")), [["https://a.com/x", "a.com/…"], ["https://b.com/y", "b.com/…"]]);
+eq("이름 붙은 링크는 세지 않음", links(mdLinks("[표](https://docs.google.com/a) https://docs.google.com/spreadsheets/d/1")), [["https://docs.google.com/a", "표"], ["https://docs.google.com/spreadsheets/d/1", "docs.google.com/…"]]);
+// v1.0.44 ⑦ 주소 모양 이름이 다른 사이트를 가리키면 실제 주소를 보인다
+eq("주소 모양 이름 · 다른 사이트 → 실제 주소", links(mdLinks("[https://old.com](https://new.com/x)")), [["https://new.com/x", "new.com/…"]]);
+eq("스킴 없는 주소 모양 이름 · 다른 사이트", links(mdLinks("[bank.com/login](https://evil.com/a)")), [["https://evil.com/a", "evil.com/…"]]);
+eq("주소 모양 이름 · 같은 사이트 → 이름 그대로", links(mdLinks("[docs.google.com/표](https://docs.google.com/x)")), [["https://docs.google.com/x", "docs.google.com/표"]]);
+eq("파일 이름·버전은 이름 그대로", links(mdLinks("[report.pdf](https://drive.google.com/file/d/1) [v2.1](https://a.com/x) [1.0.44](https://github.com/r)")).map(x => x[1]), ["report.pdf", "v2.1", "1.0.44"]);
+eq("도메인만 쓴 이름 · 다른 사이트", links(mdLinks("[google.com](https://evil.com/a)")).map(x => x[1]), ["evil.com/…"]);
+eq("포트·물음표·띄어쓰기·끝 점 우회 막기", links(mdLinks("[https://bank.com:443/login](https://evil.com/a) [bank.com?login](https://evil.com/a) [bank.com 로그인](https://evil.com/a) [bank.com.](https://evil.com/a)")).map(x => x[1]),
+  ["evil.com/a…", "evil.com/a…", "evil.com/a…", "evil.com/a…"]);   // 같은 사이트 넷이라 경로 한 마디까지
+eq("%XX 경로는 풀어서 보임", links(mdLinks("https://a.com/%ED%9A%8C%EC%9D%98%EB%A1%9D%20%EC%A0%95%EB%A6%AC/x 와 https://a.com/b")).map(x => x[1]),
+  ["a.com/회의록 정리…", "a.com/b…"]);
+eq("긴 경로 마디는 20자로", links(mdLinks("https://a.com/abcdefghijklmnopqrstuvwxyz/x 와 https://a.com/b")).map(x => x[1]),
+  ["a.com/abcdefghijklmnopqrst…", "a.com/b…"]);
+eq("평범한 이름은 그대로", links(mdLinks("[회의록 v2.1](https://evil.com/a)")), [["https://evil.com/a", "회의록 v2.1"]]);
 eq("저장: 맨 주소 → [주소](주소)", linkifyMemo("일정 https://a.b/c 확인"), "일정 [https://a.b/c](https://a.b/c) 확인");
 eq("저장: 이미 링크면 그대로", linkifyMemo("[표](https://a.b/c)"), "[표](https://a.b/c)");
 eq("저장: 라벨이 주소인 링크 그대로", linkifyMemo("[https://old.com](https://new.com)"), "[https://old.com](https://new.com)");

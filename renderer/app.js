@@ -415,8 +415,24 @@
   // "[라벨](https://...)" 마크다운 링크 → 클릭 가능한 링크로. (시트에서 작성한 하이퍼링크 인식)
   // 전체를 먼저 esc()로 이스케이프한 뒤 변환하므로 XSS 안전. http/https만 허용.
   // 「[이름](주소)」와 맨 주소(https://…)를 눌리는 링크로. 이름이 주소 그대로거나 맨 주소면 「도메인/…」로 짧게 보인다.
-  function shortUrl(u){
-    try { const x = new URL(u.replace(/&amp;/g, "&")); return x.hostname.replace(/^www\./, "") + (x.pathname.length > 1 || x.search ? "/…" : ""); } catch(e){ return u; }
+  // seg = 같은 사이트 링크가 한 항목에 둘 이상이면 경로 첫 마디를 붙여 구별한다(docs.google.com/spreadsheets…) — v1.0.44
+  function shortUrl(u, seg){
+    try {
+      const x = new URL(u.replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"')), h = x.hostname.replace(/^www\./, "");
+      let first = seg ? x.pathname.split("/").filter(Boolean)[0] || "" : "";
+      try { first = decodeURIComponent(first); } catch (_) {}
+      if (first.length > 20) first = first.slice(0, 20);          // 한글 경로를 복사한 긴 %XX 가 한 줄을 밀어내지 않게
+      return first ? h + "/" + esc(first) + "…" : h + (x.pathname.length > 1 || x.search ? "/…" : "");
+    } catch(e){ return u; }
+  }
+  function hostOf(u){ u = String(u).trim().split(/\s+/)[0].replace(/\.$/, ""); try { return new URL(/^https?:\/\//i.test(u) ? u.replace(/&amp;/g, "&") : "https://" + u).hostname.replace(/^www\./, "").toLowerCase(); } catch(e){ return ""; } }
+  // 이름이 주소 모양(a.com/… · https://… · bank.com)인데 실제 링크와 사이트가 다르면 이름 대신 실제 주소를 보인다(겉보기 주소 속이기 방지 — v1.0.44).
+  // 첫 낱말만 본다(「bank.com 로그인」). 경로가 없으면 끝이 영문 2자 이상(도메인 끝)이고 파일 이름이 아닐 때만 — report.pdf · v2.1 · 1.0.44 는 이름 그대로.
+  const FILE_EXT = /\.(pdf|pptx?|docx?|xlsx?|hwpx?|zip|7z|rar|png|jpe?g|gif|webp|svg|mp4|mov|avi|mp3|wav|psd|ai|aep|prproj|txt|csv|json|md|html?)$/i;
+  function urlLikeLabel(label){
+    const l = String(label).trim().split(/\s+/)[0].replace(/\.$/, "");
+    if (/^https?:\/\//i.test(l) || /^[a-z0-9-]+(\.[a-z0-9-]+)+[\/:?#]/i.test(l)) return true;
+    return /^[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i.test(l) && !FILE_EXT.test(l);
   }
   // 맨 주소로 볼 글자: 영문 주소 문자만(한글·괄호·대괄호·꺾쇠·따옴표·공백은 주소가 아님 — 「주소에서 확인」의 「에서」가 끌려오지 않게).
   // 끝의 . , ; : ! ? 와 (화면용) &#39; 같은 이스케이프 꼬리는 문장 쪽으로 돌린다. 바로 뒤가 「(」면 괄호가 든 주소라 손대지 않는다.
@@ -428,11 +444,21 @@
   function mdLink(u, text){ return `<a class="mdlink" href="#" data-url="${u}" title="${u}" onclick="openMdLink(event, this)">${text}</a>`; }
   function mdLinks(s){
     const t = esc(s);
-    return t.replace(new RegExp("\\[([^\\]]+)\\]\\((https?:\\/\\/[^)\\s]+)\\)|(" + BARE_URL + ")", "g"), (m, label, url, bare, off) => {
-      if (!bare) return mdLink(url, label === url ? shortUrl(url) : label);
+    const re = () => new RegExp("\\[([^\\]]+)\\]\\((https?:\\/\\/[^)\\s]+)\\)|(" + BARE_URL + ")", "g");
+    // 짧은 주소로 보일 링크의 사이트별 개수(같은 사이트가 둘 이상이면 경로 한 마디를 붙인다)
+    const shortAs = (label, url) => label === url || (urlLikeLabel(label) && hostOf(label) !== hostOf(url));
+    const hosts = {};
+    t.replace(re(), (m, label, url, bare, off) => {
+      if (!bare) { if (shortAs(label, url)) hosts[hostOf(url)] = (hosts[hostOf(url)] || 0) + 1; }
+      else if (!(t[off + m.length] === "(" || t.slice(off - 2, off) === "](")) { const [u] = splitUrlTail(bare); if (u.length > 8) hosts[hostOf(u)] = (hosts[hostOf(u)] || 0) + 1; }
+      return m;
+    });
+    const short = u => shortUrl(u, hosts[hostOf(u)] > 1);
+    return t.replace(re(), (m, label, url, bare, off) => {
+      if (!bare) return mdLink(url, shortAs(label, url) ? short(url) : label);
       if (t[off + m.length] === "(" || t.slice(off - 2, off) === "](") return m;
       const [u, tail] = splitUrlTail(bare);
-      return u.length > 8 ? mdLink(u, shortUrl(u)) + tail : m;
+      return u.length > 8 ? mdLink(u, short(u)) + tail : m;
     });
   }
   // 메모 저장 전: 맨 주소만 「[주소](주소)」로 — 시트에도 링크로 들어가게. 이미 [이름](주소) 인 구간은 통째로 건너뛴다
@@ -532,6 +558,13 @@
     const dark0 = saved ? saved === "dark" : !!(window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);   // 고른 적 없으면 윈도 테마
     if (dark0) { document.body.classList.add("dark"); setThemeIcon(); }
     if (window.timerAPI && window.timerAPI.setThemeBg) window.timerAPI.setThemeBg(dark0);
+    if (window.matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+      try { if (localStorage.getItem("theme")) return; } catch (_) { return; }   // 직접 고른 사람은 그대로
+      if (e.matches !== document.body.classList.contains("dark")) {
+        document.body.classList.toggle("dark", e.matches); setThemeIcon();
+        if (window.timerAPI && window.timerAPI.setThemeBg) window.timerAPI.setThemeBg(e.matches);
+      }
+    });
   } catch (e) {}
   function toggleTheme() {
     document.body.classList.toggle("dark");
@@ -2268,11 +2301,12 @@
   function applyStatusColors(){
     STATUS_DEFS.forEach(s => {
       if(statusColors[s.key]){
-        document.documentElement.style.setProperty("--st-" + s.key, statusColors[s.key]);
-        document.documentElement.style.setProperty("--st-" + s.key + "-ink", statusColors[s.key]);
+        // ★body 에 넣는다 — 다크 테마는 body.dark 가 상태색을 다시 정의해서, :root 에 넣으면 다크에선 기본색으로 돌아갔다(v1.0.44)
+        document.body.style.setProperty("--st-" + s.key, statusColors[s.key]);
+        document.body.style.setProperty("--st-" + s.key + "-ink", statusColors[s.key]);
       } else {
-        document.documentElement.style.removeProperty("--st-" + s.key);        // 기본값(테마 적응) 사용
-        document.documentElement.style.removeProperty("--st-" + s.key + "-ink");
+        document.body.style.removeProperty("--st-" + s.key);        // 기본값(테마 적응) 사용
+        document.body.style.removeProperty("--st-" + s.key + "-ink");
       }
     });
   }
@@ -3306,7 +3340,7 @@
     let html="";
     if(active.length){ html+=sectionGroup("active","진행 중",active.length, active.map(card).join("")); }
     if(done.length){ html+=sectionGroup("done","완료",done.length, done.map(card).join(""), `<button class="clear-done" onclick="event.stopPropagation(); clearDone()">${IC.trash}<span>비우기</span></button>`); }
-    if(!tasks.length && !mgmtItems.length) html=`<div class="empty">${IC.inbox}<div class="msg">작업이 없어요. 인트라넷에서 가져오거나 직접 추가해보세요.</div></div>`;
+    if(!tasks.length && !mgmtItems.length) html=`<div class="empty">${IC.inbox}<div class="msg">작업이 없어요. 인트라넷 요청글에서 딸깍으로 보내거나<br>[＋] 로 직접 추가해 보세요.<br><a href="#" class="doc-link" onclick="event.preventDefault(); openDocs()">설명서 보기</a></div></div>`;
     host.innerHTML=html;
     lastOrder=active.map(t=>t.id).join(",");
 
