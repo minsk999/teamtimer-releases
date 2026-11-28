@@ -1,5 +1,11 @@
 // ============================================================
-//  Google Apps Script v68  (7칸 구조
+//  Google Apps Script v69  (7칸 구조
+//  - v69: 2026-11-28 타이머 세션(사용자 승인). 관리항목(B·C / J·K)의 **스마트 칩 링크**를 읽는다.
+//         시트에 문서 주소를 붙여 넣으면 칩이 되는데, 칩의 주소는 RichTextValue 에 안 실려 앱에 글자만 갔다(그 메모를 앱에서
+//         고쳐 저장하면 칩 링크가 사라졌다). Sheets 고급 서비스(chipRuns)로 관리항목 칸만 한 번에 읽어 「[칩 글자](주소)」로 넘긴다.
+//         같은 칸의 글자 링크(Ctrl+K)도 그대로 살린다. updateMemo 의 지문도 같은 변환으로 비교한다(안 그러면 칩 메모 수정이 늘 stale).
+//         고급 서비스가 없거나 실패하면 v68 과 같다(글자만) — 읽기는 멈추지 않는다. 쓰기는 그대로(칩 → 일반 링크로 바뀜, 링크는 보존).
+//  (구) v68  (7칸 구조
 //  - v68: ① 구분어 판정을 체크박스 행(작업 행)에서도 하지 않는다 — 링크 없이 손으로 적은 작업 제목에 「공지사항」이
 //            들어가도 구역이 끊기지 않게. 실제 경계 행(참고사항·공지사항)은 체크 칸이 비어 있다(11-28 실측).
 //         ② deleteTask 가 행을 한 칸씩 당길 때 '=' 로 시작하는 글자 값을 textSafe 로 — 예전엔 글자로 저장된
@@ -704,6 +710,51 @@ function findSheetByHint(hint) {
 
 // v52: 첫 번째 시트가 아니라 이름으로 찾는다.
 // (자동화 시트를 맨 앞으로 옮겨도 앱이 깨지지 않도록)
+// ── v69: 스마트 칩 ───────────────────────────────────────────
+function colA1(c) { var s = ""; while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); } return s; }
+// cells: [{r: 1-based 행, c: 1-based 열}] → { "r,c": { fv: 보이는 글자, runs: chipRuns } } — 칩(주소 있는 것)이 있는 칸만
+function chipRunsFor(sheet, cells) {
+  var out = {};
+  if (!cells.length || typeof Sheets === "undefined") return out;
+  try {
+    var name = sheet.getName().replace(/'/g, "''");
+    var res = Sheets.Spreadsheets.get(SpreadsheetApp.getActiveSpreadsheet().getId(), {
+      ranges: cells.map(function (x) { return "'" + name + "'!" + colA1(x.c) + x.r; }),
+      fields: "sheets.data(startRow,startColumn,rowData.values(formattedValue,chipRuns))"
+    });
+    var data = (res && res.sheets && res.sheets[0] && res.sheets[0].data) || [];
+    for (var i = 0; i < data.length; i++) {
+      var d = data[i], v = d.rowData && d.rowData[0] && d.rowData[0].values && d.rowData[0].values[0];
+      if (!v || !v.chipRuns) continue;
+      var has = v.chipRuns.some(function (cr) { return cr.chip && cr.chip.richLinkProperties && /^https?:\/\//i.test(cr.chip.richLinkProperties.uri || ""); });
+      if (has) out[((d.startRow || 0) + 1) + "," + ((d.startColumn || 0) + 1)] = { fv: String(v.formattedValue || ""), runs: v.chipRuns };
+    }
+  } catch (err) { Logger.log("chipRunsFor: " + err); }
+  return out;
+}
+// 칩 정보 + (같은 글자라면) 리치텍스트 링크 → 「[글자](주소)」 마크다운. 글자 위치마다 주소를 정한 뒤 같은 주소끼리 묶는다.
+function chipMd(info, rich) {
+  var t = info.fv, url = new Array(t.length), k;
+  try {
+    if (rich && rich.getText && rich.getText() === t) rich.getRuns().forEach(function (rn) {
+      var u = rn.getLinkUrl(); if (u) for (k = rn.getStartIndex(); k < rn.getEndIndex(); k++) url[k] = u;
+    });
+  } catch (e) {}
+  var rs = info.runs;
+  for (var i = 0; i < rs.length; i++) {
+    var st = rs[i].startIndex || 0, en = (i + 1 < rs.length) ? (rs[i + 1].startIndex || 0) : t.length;
+    var u2 = rs[i].chip && rs[i].chip.richLinkProperties && rs[i].chip.richLinkProperties.uri;
+    if (u2 && /^https?:\/\//i.test(u2)) for (k = st; k < en; k++) url[k] = u2;
+  }
+  var out = "";
+  for (k = 0; k < t.length;) {
+    var j = k; while (j < t.length && url[j] === url[k]) j++;
+    out += url[k] ? "[" + t.slice(k, j) + "](" + url[k] + ")" : t.slice(k, j);
+    k = j;
+  }
+  return out.trim();
+}
+
 function getSheet() {
   return findSheetByHint(MAIN_SHEET_HINT) || SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
 }
@@ -919,6 +970,24 @@ function doRead(e) {
     if (!MEMBER_COLS[list[i]]) continue;
     members.push(buildMemberData(allData, formulas, richAt, list[i]));
   }
+  // v69: 관리항목 칸의 스마트 칩 링크(한 번의 Sheets API 요청). 칩이 있는 칸만 바꾼다.
+  var chipCells = [];
+  members.forEach(function (m) {
+    var sc = MEMBER_COLS[m.name]; if (!sc) return;
+    m.mgmt.forEach(function (it) {
+      if (it.b) chipCells.push({ r: it.row, c: sc + COL.TITLE });
+      if (it.c) chipCells.push({ r: it.row, c: sc + COL.LINK });
+    });
+  });
+  var chips = chipRunsFor(sheet, chipCells);
+  if (Object.keys(chips).length) members.forEach(function (m) {
+    var sc = MEMBER_COLS[m.name]; if (!sc) return;
+    m.mgmt.forEach(function (it) {
+      var kb = it.row + "," + (sc + COL.TITLE), kc = it.row + "," + (sc + COL.LINK);
+      if (chips[kb]) it.b = chipMd(chips[kb], richAt(it.row - 1, sc - 1 + COL.TITLE));
+      if (chips[kc]) it.c = chipMd(chips[kc], richAt(it.row - 1, sc - 1 + COL.LINK));
+    });
+  });
   // v51: memberNames = 시트에서 인식한 팀원 이름 목록(순서 포함). 앱/확장이 이걸로 목록을 구성.
   var payload = JSON.stringify({ ok: true, members: members, memberNames: ALL_MEMBERS, warn: MEMBER_WARN });
   if (!only0) {
@@ -960,6 +1029,10 @@ function updateMemo(p) {
     var bCell = sheet.getRange(row, startCol + COL.TITLE), cCell = sheet.getRange(row, startCol + COL.LINK);
     var curB = cellToMd(bCell.getRichTextValue(), bCell.getValue(), bCell.getFormula());
     var curC = cellToMd(cCell.getRichTextValue(), cCell.getValue(), "");
+    // v69: 앱이 받은 값은 칩 링크까지 바꾼 것 — 같은 변환으로 비교한다
+    var ch = chipRunsFor(sheet, [{ r: row, c: startCol + COL.TITLE }, { r: row, c: startCol + COL.LINK }]);
+    if (ch[row + "," + (startCol + COL.TITLE)]) curB = chipMd(ch[row + "," + (startCol + COL.TITLE)], bCell.getRichTextValue());
+    if (ch[row + "," + (startCol + COL.LINK)]) curC = chipMd(ch[row + "," + (startCol + COL.LINK)], cCell.getRichTextValue());
     if ((p.expectB != null && String(p.expectB).trim() !== String(curB).trim()) ||
         (p.expectC != null && String(p.expectC).trim() !== String(curC).trim())) {
       return respond({ ok: false, stale: true, row: row, found: String(curB || curC).slice(0, 40),
