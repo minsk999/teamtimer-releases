@@ -15,6 +15,7 @@
 
   :root {
     --accent: #1A73E8;          /* 링크 — 흰 바탕 대비 4.5:1 이상(v1.0.44, 예전 #2E96FF 는 3:1) */
+    --ink-4: #c9c9c9;           /* 꺼진 메일 점 — 예전엔 정의 없이 폴백값으로 쓰던 것(값 같음) */
     /* 라이트 (기본) */
     --hairline: 1px; /* JS가 devicePixelRatio 기준 1 디바이스 픽셀로 설정 (배율 화면 또렷) */
     --bg: #ffffff;
@@ -462,6 +463,7 @@
   .empty .msg { font-size: 14px; letter-spacing: -0.01em; }
   .empty .doc-link { display: inline-block; margin-top: 10px; color: var(--accent); text-decoration: none; font-size: 12.5px; font-weight: 600; }
   .empty .doc-link:hover { text-decoration: underline; }
+  .empty-hint { text-align: center; padding: 26px 20px 0; color: var(--ink-3); font-size: 13px; letter-spacing: -0.01em; }
   /* 부드러운 커서(caret.js, v1.0.45) — 그 칸의 기본 커서는 .scr 로 감추고 #scaret 을 그린다. 색은 기본 커서와 같은 글자색 */
   .scr { caret-color: transparent; }
   #scaret { position: fixed; left: 0; top: 0; width: 2px; border-radius: 1px; background: var(--ink); pointer-events: none; z-index: 2147483000; display: none; will-change: transform; }
@@ -1021,7 +1023,9 @@
     font-size: 13.5px; font-weight: 600; box-shadow: 0 16px 44px -12px rgba(0,0,0,0.4);
     opacity: 0; transition: all 0.3s cubic-bezier(0.16,1,0.3,1); z-index: 200;
     display: flex; align-items: center; gap: 9px; letter-spacing: -0.01em;
+    width: max-content; max-width: calc(100vw - 32px);   /* left:50% 라 폭이 창의 절반으로 묶여 긴 알림이 두 줄로 꺾이고 아이콘이 찌그러졌다(v1.0.48 시안 ③) */
   }
+  .toast svg { flex-shrink: 0; }
   .toast svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 

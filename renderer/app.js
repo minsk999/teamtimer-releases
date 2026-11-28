@@ -3353,6 +3353,8 @@
     let html="";
     if(active.length){ html+=sectionGroup("active","진행 중",active.length, active.map(card).join("")); }
     if(done.length){ html+=sectionGroup("done","완료",done.length, done.map(card).join(""), `<button class="clear-done" onclick="event.stopPropagation(); clearDone()">${IC.trash}<span>비우기</span></button>`); }
+    // 관리 항목만 있고 작업이 없는 내 보드: 그 아래가 비어 길을 모르던 자리에 한 줄 안내(v1.0.48, 사용자 승인 시안 ②)
+    if(!tasks.length && mgmtItems.length && !isReadonly()) html=`<div class="empty-hint">진행 중인 작업이 없어요. 딸깍으로 보내거나 [＋] 로 추가해 보세요.</div>`;
     if(!tasks.length && !mgmtItems.length) html=`<div class="empty">${IC.inbox}<div class="msg">작업이 없어요. 인트라넷 요청글에서 딸깍으로 보내거나<br>[＋] 로 직접 추가해 보세요.<br><a href="#" class="doc-link" onclick="event.preventDefault(); openDocs()">설명서 보기</a></div></div>`;
     host.innerHTML=html;
     lastOrder=active.map(t=>t.id).join(",");
