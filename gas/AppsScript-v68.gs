@@ -1,5 +1,14 @@
 // ============================================================
-//  Google Apps Script v67  (7칸 구조
+//  Google Apps Script v68  (7칸 구조
+//  - v68: ① 구분어 판정을 체크박스 행(작업 행)에서도 하지 않는다 — 링크 없이 손으로 적은 작업 제목에 「공지사항」이
+//            들어가도 구역이 끊기지 않게. 실제 경계 행(참고사항·공지사항)은 체크 칸이 비어 있다(11-28 실측).
+//         ② deleteTask 가 행을 한 칸씩 당길 때 '=' 로 시작하는 글자 값을 textSafe 로 — 예전엔 글자로 저장된
+//            「=…」 제목이 당겨지면서 수식이 됐다.
+//         ③ insert 가 행을 쓴 뒤(서식 단계에서) 실패하면 ok:true 로 답한다 — ok:false 면 딸깍이 다시 보내게 해서
+//            중복 검사를 끈 사람은 같은 글이 두 줄 들어갔다.
+//         ④ ?action=versions 의 at 을 날짜까지만(시각은 6시간 판정용으로 속성에만 남긴다).
+//         ⑤ LATEST_TTALKAK_VER 1.8.9 → 1.8.10. 타이머 경로(updateTask·addMemo·updateMemo·toggleDone·updateDue)는 그대로.
+//  (구) v67  (7칸 구조
 //  - v67: findSectionEnd 의 구분어(참고사항·공지사항·팀 업무) 판정을 영상작업 행·📌 관리 행에서는 하지 않는다.
 //         작업 제목에 그 단어가 들어가면 구역이 끊겨 아래 작업이 중복 검사·타이머 목록에서 빠지던 것. 지금 시트 해당 0건(11-28 실측) — 판정 변화 없음.
 //  (구) v66  (7칸 구조
@@ -231,7 +240,7 @@ var CHECK_FONT_COLOR = "#434343";
 
 // ── 딸깍 확장 버전 알림 (v57) ───────────────────────────────
 // 딸깍을 새 버전으로 배포하면 이 값을 같이 올린다.
-var LATEST_TTALKAK_VER = "1.8.9";
+var LATEST_TTALKAK_VER = "1.8.10";
 // 알림에 덧붙일 안내 (빈 문자열이면 "새 버전이 있어요"만 뜬다)
 var UPDATE_MSG = "— 받은 zip 을 기존 폴더에 덮어쓰고 chrome://extensions 에서 ↻, 인트라넷 탭은 F5 해 주세요";
 
@@ -487,7 +496,7 @@ function clientVersions() {
     Object.keys(all).forEach(function (k) {
       if (k.indexOf("ttalkakVer:") !== 0) return;
       var v = String(all[k]).split("|");
-      out[k.slice(11)] = { ver: v[0], at: v[1] || "" };
+      out[k.slice(11)] = { ver: v[0], at: String(v[1] || "").slice(0, 10) };   // v68: 날짜까지만
     });
     return respond({ ok: true, latestVer: LATEST_TTALKAK_VER, versions: out });
   } catch (err) { return respond({ ok: false, error: String(err) }); }
@@ -790,7 +799,8 @@ function findSectionEnd(allData, formulas, member, startCol, nameRow) {
     //      중복 검사와 타이머 목록에서 빠졌다(점수표 R-1). 실제 경계 행은 링크도 📌 도 없다(11-28 실측: 참고사항·공지사항 두 줄).
     var isTaskRow = /HYPERLINK/i.test(String(formulas[r][base + COL.LINK])) || /HYPERLINK/i.test(String(formulas[r][base + COL.PLAN]));
     var isPinRow  = String(allData[r][base + COL.CHECK]).indexOf("📌") !== -1;
-    if (!isTaskRow && !isPinRow) {
+    var isChkRow  = typeof allData[r][base + COL.CHECK] === "boolean";   // v68: 체크박스 = 작업 행
+    if (!isTaskRow && !isPinRow && !isChkRow) {
       for (var k = 0; k < BOUNDARY_WORDS.length; k++) {
         if (combined.indexOf(BOUNDARY_WORDS[k]) !== -1) return r + 1;
       }
@@ -1282,7 +1292,9 @@ function deleteTask(p) {
       for (var c = 0; c < width; c++) {
         // 링크 2칸(LINK/PLAN)은 수식 우선, 나머지는 값
         if ((c === COL.LINK || c === COL.PLAN) && forms[i + 1][c]) vals[i][c] = forms[i + 1][c];
-        else vals[i][c] = (forms[i + 1][c] ? forms[i + 1][c] : vals[i + 1][c]);
+        // v68: 글자로 저장된 「=…」 를 그대로 setValues 하면 수식이 된다 — textSafe 로 글자 유지
+        else vals[i][c] = forms[i + 1][c] ? forms[i + 1][c]
+                        : (typeof vals[i + 1][c] === "string" ? textSafe(vals[i + 1][c]) : vals[i + 1][c]);
       }
       dueNF[i][0] = dueNF[i + 1][0];
     }
@@ -1381,7 +1393,7 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  var lock = null;
+  var lock = null, written = "";
   try {
     var p      = e.parameter;
     var action = p.action || "insert";
@@ -1553,6 +1565,7 @@ function doPost(e) {
       planVal,
       (dateValue instanceof Date) ? dateValue : textSafe(dateValue)
     ]]);
+    written = target + " " + insertRow + "행";   // v68: 여기부터 실패해도 행은 들어가 있다
     // 메모(F/N)는 있을 때만 — 비어 있으면 그 칸을 건드리지 않는다(v62 와 같음)
     if (memo) sheet.getRange(insertRow, startCol + COL.MEMO).setValue(textSafe(memo));
     sheet.getRange(insertRow, startCol + COL.CHECK).setValue(false);
@@ -1578,6 +1591,8 @@ function doPost(e) {
     return respond(withVer({ ok: true, message: target + " " + insertRow + "행 추가됨 (섹션끝:" + scanEnd + ", needBlank:" + needBlank + ")" }, clientVer));
 
   } catch (err) {
+    // v68: 행을 쓴 뒤의 실패(서식·빈 줄 삽입)는 ok:true — ok:false 면 딸깍이 다시 보내 같은 글이 두 줄 된다
+    if (written) return respond({ ok: true, message: written + " 추가됨 (서식 일부 실패: " + String(err).slice(0, 80) + ")" });
     return respond({ ok: false, error: err.toString() });
   } finally {
     if (lock) { try { lock.releaseLock(); } catch (e2) {} }
