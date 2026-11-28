@@ -70,7 +70,10 @@ process.on('unhandledRejection', (e) => logError('main-promise', e));
 ipcMain.on('log-error', (event, msg) => logError('renderer', String(msg).slice(0, 2000)));
 // 화면 테마를 기억해 다음 시작 때 창 바탕색을 맞춘다 — 어두운 테마인데 뜰 때 흰 바탕이 번쩍이지 않게
 function themePath() { return path.join(app.getPath('userData'), 'theme.txt'); }
-ipcMain.on('theme-bg', (event, dark) => { try { fs.writeFileSync(themePath(), dark ? 'dark' : 'light'); } catch (e) {} });
+ipcMain.on('theme-bg', (event, dark) => {
+  try { fs.writeFileSync(themePath(), dark ? 'dark' : 'light'); } catch (e) {}
+  try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setBackgroundColor(dark ? '#0a0a0a' : '#ffffff'); } catch (e) {}   // 실행 중 바꿔도 크기 조절·복원 때 흰 바탕이 안 비치게
+});
 function startDark() {
   try { return fs.readFileSync(themePath(), 'utf8').trim() === 'dark'; } catch (e) { return nativeTheme.shouldUseDarkColors; }
 }
