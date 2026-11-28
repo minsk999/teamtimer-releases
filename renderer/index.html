@@ -10,6 +10,9 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
   @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+  /* ★@import 는 스타일 맨 앞에만 둘 수 있다 — 그 위에 규칙을 두면 글꼴을 조용히 못 불러온다 */
+  /* v1.0.39: 한글은 낱말 단위로 줄을 바꾼다(「연/결하세요」 방지). 긴 주소·영문은 넘치지 않게 끊는다. */
+  body { word-break: keep-all; overflow-wrap: break-word; }
 
   :root {
     /* 라이트 (기본) */
@@ -20,7 +23,7 @@
     --surface-2: #fafafa;
     --ink: #0a0a0a;
     --ink-2: #71717a;
-    --ink-3: #a1a1aa;
+    --ink-3: #7a7a83;   /* v1.0.39: 대비 2.6 → 4.3 (사용자 승인) */
     --line: #ebebe8;
     --pill: #0a0a0a;
     --pill-text: #ffffff;
@@ -50,7 +53,7 @@
     --surface-2: #1e1e1e;
     --ink: #d8d8dc;
     --ink-2: #8f8f97;
-    --ink-3: #63636b;
+    --ink-3: #7c7c85;   /* v1.0.39: 다크 보조 글자 대비 올림 */
     --line: #2a2a2e;
     --pill: #d8d8dc;
     --pill-text: #161616;
@@ -214,6 +217,7 @@
   }
   .sync-pill:hover { border-color: var(--ink-3); }
   .sync-pill.syncing { pointer-events: none; }
+  .sync-pill.err .dot { background: var(--red); animation: none; }   /* v1.0.39: 마지막 동기화 실패 */
   .sync-pill .sync-text { overflow: hidden; max-width: 60px; opacity: 1; transition: max-width 0.3s ease, opacity 0.25s ease; white-space: nowrap; }
   .sync-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
   .sync-pill.syncing .dot { animation: spin-pulse 0.8s linear infinite; }
@@ -1132,7 +1136,7 @@
   <!-- 상단바 -->
   <div class="topbar">
     <div class="stat-swap">
-      <div class="stat-line" onclick="openSheet()" title="클릭하면 구글 시트 열기" style="cursor:pointer">
+      <div class="stat-line" role="button" tabindex="0" onclick="openSheet()" title="클릭하면 구글 시트 열기" style="cursor:pointer">
         <div class="stat-item red"><span class="sdot"></span><span class="n" id="s-red">0</span><span class="l">마감임박</span></div>
         <div class="stat-item orange"><span class="sdot"></span><span class="n" id="s-orange">0</span><span class="l">오늘마감</span></div>
         <div class="stat-item green"><span class="sdot"></span><span class="n" id="s-green">0</span><span class="l">여유있음</span></div>
@@ -1148,7 +1152,7 @@
       </div>
     </div>
     <div class="top-controls">
-      <div class="sync-pill" id="sync-pill" onclick="doSync()" title="지금 동기화"><span class="dot"></span><span class="sync-text">동기화</span></div>
+      <div class="sync-pill" id="sync-pill" role="button" tabindex="0" onclick="doSync()" title="지금 동기화"><span class="dot"></span><span class="sync-text">동기화</span></div>
       <div class="pill-group">
         <button class="pill-btn icon-only" onclick="toggleTheme()" title="테마 전환" id="theme-btn">
           <svg viewBox="0 0 24 24" id="theme-icon"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M4.6 4.6l1.7 1.7M17.7 17.7l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.6 19.4l1.7-1.7M17.7 6.3l1.7-1.7"/></svg>
@@ -1234,7 +1238,7 @@
         <label>마감 시간</label>
         <div class="dl-box">
           <div class="chip-grid" id="chip-grid"></div>
-          <div class="custom-toggle" onclick="toggleCustom('main')">+ 직접 입력</div>
+          <div class="custom-toggle" role="button" tabindex="0" onclick="toggleCustom('main')">+ 직접 입력</div>
           <div class="custom-row" id="custom-row-main">
             <button class="cal-trigger" id="cal-trig-main" onclick="toggleCal('main')">
               <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8h13M7 3v3M13 3v3"/></svg>
@@ -1282,7 +1286,7 @@
         <label>마감 시간 설정</label>
         <div class="dl-box">
           <div class="chip-grid" id="chip-grid-import"></div>
-          <div class="custom-toggle" onclick="toggleCustom('import')">+ 직접 입력</div>
+          <div class="custom-toggle" role="button" tabindex="0" onclick="toggleCustom('import')">+ 직접 입력</div>
           <div class="custom-row" id="custom-row-import">
             <button class="cal-trigger" id="cal-trig-import" onclick="toggleCal('import')">
               <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8h13M7 3v3M13 3v3"/></svg>
@@ -1398,7 +1402,7 @@
         <label>마감 시간</label>
         <div class="dl-box">
           <div class="chip-grid" id="chip-grid-edit"></div>
-          <div class="custom-toggle" onclick="toggleCustom('edit')">+ 직접 입력</div>
+          <div class="custom-toggle" role="button" tabindex="0" onclick="toggleCustom('edit')">+ 직접 입력</div>
           <div class="custom-row" id="custom-row-edit">
             <button class="cal-trigger" id="cal-trig-edit" onclick="toggleCal('edit')">
               <svg viewBox="0 0 20 20"><rect x="3.5" y="4.5" width="13" height="12" rx="2"/><path d="M3.5 8h13M7 3v3M13 3v3"/></svg>
@@ -1497,7 +1501,7 @@
           <button class="seg-btn toggle" data-val="comment">코멘트 알림</button>
           <button class="seg-btn toggle" data-val="assign">담당자 배정</button>
         </div>
-        <div class="opt-row" onclick="toggleMailHide()">
+        <div class="opt-row" role="button" tabindex="0" onclick="toggleMailHide()">
           <div class="opt-text">
             <span class="opt-title">목록에서도 숨기기</span>
             <span class="opt-desc">꺼두면 알림만 안 와요. 켜면 목록·배지에서도 빠져요.</span>
@@ -1511,21 +1515,21 @@
       <div class="field">
         <label>일반 <span class="opt">즉시 적용</span></label>
         <p class="setting-desc">앱 실행 방식과 링크·단축키를 정해요.</p>
-        <div class="opt-row" onclick="toggleAutostart()">
+        <div class="opt-row" role="button" tabindex="0" onclick="toggleAutostart()">
           <div class="opt-text">
             <span class="opt-title">시작 시 자동 실행</span>
             <span class="opt-desc">컴퓨터를 켜면 작업 타이머가 자동으로 실행돼요.</span>
           </div>
           <div class="mh-toggle" id="autostart-toggle"><div class="mh-switch"></div></div>
         </div>
-        <div class="opt-row" id="autostart-min-row" onclick="toggleAutostartMin()">
+        <div class="opt-row" id="autostart-min-row" role="button" tabindex="0" onclick="toggleAutostartMin()">
           <div class="opt-text">
             <span class="opt-title">자동 실행 시 트레이로 시작</span>
             <span class="opt-desc">부팅 자동 실행 때 창을 띄우지 않고 트레이(메뉴바)에만 떠 있어요.</span>
           </div>
           <div class="mh-toggle" id="autostart-min-toggle"><div class="mh-switch"></div></div>
         </div>
-        <div class="opt-row" onclick="openKeysModal()">
+        <div class="opt-row" role="button" tabindex="0" onclick="openKeysModal()">
           <div class="opt-text">
             <span class="opt-title">단축키</span>
             <span class="opt-desc">키보드 단축키를 원하는 키로 바꿔요.</span>
@@ -1561,7 +1565,7 @@
       <div class="field">
         <label>남은 시간</label>
         <p class="setting-desc">카드의 남은 시간을 어떻게 셀지 정해요. 마감 시각과 알람은 그대로예요.</p>
-        <div class="opt-row" onclick="toggleWorkDraft()">
+        <div class="opt-row" role="button" tabindex="0" onclick="toggleWorkDraft()">
           <div class="opt-text">
             <span class="opt-title">업무시간만 세기</span>
             <span class="opt-desc">주말·공휴일과 퇴근 후 시간은 빼고 계산해요. 그동안은 숫자가 멈추고 카드에 이유가 표시돼요.</span>
@@ -1578,7 +1582,7 @@
           <span class="ph-time">–</span>
           <input type="text" size="1" class="preset-time" id="work-end" value="18:00" placeholder="18:00" oninput="draftWork.end=this.value" onblur="normalizeWorkTime(this,'end')" onkeydown="if(event.key==='Enter'){event.preventDefault(); normalizeWorkTime(this,'end'); this.blur();}">
         </div>
-        <div class="opt-row" onclick="toggleWorkLabelsDraft()">
+        <div class="opt-row" role="button" tabindex="0" onclick="toggleWorkLabelsDraft()">
           <div class="opt-text">
             <span class="opt-title">설명 표시</span>
             <span class="opt-desc">「초과」와 멈춘 이유(업무 전·업무 후·주말·공휴일)를 카드에 작게 적어요.</span>
@@ -1661,6 +1665,7 @@
     edit: '<svg viewBox="0 0 20 20"><path d="M13.5 4.5l2 2L7 15l-2.5.5L5 13l8.5-8.5z"/></svg>',
     trash: '<svg viewBox="0 0 20 20"><path d="M4.5 6h11M8 6V4.5h4V6M6 6l.5 9h7l.5-9"/></svg>',
     check: '<svg viewBox="0 0 20 20"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>',
+    warn: '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7.3"/><path d="M10 6.4v4.6M10 13.6v.01"/></svg>',
     bell: '<svg viewBox="0 0 20 20" style="width:12px;height:12px;"><path d="M10 3a4.5 4.5 0 00-4.5 4.5c0 4-1.5 5-1.5 5h12s-1.5-1-1.5-5A4.5 4.5 0 0010 3zM8.5 15.5a1.5 1.5 0 003 0"/></svg>',
     inbox: '<svg viewBox="0 0 24 24"><path d="M4 13l2-7h12l2 7M4 13v5h16v-5M4 13h4l1.5 2.5h5L16 13h4"/></svg>',
     chevL: '<svg viewBox="0 0 20 20"><path d="M12 5l-5 5 5 5"/></svg>',
@@ -1852,7 +1857,7 @@
         openConfirm("지금 재시작할까요?", "앱을 껐다 켜면서 새 버전을 설치해요. 저장 안 한 편집은 사라져요.",
           "재시작", async () => {
             const res = await window.timerAPI.updaterInstall();
-            if (!res || !res.ok) { updState = "error"; paintUpdater(); toast("설치를 시작하지 못했어요"); }
+            if (!res || !res.ok) { updState = "error"; paintUpdater(); toast("설치를 시작하지 못했어요", "err"); }
           });
       } else {
         const res = await window.timerAPI.updaterReveal();
@@ -1870,10 +1875,10 @@
       updWatchStop();
       if (r && r.upToDate) { updState = "idle"; updLatest = ""; paintUpdater(); closeUpdBanner(); toast("이미 최신 버전이에요"); }
       else if (r && r.ok) { updState = "ready"; announceUpdateReady(); }
-      else { updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(r && r.error)); }
+      else { updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(r && r.error), "err"); }
     } else if (r && !r.ok) {
       updWatchStop();
-      updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(r.error));
+      updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(r.error), "err");
     }
   }
 
@@ -1923,12 +1928,12 @@
         if (p.type === "checkFailed"){ toast("업데이트 확인에 실패했어요 — 잠시 뒤 다시 시도해 주세요"); return; }
         if (p.type === "progress") { updState = "downloading"; updPct = p.percent || 0; paintUpdater(); updWatchStart(); }
         else if (p.type === "ready") { updState = "ready"; announceUpdateReady(); }
-        else if (p.type === "error") { updWatchStop(); updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(p.error)); }
+        else if (p.type === "error") { updWatchStop(); updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(p.error), "err"); }
         else if (p.type === "mac") {
           if (p.state === "download" || p.state === "verify" || p.state === "extract") {
             updState = "downloading"; updPct = p.pct || 0; paintUpdater(); updWatchStart();
           } else if (p.state === "ready" || p.state === "armed") { updState = "ready"; announceUpdateReady(); }
-          else if (p.state === "error") { updWatchStop(); updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(p.err)); }
+          else if (p.state === "error") { updWatchStop(); updState = "error"; paintUpdater(); openUpdBanner(); toast(updErrText(p.err), "err"); }
         }
       });
     } catch(e){}
@@ -2274,6 +2279,13 @@
     const t = pill.querySelector(".sync-text");
     if(t){ if(syncPillOrig === null) syncPillOrig = t.textContent; t.textContent = "동기화 중"; }
   }
+  // 마지막 동기화가 실패했으면 점을 빨갛게 멈추고, 마우스를 올리면 마지막 성공 시각을 보여 준다
+  function syncPillState(ok){
+    const pill = $("sync-pill"); if(!pill) return;
+    pill.classList.toggle("err", !ok);
+    const hm = d => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    pill.title = ok ? "지금 동기화" : ("동기화 실패 — 마지막 성공 " + (lastSyncOkAt ? hm(new Date(lastSyncOkAt)) : "없음") + " · 눌러서 다시 시도");
+  }
   function syncPillOff(){
     const pill = $("sync-pill"); if(!pill) return;
     pill.classList.remove("syncing");
@@ -2382,12 +2394,14 @@
       if (!allMembersData.find(m => m.name === viewName)) viewName = myName;
       const cnt = applyView(viewName);
       lastSyncOkAt = Date.now(); // 포커스 프리싱크 기준 시각
+      syncPillState(true);
       if(!silent || owedToast) toast(_el >= 8000
         ? `동기화 완료 · 작업 ${cnt}건 (${(_el/1000).toFixed(1)}초 — 시트가 느려요)`
         : `동기화 완료 · 작업 ${cnt}건`);
       return cnt;
     } catch (e) {
-      if(!silent || syncDroppedLoud) toast(syncErrText(e));
+      syncPillState(false);
+      if(!silent || syncDroppedLoud) toast(syncErrText(e), "err");
       // 다시 받기까지 실패했으면 거기서 멈춘다(실패할 때마다 다시 예약하면 끝없이 돈다). 가는 중인 쓰기가 있으면 그 끝에서 한 번 더 시도한다.
       syncDroppedLoud = false;
       if (!writesInFlight) syncDropped = false;
@@ -3115,6 +3129,8 @@
     if(typeof closeColorPicker==="function") closeColorPicker();
     if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if(modalExitTimers[id]){ clearTimeout(modalExitTimers[id]); modalExitTimers[id] = null; }
+    const back = modalReturnFocus[id]; modalReturnFocus[id] = null;
+    if (back && back.isConnected && back.focus) setTimeout(() => { if (!anyModalOpen()) back.focus(); }, 0);
     if(!el.classList.contains("show")){ el.classList.remove("closing"); return; }
     if(reducedMotion()){ el.classList.remove("show"); el.classList.remove("closing"); return; }
     el.classList.add("closing");
@@ -3128,11 +3144,19 @@
   // ★모달을 열 땐 반드시 이걸 쓴다. 퇴장 타이머를 취소하고 .closing 을 떼지 않으면
   //   닫자마자 다시 여는 경로에서 (a) 새로 연 모달이 곧바로 사라지거나
   //   (b) fadeOut(forwards) 이 남아 투명한 채로 열린다. 둘 다 실측으로 확인했다.
+  const modalReturnFocus = {};   // id → 창을 열기 전 포커스(닫을 때 되돌린다)
   function openModal(id){
     const el = $(id); if(!el) return;
     if(modalExitTimers[id]){ clearTimeout(modalExitTimers[id]); modalExitTimers[id] = null; }
+    const was = document.activeElement;
+    if (!el.classList.contains("show") && was && was !== document.body && !el.contains(was)) modalReturnFocus[id] = was;
     el.classList.remove("closing");
     el.classList.add("show");
+    // 첫 글자 입력칸에 커서. 설정 창은 입력칸이 아래쪽이라 창이 스크롤되므로 뺀다.
+    if (id !== "modal-settings" && !el.contains(document.activeElement)) {
+      const inp = el.querySelector('input[type="text"]:not([disabled]), input:not([type]):not([disabled]), textarea:not([disabled])');
+      if (inp && inp.offsetParent) inp.focus();
+    }
   }
   // ★"열려 있는가"는 반드시 이걸로 판정한다. 퇴장 애니메이션 중(.closing)에는
   //   .show 가 160ms 더 남아 있는데, 그걸 열림으로 읽으면
@@ -3233,7 +3257,7 @@
     if(!selDl){toast("마감 시간을 선택해 주세요");return;}
     if(editingId){
       const t = findPinned(editingId, editingPin);
-      if(!t){ closeModal("modal-task"); toast(PIN_LOST); return; }
+      if(!t){ closeModal("modal-task"); toast(PIN_LOST, "err"); return; }
       if(!reqLink){ toast("요청글 링크를 입력해 주세요"); return; }
       const myName = getMyName();
       if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
@@ -3335,7 +3359,7 @@
   //   경우가 흔해서, 되돌리면 "삭제가 취소된 것처럼" 보였다가 다음 동기화에 다시 사라진다.
   //   대신 사실대로 알리고 서버 상태를 받아 맞춘다.
   function afterWriteFail(r, arr, undo, failMsg){
-    if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요"); doSync({ silent:true }); return; }
+    if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요", "err"); doSync({ silent:true }); return; }
     if (r && r.stale) { rollbackTasks(arr, undo); handleStale(r); return; }
     rollbackTasks(arr, undo);
     toast(failMsg);
@@ -3351,7 +3375,7 @@
     const msg = found
       ? `'${found.length > 20 ? found.slice(0, 20) + "…" : found}'가 그 자리에 있어요`
       : "그 자리가 비어 있어요";
-    toast(msg + " — 목록을 다시 불러올게요");
+    toast(msg + " — 목록을 다시 불러올게요", "err");
     doSync({ silent:true });
   }
 
@@ -3371,8 +3395,8 @@
   }
   // 관리항목(mgmtItems)용 — 배열 교체 여부 대신 타임아웃만 가른다
   function afterMgmtWriteFail(r, undo, failMsg){
-    if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요"); doSync({ silent:true }); return; }
-    if (r && r.stale) { undo(); renderMgmt(); toast("그 사이 목록이 바뀌었어요 — 다시 불러올게요"); doSync({ silent:true }); return; }
+    if (r && r.timeout) { toast("응답이 늦어요 — 동기화로 확인할게요", "err"); doSync({ silent:true }); return; }
+    if (r && r.stale) { undo(); renderMgmt(); toast("그 사이 목록이 바뀌었어요 — 다시 불러올게요", "err"); doSync({ silent:true }); return; }
     undo(); renderMgmt(); toast(failMsg);
   }
 
@@ -3386,7 +3410,7 @@
     const pin = pinOf(t);
     openConfirm("작업 삭제", `「${t.title}」을(를) 삭제할까요? 시트에서도 지워져요.`, "삭제", () => {
       const cur = findPinned(t.id, pin);
-      if(cur) delTask(cur.id); else toast(PIN_LOST);
+      if(cur) delTask(cur.id); else toast(PIN_LOST, "err");
     });
   }
   async function delTask(id){
@@ -3460,7 +3484,7 @@
       // 서버가 실제로는 지웠는데 확인용 동기화가 삭제 전 캐시를 받으면 카드가 다시 보인다 → 캐시가 죽은 뒤 한 번 더 받아 맞춘다.
       // (묘비는 세우지 않는다 — 서버가 안 지운 경우 멀쩡한 카드를 가린다.)
       if(r && r.timeout){
-        toast("응답이 늦어요 — 동기화로 확인할게요");
+        toast("응답이 늦어요 — 동기화로 확인할게요", "err");
         addTombstone(fp, 0, true);                 // 가리지 않고 지켜본다 — 다시 보이면 캐시가 죽을 때까지 한 번 더 받는다
         doSync({ silent:true }); scheduleLateSync(Date.now() + TOMB_MS);
         return;
@@ -3514,7 +3538,7 @@
   async function confirmDone(statusText, forceDone){
     const ctx = doneCtx; if(!ctx){ closeModal("modal-done"); return; }
     const t = findPinned(ctx.id, ctx.pin);
-    if(!t){ closeModal("modal-done"); toast(PIN_LOST); return; }
+    if(!t){ closeModal("modal-done"); toast(PIN_LOST, "err"); return; }
     closeModal("modal-done");
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
@@ -3584,7 +3608,7 @@
   }
   // 날짜+시간 확정: 날짜는 시트, 시간은 로컬. (프리셋·저장 버튼 공통)
   async function commitDue(dateStr, timeStr){
-    const t = findPinned(dueCtx, duePin); if(!t){ closeModal("modal-time"); toast(PIN_LOST); return; }
+    const t = findPinned(dueCtx, duePin); if(!t){ closeModal("modal-time"); toast(PIN_LOST, "err"); return; }
     if(!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)){ toast("날짜를 선택해 주세요"); return; }
     timeStr = normalizeTime(timeStr);
     if(!timeStr){ toast("시간을 입력해 주세요 (예: 1800)"); return; }
@@ -4218,7 +4242,7 @@
         playPreview("custom");
         toast("음원을 추가했어요");
       };
-      probe.onerror = () => { toast("음원을 읽을 수 없어요"); e.target.value=""; };
+      probe.onerror = () => { toast("음원을 읽을 수 없어요", "err"); e.target.value=""; };
       probe.src = dataUrl;
     };
     reader.readAsDataURL(file);
@@ -4620,7 +4644,7 @@
   function sectionGroup(key, label, count, inner, extra){
     const col = collapsedState[key] ? " collapsed" : "";
     return `<div class="sec-group${col}" id="sec-${key}">
-      <div class="sec-head" onclick="toggleSec('${key}')">
+      <div class="sec-head" role="button" tabindex="0" onclick="toggleSec('${key}')">
         <svg class="chev" viewBox="0 0 20 20"><path d="M6 8l4 4 4-4"/></svg>
         <span class="sh-label">${label} · ${count}</span><span class="ln"></span>${extra || ""}
       </div>
@@ -4865,7 +4889,7 @@
       ? (st ? `<div class="cst" title="${esc(st)}">${esc(st)}</div>` : `<div class="t"></div>`)
       : `<div class="t">${cd.t}</div>${cd.l?`<div class="l">${esc(cd.l)}</div>`:""}`;
     return `<div class="task ${u} ${t.done?'done':''}" data-id="${t.id}" onclick="openTaskReq(${t.id}, event)" style="cursor:pointer">
-      <div class="check ${t.done?'on':''}" onclick="toggleDone(${t.id})">${IC.check}</div>
+      <div class="check ${t.done?'on':''}" role="button" tabindex="0" aria-label="${t.done?'완료 취소':'완료'}" onclick="toggleDone(${t.id})">${IC.check}</div>
       <div class="task-main">
         <div class="task-title">${esc(t.title)}</div>
         <div class="task-sub">${tag}<span class="meta-text meta-deadline" title="마감 시간 설정" onclick="event.stopPropagation(); openTimeEdit(${t.id})" style="cursor:pointer">${fmtDl(t.deadline, compact)}</span>${alarm}${links}</div>
@@ -4885,24 +4909,35 @@
     const t = tasks.find(x => x.id === id); if(!t) return;
     if(!t.reqLink){ toast("요청글 링크가 없어요"); return; }
     const url = webUrl(t.reqLink);
-    if(!url){ toast("웹 주소가 아니라서 앱에서 열 수 없어요"); return; }
+    if(!url){ toast("웹 주소가 아니라서 앱에서 열 수 없어요", "err"); return; }
     if(typeof window.timerAPI !== "undefined" && window.timerAPI.openExternal) window.timerAPI.openExternal(url);
     else window.open(url, "_blank");
   }
 
   let toastTimer;
-  function toast(msg) {
+  // kind "err" 또는 문구에 「실패」가 있으면 실패 알림 — 체크 대신 경고 표시, 글 길이에 맞춰 더 오래(최대 6초).
+  function toast(msg, kind) {
     const el=$("toast");
+    const err = kind === "err" || /실패/.test(String(msg));
     // msg 에는 서버 error 문자열(최대 150자)이 그대로 실려 오는 경로가 여럿 있다 → esc() 필수.
-    // IC.check 는 코드에 박힌 SVG 라 그대로 둔다.
-    el.innerHTML=`${IC.check} ${esc(msg)}`; el.classList.add("show");
-    clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"),2200);
+    // 아이콘은 코드에 박힌 SVG 라 그대로 둔다.
+    el.innerHTML=`${err ? IC.warn : IC.check} ${esc(msg)}`; el.classList.add("show");
+    const ms = err ? Math.min(6000, Math.max(2200, 1500 + String(msg).length * 90)) : 2200;
+    clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove("show"), ms);
   }
 
-  document.querySelectorAll(".overlay").forEach(o=>o.addEventListener("click",e=>{if(e.target===o)o.classList.remove("show");}));
+  // 바깥(어두운 곳) 클릭도 X·Esc 와 같은 닫힘 효과로. 인라인 onclick 이 이미 있는 오버레이는 그쪽이 처리한다.
+  document.querySelectorAll(".overlay").forEach(o=>{ if(!o.hasAttribute("onclick")) o.addEventListener("click",e=>{if(e.target===o)closeModal(o.id);}); });
 
   // 창 컨트롤 — Electron이면 실제 동작, 브라우저면 시연 토스트
   const isElectron = typeof window.timerAPI !== "undefined";
+  // Tab 으로 온 「버튼 역할 div」는 Enter·Space 로 누른다. ★:focus-visible 일 때만 — 마우스로 누른 div 에도 포커스가 남는다.
+  document.addEventListener("keydown", e => {
+    const el = document.activeElement;
+    if ((e.key === " " || e.key === "Enter") && el && el.tagName !== "BUTTON" && el.getAttribute && el.getAttribute("role") === "button" && el.matches(":focus-visible")) {
+      e.preventDefault(); e.stopPropagation(); el.click();
+    }
+  }, true);
   if (isElectron && window.timerAPI.logError) {
     window.addEventListener("error", e => window.timerAPI.logError((e.error && e.error.stack) || (e.message + " @" + e.filename + ":" + e.lineno)));
     window.addEventListener("unhandledrejection", e => window.timerAPI.logError("promise: " + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
@@ -5160,7 +5195,7 @@
         e.preventDefault();
         const url = webUrl(a.getAttribute("href"));
         if (url) window.timerAPI.openExternal(url);
-        else toast("웹 주소가 아니라서 앱에서 열 수 없어요");
+        else toast("웹 주소가 아니라서 앱에서 열 수 없어요", "err");
       }
     }, true);
   }
