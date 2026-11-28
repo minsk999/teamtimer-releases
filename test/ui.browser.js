@@ -6,7 +6,7 @@
 //   다른 PC 에서는 TT_PW(playwright-core 경로)·TT_CHROME(실행 파일)을 준다. 바깥 요청은 전부 막는다(글꼴 CDN 포함).
 "use strict";
 const path = require("path"), fs = require("fs"), url = require("url");
-const PW = process.env.TT_PW || "C:/Users/misk9/ClaudeCode/nas-gallery/tools/whatsnew/node_modules/playwright-core";
+const PW = process.env.TT_PW || path.join(__dirname, "..", "..", "nas-gallery", "tools", "whatsnew", "node_modules", "playwright-core");   // 이 PC 는 형제 폴더의 것을 쓴다
 const { chromium } = require(PW);
 const exe = process.env.TT_CHROME || (() => {
   const base = path.join(process.env.LOCALAPPDATA || "", "ms-playwright");

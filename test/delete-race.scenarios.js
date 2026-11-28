@@ -585,6 +585,31 @@
       h.check("addMemo 한 번", h.posts(m).filter(p => p.action === "addMemo").length, 1);
       h.check("서버 관리 항목", h.server.mgmt[ME].map(x => x.b), ["주간 보고", "회의록 정리"]);
     } },
+    { key: "MD5", name: "중복 확인을 기다리는 사이 동료 보드로 넘어가도 내 목록으로 센다(이미 들어갔으면 안 보냄 · 동료 화면에 임시 줄 없음)", async run(h) {
+      await h.app("doSync({ silent:true })"); await h.settle();
+      h.server.postQueue.push(p => { h.server.apply(p); return { ok: false, timeout: true, error: "응답 지연(타임아웃)" }; });
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle();
+      const m = h.mark();
+      h.server.hold("sync");
+      h.app('submitAddMgmt("회의록 정리")'); await h.tick();
+      h.app('applyView("' + OTHER + '")');
+      h.server.release("sync"); await h.settle();
+      h.check("addMemo 다시 안 보냄", h.posts(m).filter(p => p.action === "addMemo").length, 0);
+      h.check("서버 관리 항목", h.server.mgmt[ME].map(x => x.b), ["주간 보고", "회의록 정리"]);
+      h.check("동료 화면에 임시 줄 없음", h.app("mgmtItems.filter(x => x._temp).length"), 0);
+      h.check("토스트", h.toastsSince(m).slice(-1), ["앞서 보낸 관리 항목이 이미 들어가 있어요"]);
+    } },
+    { key: "MD6", name: "중복 확인용 동기화가 실패하면 보내지 않고, 친 글은 입력칸에 되살린다", async run(h) {
+      await h.app("doSync({ silent:true })"); await h.settle();
+      h.server.postQueue.push(() => ({ ok: false, timeout: true, error: "응답 지연(타임아웃)" }));
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle();
+      const m = h.mark();
+      h.server.readQueue.push({ ok: false, error: "HTTP 500" }, { ok: false, error: "HTTP 500" });   // 동기화 1회 = 내부 재시도 포함 두 번 읽기
+      h.app('submitAddMgmt("회의록 정리")'); await h.settle(); await h.clock.advance(60000); await h.settle();
+      h.check("addMemo 안 보냄", h.posts(m).filter(p => p.action === "addMemo").length, 0);
+      h.check("토스트(마지막)", h.toastsSince(m).slice(-1), ["앞서 보낸 것이 들어갔는지 확인하지 못했어요 — 잠시 뒤 다시 시도해 주세요"]);
+      h.check("입력칸 되살림", [h.app("mgmtAdding"), h.app("mgmtAddDraft")], [true, "회의록 정리"]);
+    } },
     { key: "W3", name: "작업 추가·수정(쓰기 경로 유지)", async run(h) {
       const m = h.mark();
       const $v = (id, v) => h.app('document.getElementById("' + id + '").value = ' + JSON.stringify(v));

@@ -2,7 +2,7 @@
 //   test/loader.js 가 index.html 에서 순수 함수 블록(HOLIDAYS·getHoliday·normalizeTime·WORK_DEFAULT~workCfg·hmToMin~cdTextAt·fmtDl)을
 //   추출해 vm 에서 평가한다. 실행: npm test  (또는 node test/workhours.test.js)
 //   설계 기록·시안: _audit/ (git 제외). 규칙이 바뀌면 기대값을 손 검산으로 갱신할 것 — 함수 출력으로 기대값을 만들지 말 것.
-// ── bizleft.js 테스트 — node C:\Users\misk9\ClaudeCode\teamtimer\_audit\bizleft.test.js ──
+// ── bizleft.js 테스트 — node _audit/bizleft.test.js ──
 // 본 규칙 = 규칙 B(마감 당일 창 확장, 사용자 결정 2026-09-18). 스펙 벡터 V01~V28 은 B 기준으로 다시 손 검산했다.
 //   B 로 바뀐 것 = 마감이 업무시간 밖인 벡터 5개(V03·V04·V05·V14·V22) + E26 통계 + E27. 나머지는 규칙 A 와 값이 같다.
 // orange 정합(09-18 마무리) — 주황 = ts ≤ 다음 업무일 시작 AND (마감이 오늘 OR bizLeft < dayMs). 'Nd Nh' 카드는 주황이 아니다.

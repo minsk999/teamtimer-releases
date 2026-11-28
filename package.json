@@ -12,7 +12,7 @@
     "build:mac": "electron-builder --mac --x64 --dir --publish never && node sign-mac.js x64 && electron-builder --mac --x64 --prepackaged dist/mac/TeamTimer.app --publish never && electron-builder --mac --arm64 --dir --publish never && node sign-mac.js arm64 && electron-builder --mac --arm64 --prepackaged dist/mac-arm64/TeamTimer.app --publish never",
     "build:win": "electron-builder --win --publish never",
     "bump": "node bump-version.js",
-    "test": "node test/workhours.test.js && node test/delete-race.test.js && node test/weburl.test.js && node test/gas/gas.test.js && node test/gas/chips.test.js && node test/main-lib.test.js && node test/memolink.test.js",
+    "test": "node test/workhours.test.js && node test/delete-race.test.js && node test/weburl.test.js && node test/gas/gas.test.js && node test/gas/chips.test.js && node test/main-lib.test.js && node test/memolink.test.js && node test/fuzz/fuzz.js npm S 100 1 && node test/fuzz/fuzz.js npm R 60 1 && node test/fuzz/fuzz.js npm X 60 1",
     "test:ui": "node test/ui.browser.js && node test/caret.browser.js",
     "build:all": "electron-builder --mac --win --publish never"
   },

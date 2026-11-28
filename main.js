@@ -52,9 +52,10 @@ app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.setPath('userData', path.join(app.getPath('appData'), 'teamtimer'));
 
 // ── 오류 기록: 팀원 PC 에서 난 오류를 나중에 볼 수 있게 userData/error.log 에 남긴다(256KB 넘으면 뒤 절반만 남김) ──
-function logError(where, err) {
+// file 을 주면 그 파일에 — 지표(시작 시간·메모리)는 metrics.log 로 따로 남겨 오류 기록을 밀어내지 않는다(v1.0.48)
+function logError(where, err, file) {
   try {
-    const f = path.join(app.getPath('userData'), 'error.log');
+    const f = path.join(app.getPath('userData'), file || 'error.log');
     const line = new Date().toISOString() + ' v' + app.getVersion() + ' [' + where + '] '
       + String((err && (err.stack || err.message)) || err).slice(0, 2000).replace(/\r?\n/g, ' | ') + '\n';
     try { if (fs.statSync(f).size > 262144) fs.writeFileSync(f, fs.readFileSync(f, 'utf8').slice(-131072)); } catch (e) {}
@@ -390,6 +391,8 @@ function createWindow() {
 
   // 준비되면 표시 (깜빡임 방지). 단, 부팅 자동 실행 + "최소화 시작" 설정이면 트레이에 머무름
   mainWindow.once('ready-to-show', () => {
+    // 실행부터 창이 그릴 준비가 될 때까지(부팅 자동 실행이면 다른 프로그램과 겹쳐 더 길다) — 「켜는 게 느리다」 제보를 수치로
+    logError('metric:startup', Math.round(process.uptime() * 1000) + 'ms' + (wasOpenedAtLogin() ? ' (자동 실행)' : ''), 'metrics.log');
     if (wasOpenedAtLogin() && readStartupCfg().minimized) return; // 창 안 띄우고 트레이 상주
     showMain();
   });
@@ -534,7 +537,7 @@ app.whenReady().then(() => {
     try {
       const ms = app.getAppMetrics();
       const kb = ms.reduce((n, m) => n + ((m.memory && m.memory.workingSetSize) || 0), 0);
-      logError('metric:memory', 'working set ' + Math.round(kb / 1024) + 'MB, processes ' + ms.length);
+      logError('metric:memory', 'working set ' + Math.round(kb / 1024) + 'MB, processes ' + ms.length, 'metrics.log');
     } catch (e) {}
   };
   setTimeout(logMemory, 10 * 60 * 1000);

@@ -4,7 +4,7 @@
 //   기본 커서를 잠깐 빨갛게 켜고 그 칸만 찍어 빨간 세로줄의 가운데를 찾는다). 라이트·다크 둘 다.
 "use strict";
 const path = require("path"), fs = require("fs"), url = require("url");
-const PW = process.env.TT_PW || "C:/Users/misk9/ClaudeCode/nas-gallery/tools/whatsnew/node_modules/playwright-core";
+const PW = process.env.TT_PW || path.join(__dirname, "..", "..", "nas-gallery", "tools", "whatsnew", "node_modules", "playwright-core");   // 이 PC 는 형제 폴더의 것을 쓴다
 const { chromium } = require(PW);
 const exe = process.env.TT_CHROME || (() => {
   const base = path.join(process.env.LOCALAPPDATA || "", "ms-playwright");

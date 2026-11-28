@@ -123,7 +123,7 @@
       // ★[다시 시도]를 권하지 않는다. electron-updater 는 downloadPromise 가 살아 있으면
       //   새로 받지 않고 멈춘 그 promise 를 그대로 돌려준다(AppUpdater.js) — 눌러도 아무 일이 없다.
       updState = "stalled"; paintUpdater(); openUpdBanner();
-      toast("업데이트가 멈춘 것 같아요 — 앱을 껐다 켜 주세요");
+      toast("업데이트가 멈춘 것 같아요 — 앱을 껐다 켜 주세요", "err");
     }, 90000);
   }
   function updWatchStop(){ clearTimeout(updWatchdog); updWatchdog = null; }
@@ -3242,7 +3242,9 @@
     // 앞서 같은 글이 시간 초과로 끝났으면(서버엔 들어갔을 수 있다) 먼저 새로 받아 보고, 이미 있으면 또 보내지 않는다.
     // 작업 추가의 dupCheck 와 같은 생각 — 서버 addMemo 에는 중복 검사가 없어 앱이 한다.
     const memoKey = myName + "\n" + val;
-    const sameMemo = () => mgmtItems.filter(m => !m._temp && (String(m.b || "").trim() === val || String(m.c || "").trim() === val)).length;
+    // ★센 대상은 「내」 관리 항목 — 확인을 기다리는 사이 다른 팀원 보드로 넘어가면 mgmtItems 가 그 사람 것이 된다(v1.0.48, 4차 채점)
+    const myMgmt = () => { const me = (allMembersData || []).find(x => x.name === myName); return me ? (me.mgmt || []) : (isReadonly() ? [] : mgmtItems); };
+    const sameMemo = () => myMgmt().filter(m => !m._temp && (String(m.b || "").trim() === val || String(m.c || "").trim() === val)).length;
     mgmtAdding = false;            // ★기다리기 전에 입력칸부터 닫는다 — 확인 중에 Enter 를 또 누르거나 Esc 로 취소한 뒤에 나가는 일이 없게
     mgmtAddDraft = "";
     const memo0 = timedOutMemos[memoKey];
@@ -3250,7 +3252,10 @@
       renderMgmt(true);
       const seq = syncAppliedSeq;
       await doSync({ silent: true });
-      if (syncAppliedSeq === seq) { toast("앞서 보낸 것이 들어갔는지 확인하지 못했어요 — 잠시 뒤 다시 시도해 주세요", "err"); return; }
+      if (syncAppliedSeq === seq) {
+        if (!isReadonly()) { mgmtAdding = true; mgmtAddDraft = String(text); renderMgmt(true); }   // 친 글은 입력칸에 되살려 둔다
+        toast("앞서 보낸 것이 들어갔는지 확인하지 못했어요 — 잠시 뒤 다시 시도해 주세요", "err"); return;
+      }
       if (sameMemo() > memo0.n0) {   // 시간 초과 때보다 같은 글이 늘었다 = 그때 이미 들어갔다
         delete timedOutMemos[memoKey];
         toast("앞서 보낸 관리 항목이 이미 들어가 있어요");
@@ -3258,9 +3263,8 @@
       }
     }
     const n0 = sameMemo();
-    const temp = { row: -1, b: val, c: "", done: false, _temp: true };  // ① 즉시 표시
-    mgmtItems.push(temp);
-    renderMgmt();
+    const temp = { row: -1, b: val, c: "", done: false, _temp: true };  // ① 즉시 표시(내 보드를 보고 있을 때만)
+    if (!isReadonly()) { mgmtItems.push(temp); renderMgmt(); }
     const r = await postSheetTracked({ action:"addMemo", targetMember:myName, text:val });  // ② 기록
     if (r && r.timeout) timedOutMemos[memoKey] = { until: Date.now() + 10 * 60000, n0 };
     else if (!(r && r.busy)) delete timedOutMemos[memoKey];   // busy = 확실히 안 들어감, 앞선 기억은 그대로

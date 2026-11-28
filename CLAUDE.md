@@ -108,6 +108,7 @@ CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lip
 - Gmail 토큰: 윈도는 `safeStorage`(DPAPI) 암호화, 맥은 평문 + 0600(ad-hoc 서명이라 키체인 허용 창이 업데이트마다 뜰 수 있어 보류). OAuth 는 state + PKCE.
   ⚠️ 1.0.39 에서 그 전 버전으로 내리면 암호화된 토큰을 못 읽어 메일을 다시 연결해야 한다(데이터 손실은 없음).
 - 오류 기록: `userData/error.log`(256KB 넘으면 뒤 절반만). 메인·렌더러 예외, 동기화 실패 원문, 토큰 복호화 실패가 남는다.
+  지표(창이 그릴 준비까지 걸린 시간 `metric:startup` · 10분·8시간 뒤 상주 메모리 `metric:memory`)는 `userData/metrics.log` 로 따로(v1.0.48).
 - ⚠️ **남은 큰 구멍: 공유 GAS 웹앱에 인증이 없다** — 주소(공개 저장소·공개 딸깍 zip 에 있음)만 알면 누구나 읽기·쓰기·삭제가 된다.
   공유 토큰은 설치본·zip 이 공개라 소용없다. 닫으려면 「회사 구글 계정만」 접근 + 앱·딸깍이 구글 토큰을 실어 보내야 한다(팀 전원 재로그인 — 사용자 결정 대기, 2026-11-28).
 
@@ -161,6 +162,9 @@ CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lip
   3. main 에서 `git tag vX.Y.Z` → 태그 푸시 → CI(시험 → 빌드 → **prerelease**). ★`docs-vX.Y.Z` 가지를 **태그보다 먼저 푸시**할 것 — v1.0.43 부터 CI 가 그 가지의 설명서로
      `tools/release-notes.js` 를 돌려 본문을 넣는다(가지가 없으면 「설명서 참고」 한 줄). STATUS 에 「prerelease」라고 적는 건 **릴리스가 실제로 생긴 걸 확인한 뒤**(`gh release view`).
   4. 승격(사용자 「승격해」): `gh release edit vX.Y.Z --prerelease=false --latest` → docs 가지를 main 에 합쳐 푸시 → 가지 삭제.
+     ★**숙성**: 승격을 권할 땐 사용자 PC 에서 반나절~하루 써 본 뒤로, 팀 승격은 하루 한 번까지(2026-11-28 하루에 1.0.45·46·47 세 번 승격 — 4차 채점 지적).
+     예외는 팀이 지금 겪는 고장의 긴급 수정뿐. 사용자가 바로 「승격해」 하면 따르되, 숙성 없이 나간다는 것을 한 줄로 알릴 것.
+     승격 ≠ 설치: `autoDownload=false` 라 각자 [받기]를 눌러야 깔린다. 팀원 PC 의 판은 지금 알 길이 없다(타이머는 서버에 버전을 안 보낸다).
   5. **되돌리기**: `allowDowngrade` 가 꺼져 있어 직전 latest 를 다시 latest 로 지정해도 **이미 받은 PC 는 내려가지 않는다**. 고친(또는 되돌린) 코드로 다음 패치 버전을 내서 같은 절차로 올린다.
      1.0.39 부터 윈도 메일 토큰이 암호화돼, 그 아래 판을 손으로 다시 설치하면 메일을 다시 연결해야 한다.
 - 버전 올릴 땐 **`npm run bump 1.0.28`** — package.json 과 docs/index.html 을 같이 고친다.
@@ -221,7 +225,7 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
 - ★**팝업이 붙잡은 카드는 `findPinned()` 로 다시 찾는다.** 카드 id = 시트 행 번호라, 편집·완료·마감 창이 떠 있는 사이 목록이 당겨지면
   같은 id 가 옆 카드를 가리킨다 — 그대로 확정하면 **옆 카드가 완료·수정됐다**(수정 전 코드로 재현). pin = 카드 객체 + 제목·링크 + 「같은 것 몇 줄 중 몇 번째」.
   목록이 그대로면 같은 객체, 교체됐으면 제목·링크로 찾되 줄 수가 달라졌거나 쌍둥이들이 같은 폭으로 밀린 게 아니면 쓰지 않고 안내한다. 새 팝업을 만들 때도 같은 규칙.
-- **테스트:** `npm test` = 업무시간 계산(`test/workhours.test.js`) · 쓰기↔동기화 경합 시나리오(`test/delete-race.test.js`, 가짜 시트 서버·가짜 시계) · 링크 판정(`test/weburl.test.js`) · **실제 서버 코드**를 vm 에 올린 서버 약속(`test/gas/gas.test.js`·스마트 칩 `test/gas/chips.test.js`, gas/ 의 최신 사본 자동, 다른 판은 `TT_GAS=<파일>`) · main 순수 함수(`test/main-lib.test.js`) · 관리항목 링크 변환과 서버 왕복(`test/memolink.test.js`). 정본 목록은 `package.json` 의 `scripts.test`. 건수는 출력 참조(문서에 숫자를 적지 않는다 — 늘 낡는다). 릴리스 CI 도 같은 `npm test` 를 돈다. 수정 전 코드 재현은 `TT_RENDERER=<옛 파일>`.
+- **테스트:** `npm test` = 무작위 경합(`test/fuzz/fuzz.js`, 시드 고정 S100·R60·X60 — 실제 서버 코드 위에서 「누른 카드만 바뀌었나」, 엉뚱한 카드 변경이 1건이라도 나면 실패. 일부러 지문을 뺀 판으로 12건 잡는 것 확인) · 업무시간 계산(`test/workhours.test.js`) · 쓰기↔동기화 경합 시나리오(`test/delete-race.test.js`, 가짜 시트 서버·가짜 시계) · 링크 판정(`test/weburl.test.js`) · **실제 서버 코드**를 vm 에 올린 서버 약속(`test/gas/gas.test.js`·스마트 칩 `test/gas/chips.test.js`, gas/ 의 최신 사본 자동, 다른 판은 `TT_GAS=<파일>`) · main 순수 함수(`test/main-lib.test.js`) · 관리항목 링크 변환과 서버 왕복(`test/memolink.test.js`). 정본 목록은 `package.json` 의 `scripts.test`. 건수는 출력 참조(문서에 숫자를 적지 않는다 — 늘 낡는다). 릴리스 CI 도 같은 `npm test` 를 돈다. 수정 전 코드 재현은 `TT_RENDERER=<옛 파일>`.
   실제 DOM 실행은 `test/delete-race.browser.js` 머리말(launch.json `teamtimer-root`, 8733). ⚠️ 실제 Electron·실제 GAS 로는 돌리지 않았다.
   ⚠️ 실제 Electron 시험에서 `location.reload()` 는 먹지 않는다(`will-navigate` 차단, v1.0.39~) — 이름을 넣은 뒤엔 `doSync()` 를 직접 부를 것(`_audit/realapp/quick.js`).
 - 남은 한계(전부 검수에서 재현·기록). 빈도 실측(2026-11-28, `?action=read` 읽기 전용): 작업 112줄 중 **쌍둥이 0 · 게시글 번호 없는 링크 0**(빈 링크 1).
@@ -230,9 +234,10 @@ min-content 이고, 패딩은 `min-height:0` 으로도 안 줄어 그만큼 남�
     보내고 서버 v64 가 비교한다 — 서버가 v64 미만이면 그 키를 무시하므로 여전히 열려 있다.
   · 관리항목(메모) 수정·삭제는 v1.0.39 부터 고치는 칸의 고치기 전 값(`expectB`/`expectC`)을 보낸다(서버 v64 가 비교, 이름 행·구분선은 거부). v63 까지는
     행이 밀린 채 메모를 지우면 **팀원 이름 칸이 지워졌다**(실제 서버 코드로 재현, 지금은 `test/gas/gas.test.js`).
-  · ~~카드를 지운 직후 그 아래 카드의 완료·마감·수정이 한 번 거부되던 것~~ → **v1.0.43 B-5**: stale 이면 다시 받아 같은 지문(완료 여부까지)이
-    누를 때도 지금도 한 줄뿐이고 행이 바뀌었을 때만 새 행으로 **한 번** 재전송(`retryRowWrite`). 쌍둥이·없어짐·같은 행(낡은 캐시)은 예전처럼 안내만. 시나리오 S1·RS3·E6·R1~R5.
+  · ~~카드를 지운 직후 그 아래 카드의 완료·마감·수정이 한 번 거부되던 것~~ → **v1.0.43 B-5**: stale 이면 다시 받아 같은 지문(게시글·제목·링크 — 완료 여부는 안 본다, 서버 지문도 안 보므로)이
+    누를 때도 지금도 한 줄뿐이고 행이 바뀌었을 때만 새 행으로 **한 번** 재전송(`retryRowWrite`). 쌍둥이·없어짐·같은 행(낡은 캐시)은 예전처럼 안내만. 시나리오 S1·RS3·E6·R1~R6.
   · 관리 항목 추가가 시간 초과되면 서버엔 들어갔을 수 있다 — v1.0.43 부터 10분 안에 같은 글을 다시 보내면 먼저 새로 받아 보고 이미 있으면 보내지 않는다(`timedOutMemos`, 시나리오 MD1·MD2).
+    셀 때는 「내」 관리 항목만 본다(확인 사이 다른 보드로 넘어가도 — v1.0.48, MD5), 확인용 동기화가 실패하면 보내지 않고 친 글을 입력칸에 되살린다(MD6).
     서버 addMemo 에는 중복 검사가 없다(앱 쪽 방어뿐).
   · 시트의 **스마트 칩**이 든 관리 항목을 앱에서 고치면 칩이 일반 셀 링크로 바뀐다(글자·주소는 남음 — setCellSmart 가 칩을 다시 만들지 않는다).
     칩 읽기(Sheets API)가 실패하면 글자만 넘어오고, 그때 지문이 어긋나 「다시 불러올게요」가 날 수 있다(빈도 미측정).
@@ -263,14 +268,14 @@ C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도�
 
 ## 업무시간만 세기 (v1.0.31, 2026-09-18)
 팀원 제안으로 넣은 **개인 옵션**. 설정 「남은 시간」 그룹. 저장 `localStorage.workHours = {on,start,end,labels}`, 기본 off.
-- 계산은 index.html 안의 순수 함수: hmToMin·isOffDay·bizLeft·nextBizStart·holidayLabel·pauseLabel·**urgencyAt·cdTextAt**
+- 계산은 renderer/app.js 안의 순수 함수: hmToMin·isOffDay·bizLeft·nextBizStart·holidayLabel·pauseLabel·**urgencyAt·cdTextAt**
   (+ parseWorkHours/makeCfg). 기존 `urgency(ts)`/`cdText(ts)` 는 이 위의 얇은 래퍼 — 호출처(tick·updateStats·card) 무변경.
 - **규칙 B**(사용자 확정): 마감일 이전은 업무일의 [start,end) 만, 마감 당일은 쉬는 날이어도 세고 창을 마감 시각까지.
   주황 = 다음 업무일 시작 전 마감 **AND** (오늘 마감 OR 잔여 < 하루폭) — 'Nd Nh' 와 주황이 한 카드에 안 나오게 숫자 형식과 같은 기준.
 - 표식은 `.count .l` 슬롯 재사용, **카드별 판정**: 업무 전·업무 후·주말·공휴일 이름(6자 이상은 '공휴일'). 지난 카드는 옵션과 무관하게 **'초과'**.
   「설명 표시」를 끄면 초과 포함 전부 숨김(옵션 켠 사람만 가능). 완료 카드는 tick 이 건너뛰어 무관.
 - ★공휴일 이름은 KASI API(외부)에서 온다 — `card()` 에서 반드시 `esc(cd.l)`. `tick()` 은 textContent 라 안전.
-- **테스트: `npm test`** — `test/loader.js` 가 index.html 에서 함수 블록을 추출해 125벡터(`test/workhours.test.js`)를 돌린다.
+- **테스트: `npm test`** — `test/loader.js` 가 renderer/app.js 에서 함수 블록을 추출해 125벡터(`test/workhours.test.js`)를 돌린다.
   규칙을 바꾸면 기대값을 **손 검산**으로 갱신할 것(함수 출력으로 만들지 말 것). 설계 기록·시안은 `_audit/`(git 제외).
 - 설정 UI 는 드래프트→[저장] 부류(프리셋·알람과 같음). 검증 두 가지(형식·끝>시작)는 saveSettings 의 프리셋 검증 바로 뒤에서, 실패 시 저장 중단·모달 유지.
 - ⚠️ `bump-version.js` 는 설명서의 **변경 내역 절을 건드리지 않는다**(옛 항목 이름까지 갈아 버리던 사고, 09-18 수정). 새 버전 항목은 손으로 추가.
