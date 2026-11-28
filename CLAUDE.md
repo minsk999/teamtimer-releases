@@ -26,7 +26,7 @@ build/                  아이콘 (icon.icns/ico/png, tray*, trayTemplate*)
 build-secrets.example.js  비밀값 템플릿
 docs/index.html         GitHub Pages 설명서 = 다운로드 페이지
 docs/intranet-ddalkkak-extension.zip   딸깍 크롬 확장 배포본
-gas/                    GAS **참조 사본**(v70) + 지문 설계 초안(v60 으로 실현) (정본은 intranet-ttalkak/server/)
+gas/                    GAS **참조 사본**(v71) + 지문 설계 초안(v60 으로 실현) (정본은 intranet-ttalkak/server/)
 bump-version.js         `npm run bump 1.0.31` — package.json + docs 버전 동시 갱신
 .github/workflows/release.yml   v* 태그 → macOS+Windows 빌드 → Releases
 ```
@@ -281,10 +281,10 @@ C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도�
 - ⚠️ `bump-version.js` 는 설명서의 **변경 내역 절을 건드리지 않는다**(옛 항목 이름까지 갈아 버리던 사고, 09-18 수정). 새 버전 항목은 손으로 추가.
 
 ## GAS (구글 앱스스크립트)
-배포본 **v70** (2026-11-28 14:48 웹앱 버전 82 — v69 + 글 머리 + - @ 도 글자로 저장(textSafe)·insert 서식 단계 실패 때 partial:true 와 읽기 캐시 비움·딸깍 1.8.11(딸깍 세션); 그 전 v69 14:26 버전 81 — v68 + 관리항목 스마트 칩 링크를 Sheets 고급 서비스(chipRuns)로 읽어 「[칩 글자](주소)」로 넘김, 메모 지문도 같은 변환(타이머 세션, 고급 서비스 Sheets 를 프로젝트에 추가함); 그 전 v68 버전 80 — v67 + 체크박스 행 구분어 건너뜀·삭제 당김 textSafe·딸깍 1.8.10 등(딸깍 세션); 그 전 v67 13:36 버전 79 — v64 + 딸깍 최신 버전 상수(v65·v66) + 구역 경계어 검사가 작업·📌 행은 건너뜀(v67, 제목에 「공지사항」이 든 작업 아래가 잘리던 것); v64 는, 웹앱 버전 76; v63 은 같은 날 75, v62 는 11-27). v64 = v63(딸깍 세션: 락 직후 그리드 다시 읽기·insert 한 번에 쓰기·수식 주입 차단·딸깍 버전 기록) + 타이머 세션: 읽기 캐시 세대 번호(쓰기와 겹친 읽기는 캐시에 안 넣음) · 메모 지문 expectB/expectC + 이름 행·구분선 거부 · expectLink. 새 키는 전부 선택(안 보내면 v63 과 같다). v61 = members 응답에 `latestVer`·`updateMsg` 상시(타이머는 ok·members 만 읽어 무관). v55~v60 에 들어간 것: READ_ROWS 클램프 · 쓰기 경로도 `readGrid` · action 화이트리스트 ·
+배포본 **v71** (2026-11-28 21:55 웹앱 버전 83 — v70 + 숫자·날짜 모양 글자(제목·메모·관리항목) 앞에 ' 를 붙여 글자로 보존(litSafe, 「3-5」가 날짜로·「0012」가 12 로 바뀌던 것, 삭제 당김도 유지) · 기획안은 공백 없는 주소일 때만 링크 수식(isPlainUrl) · 딸깍 insert 목적지 가드·간격 줄 자가 복구 · 딸깍 1.8.18(딸깍 세션, 타이머 시험 세 묶음 통과 뒤 배포); 그 전 v70 14:48 웹앱 버전 82 — v69 + 글 머리 + - @ 도 글자로 저장(textSafe)·insert 서식 단계 실패 때 partial:true 와 읽기 캐시 비움·딸깍 1.8.11(딸깍 세션); 그 전 v69 14:26 버전 81 — v68 + 관리항목 스마트 칩 링크를 Sheets 고급 서비스(chipRuns)로 읽어 「[칩 글자](주소)」로 넘김, 메모 지문도 같은 변환(타이머 세션, 고급 서비스 Sheets 를 프로젝트에 추가함); 그 전 v68 버전 80 — v67 + 체크박스 행 구분어 건너뜀·삭제 당김 textSafe·딸깍 1.8.10 등(딸깍 세션); 그 전 v67 13:36 버전 79 — v64 + 딸깍 최신 버전 상수(v65·v66) + 구역 경계어 검사가 작업·📌 행은 건너뜀(v67, 제목에 「공지사항」이 든 작업 아래가 잘리던 것); v64 는, 웹앱 버전 76; v63 은 같은 날 75, v62 는 11-27). v64 = v63(딸깍 세션: 락 직후 그리드 다시 읽기·insert 한 번에 쓰기·수식 주입 차단·딸깍 버전 기록) + 타이머 세션: 읽기 캐시 세대 번호(쓰기와 겹친 읽기는 캐시에 안 넣음) · 메모 지문 expectB/expectC + 이름 행·구분선 거부 · expectLink. 새 키는 전부 선택(안 보내면 v63 과 같다). v61 = members 응답에 `latestVer`·`updateMsg` 상시(타이머는 ok·members 만 읽어 무관). v55~v60 에 들어간 것: READ_ROWS 클램프 · 쓰기 경로도 `readGrid` · action 화이트리스트 ·
 **쓰기 락**(LockService 8초, 못 잡으면 `{ok:false, busy:true}` — 핸들러 진입 전 반환이라 쓰기가 확실히 안 일어난 것) ·
-**행 지문 검사**(`expectTitle`/`expectIdx`, 불일치면 `{ok:false, stale:true, found}`). 참조 사본 `gas/AppsScript-v70.gs`.
-서버 버전 측정: **v61 부터 `?action=members` 응답에 `latestVer` 키가 있으면 v61 이상**(읽기 전용, 시트 변화 0). 값이 `1.8.6` 이면 v62, `1.8.7` 이면 v63 또는 v64, `1.8.8` 이면 v65, `1.8.9` 이면 v66 또는 v67, `1.8.10` 이면 v68 또는 v69(구별하려면 편집기에서 머리말 확인), `1.8.11` 이면 v70. 배포 기록·해시는 딸깍 저장소 STATUS. 그 이하는 못 잰다 — 사용자에게 묻는다.
+**행 지문 검사**(`expectTitle`/`expectIdx`, 불일치면 `{ok:false, stale:true, found}`). 참조 사본 `gas/AppsScript-v71.gs`.
+서버 버전 측정: **v61 부터 `?action=members` 응답에 `latestVer` 키가 있으면 v61 이상**(읽기 전용, 시트 변화 0). 값이 `1.8.6` 이면 v62, `1.8.7` 이면 v63 또는 v64, `1.8.8` 이면 v65, `1.8.9` 이면 v66 또는 v67, `1.8.10` 이면 v68 또는 v69(구별하려면 편집기에서 머리말 확인), `1.8.11` 이면 v70, `1.8.18` 이면 v71. 배포 기록·해시는 딸깍 저장소 STATUS. 그 이하는 못 잰다 — 사용자에게 묻는다.
 시트: `영상팀 업무현황` (탭: `🎬업무현황`, `🤖자동화` 등)
 
 ⚠️ **이 웹앱은 인트라넷 딸깍과 공유한다. 배포본이 하나뿐이다.**
@@ -307,7 +307,7 @@ C2 가 라이트에서 글자만 진하게 보정했던 것(`--st-*-ink` 별도�
   응답 예: `{"ok":true,"members":[...],"source":"config"}` — `source:"config"` = 자동화 시트에서 읽음
 
 ## 연계 제품
-- **인트라넷 딸깍** (크롬 확장, 현재 **v1.8.11** — 11-28 게시, 팀원은 각자 받아야 한다. 버전 정본은 딸깍 저장소 STATUS) — 인트라넷 게시글 → 시트 전송.
+- **인트라넷 딸깍** (크롬 확장, 현재 **v1.8.18** — 11-28 게시, 팀원은 각자 받아야 한다. 버전 정본은 딸깍 저장소 STATUS) — 인트라넷 게시글 → 시트 전송.
   소스는 `docs/intranet-ddalkkak-extension.zip` 안에만 있음. 수정 시 압축 풀고 → 수정 → 재압축 → manifest version 올림.
 - **BatchRenameComps** (AE CEP 확장) — 별도 레포 `minsk999/batchrenamecomps-releases`
 - **Slate** — 영상팀 work hub, 단일 HTML 프로토타입 (별도 진행)

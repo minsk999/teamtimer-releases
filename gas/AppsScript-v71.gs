@@ -1,5 +1,17 @@
 // ============================================================
-//  Google Apps Script v70  (7칸 구조
+//  Google Apps Script v71  (7칸 구조
+//  - v71: 2026-11-29 딸깍 세션(6차 점검 — 전문가 8명 + 반박 재현).
+//         ① insert 목적지 가드 확대 — 예전엔 제목·요청글 수식·📌▼ 만 봐서, 마지막 작업 바로 아래 줄에 제목 없이
+//            메모·마감·기획안만 적혀 있으면 조용히 덮어썼다. 이제 요청글~진행상황 칸의 값·수식이 하나라도 있으면 멈춘다.
+//         ② insert 간격 줄 자가 복구 — 빈 줄 삽입이 한 번 실패하면(partial) 간격 줄 자리에 작업이 남아, 그 팀원의 전송이
+//            사람이 시트를 고칠 때까지 「멈췄습니다」로 막혔다. 간격 줄 자리가 차 있으면 그 아래에 빈 줄을 넣고 진행한다.
+//         ③ 기획안 링크는 「공백 없는 http(s) 주소 하나」일 때만 수식(insert·updateTask) — 「http 로 시작하는 글」이
+//            통째로 깨진 HYPERLINK 가 되던 것.
+//         ④ litSafe: 제목·메모·관리항목 칸에 쓰는 글이 숫자·날짜 모양(「3-5」「0012」)이면 앞에 ' 를 붙여 글자로 둔다 —
+//            시트가 3월 5일·12 로 바꿔 저장하던 것. 마감 칸과 진행상황 칸은 건드리지 않는다(textSafe 그대로).
+//            deleteTask 가 줄을 당길 때도 제목·메모 칸은 같은 규칙.
+//         ⑤ LATEST_TTALKAK_VER 1.8.11 → 1.8.18.
+//  (구) v70  (7칸 구조
 //  - v70: 2026-11-28 딸깍 세션(5차 점검 — 전문가 9명 + 반박 재현).
 //         ① textSafe 가 '=' 뿐 아니라 '+'·'-'·'@' 로 시작하는 글도 글자로(앞에 ') — 「-수정 요청」「+1 추가」가
 //            시트에서 수식으로 읽혀 #ERROR! 가 되던 것. getValue 는 ' 없이 원문을 주므로 읽기·지문 비교는 그대로.
@@ -259,7 +271,7 @@ var CHECK_FONT_COLOR = "#434343";
 
 // ── 딸깍 확장 버전 알림 (v57) ───────────────────────────────
 // 딸깍을 새 버전으로 배포하면 이 값을 같이 올린다.
-var LATEST_TTALKAK_VER = "1.8.11";
+var LATEST_TTALKAK_VER = "1.8.18";
 // 알림에 덧붙일 안내 (빈 문자열이면 "새 버전이 있어요"만 뜬다)
 var UPDATE_MSG = "— 받은 zip 을 기존 폴더에 덮어쓰고 chrome://extensions 에서 ↻, 인트라넷 탭은 F5 해 주세요";
 
@@ -603,6 +615,15 @@ function textSafe(s) {
   s = String(s == null ? "" : s);
   return /^[=+\-@]/.test(s) ? "'" + s : s;   // v70: + - @ 도 시트가 수식으로 읽는다
 }
+// v71: 사람이 쓴 글(제목·메모·관리항목)이 숫자·날짜 모양이면 시트가 값을 바꿔 저장한다(「3-5」→3월 5일, 「0012」→12).
+//      그런 글은 ' 를 붙여 글자로 둔다. 마감 칸처럼 시트가 날짜로 읽어야 하는 곳에는 쓰지 말 것(textSafe).
+function litSafe(s) {
+  s = String(s == null ? "" : s);
+  // 숫자로 시작하는 글 전부(「50%」「1e3」「3:00 PM」도 값이 바뀐다 — 글자에 ' 를 붙여도 보이는 모양은 같다)와 TRUE/FALSE
+  return /^\s*(\d|true\s*$|false\s*$)/i.test(s) ? "'" + s : textSafe(s);
+}
+// v71: 기획안 칸 — 공백 없는 http(s) 주소 하나일 때만 링크 수식으로 만든다
+function isPlainUrl(s) { return /^https?:\/\/\S+$/.test(String(s || "").trim()); }
 // v63: HYPERLINK 수식은 여기서만 만든다. " 는 "" 로(수식 탈출 차단).
 //      빈 값과 http(s) 가 아닌 스킴(javascript: 등)만 null. 스킴이 없는 주소는 v62 처럼 그대로 수식으로 —
 //      타이머 입력칸이 「intranet.adef.co.kr/...」 형태를 권하고, 이 수식이 있어야 영상작업 행으로 읽힌다.
@@ -618,7 +639,7 @@ function linkFormula(url, label) {
 function setCellSmart(cell, val) {
   var s = String(val == null ? "" : val);
   var re = /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g;
-  if (!re.test(s)) { cell.setValue(textSafe(s)); return; }
+  if (!re.test(s)) { cell.setValue(litSafe(s)); return; }
   re.lastIndex = 0;
   var display = "", spans = [], m2, last = 0;
   while ((m2 = re.exec(s)) !== null) {
@@ -632,7 +653,7 @@ function setCellSmart(cell, val) {
     var b = SpreadsheetApp.newRichTextValue().setText(display);
     spans.forEach(function (sp) { b.setLinkUrl(sp.start, sp.end, sp.url); });
     cell.setRichTextValue(b.build());
-  } catch (err) { cell.setValue(textSafe(s)); } // 실패 시 원문 텍스트로 폴백
+  } catch (err) { cell.setValue(litSafe(s)); } // 실패 시 원문 텍스트로 폴백
 }
 
 // ── 정렬 기본값 ─────────────────────────────────────────────
@@ -1301,7 +1322,7 @@ function updateTask(p) {
   try {
     // 제목 (B/J)
     var titleCell = sheet.getRange(row, startCol + COL.TITLE);
-    titleCell.setValue(textSafe(title));
+    titleCell.setValue(litSafe(title));
     titleCell.setHorizontalAlignment("left"); // B/J 좌측정렬
     // 요청글 링크 (C/K) — HYPERLINK 수식
     var linkCell = sheet.getRange(row, startCol + COL.LINK);
@@ -1312,7 +1333,7 @@ function updateTask(p) {
     // 기획안 링크 (D/L) — http면 HYPERLINK, 아니면(NAS 경로·텍스트) 그대로 텍스트
     var planCell = sheet.getRange(row, startCol + COL.PLAN);
     if (planLink) {
-      var pf = planLink.indexOf("http") === 0 ? linkFormula(planLink, "🔗기획안링크") : null;   // v62 규칙: 기획안은 http 일 때만 수식
+      var pf = isPlainUrl(planLink) ? linkFormula(planLink, "🔗기획안링크") : null;   // v62 규칙: 기획안은 http 일 때만 수식(v71: 공백 없는 주소 하나)
       if (pf) planCell.setFormula(pf);
       else planCell.setValue(textSafe(planLink)); // NAS 경로(/cr/...)·일반 텍스트는 수식이 아니라 값으로
     } else {
@@ -1380,7 +1401,8 @@ function deleteTask(p) {
         if ((c === COL.LINK || c === COL.PLAN) && forms[i + 1][c]) vals[i][c] = forms[i + 1][c];
         // v68: 글자로 저장된 「=…」 를 그대로 setValues 하면 수식이 된다 — textSafe 로 글자 유지
         else vals[i][c] = forms[i + 1][c] ? forms[i + 1][c]
-                        : (typeof vals[i + 1][c] === "string" ? textSafe(vals[i + 1][c]) : vals[i + 1][c]);
+                        : (typeof vals[i + 1][c] !== "string" ? vals[i + 1][c]
+                           : (c === COL.TITLE || c === COL.MEMO) ? litSafe(vals[i + 1][c]) : textSafe(vals[i + 1][c]));   // v71: 제목·메모는 숫자 모양도 글자로
       }
       dueNF[i][0] = dueNF[i + 1][0];
     }
@@ -1562,6 +1584,31 @@ function doPost(e) {
     //    그다음 전송이 다음 팀원 이름 행을 덮어쓴다.
     var sectionEndSheetRow = findSectionEnd(allData, insFormulas, target, startCol, nameSheetRow) - 1;
 
+    // v71: 간격 줄 자가 복구. sectionEndSheetRow(경계 바로 앞 줄)는 팀원 사이 간격 줄이어야 한다.
+    //   빈 줄 삽입이 실패한 적이 있으면(v70 partial) 그 자리에 작업이 남아, 삽입 위치가 계속 그 줄로 계산돼 가드에 막혔다.
+    //   그 줄이 차 있으면 아래에 빈 줄을 하나 넣어 간격을 되살리고, 읽어 둔 그리드에도 같은 빈 줄을 끼운다.
+    //   경계가 실제로 있을 때만(맨 아래 팀원의 「경계 없음」은 그리드 끝이라 건드리지 않는다).
+    var gIdx = sectionEndSheetRow - 1;   // 0-based 간격 줄
+    //   ★ 그 줄이 「내 작업 줄 모양」(체크박스 또는 요청글 링크, 📌·▼ 아님)일 때만. 제목 글자만 보면 다음 자리의 📌 줄·
+    //     nameAtRow 에 안 잡히는 이름 줄·머리글을 내 작업으로 오인해 새 글을 남의 자리 안쪽에 써넣는다(반박 검수 재현).
+    //     partial 로 남은 줄은 insertCheckboxes 뒤라 늘 체크박스가 있다.
+    var gChk = allData[gIdx] ? allData[gIdx][startCol - 1 + COL.CHECK] : "";
+    if (gIdx > nameSheetRow && sectionEndSheetRow < allData.length &&
+        (gChk === true || gChk === false || /HYPERLINK/i.test(String(insFormulas[gIdx][startCol - 1 + COL.LINK]))) &&
+        !/[📌▼]/u.test(String(gChk)) &&
+        (String(allData[gIdx][startCol - 1 + COL.TITLE]).trim() ||
+         /HYPERLINK/i.test(String(insFormulas[gIdx][startCol - 1 + COL.LINK])))) {
+      sheet.insertRowAfter(sectionEndSheetRow);
+      sheet.getRange(sectionEndSheetRow + 1, 1, 1, sheet.getLastColumn())
+           .clearContent().clearDataValidations().clearFormat();
+      SpreadsheetApp.flush();
+      var blankRow = function (n) { var a = []; for (var q = 0; q < n; q++) a.push(""); return a; };
+      allData.splice(gIdx + 1, 0, blankRow(allData[gIdx].length));
+      insFormulas.splice(gIdx + 1, 0, blankRow(insFormulas[gIdx].length));
+      sectionEndSheetRow++;
+      bustReadCache();   // 줄을 밀었다 — 이 뒤에 「중복」·가드로 일찍 끝나도 타이머가 어긋난 행 번호를 받지 않게
+    }
+
     var scanStart    = nameSheetRow;           // 1-based, 이름 행 다음부터
     var scanEnd      = sectionEndSheetRow - 1;  // 1-based, 섹션 마지막 행
     var scanLen      = scanEnd - scanStart;
@@ -1624,11 +1671,17 @@ function doPost(e) {
       var dChk   = String(allData[dIdx][startCol - 1 + COL.CHECK] == null ? "" : allData[dIdx][startCol - 1 + COL.CHECK]);
       var dTitle = String(allData[dIdx][startCol - 1 + COL.TITLE] == null ? "" : allData[dIdx][startCol - 1 + COL.TITLE]).trim();
       var dLinkF = String(insFormulas[dIdx][startCol - 1 + COL.LINK]);
-      if (dTitle || /HYPERLINK/i.test(dLinkF) ||
+      // v71: 제목이 없어도 요청글~진행상황 칸에 무언가 적혀 있으면 빈 줄이 아니다(메모·마감만 적어 둔 줄을 덮어썼다)
+      var dRest = "";
+      for (var dc = COL.LINK; dc <= COL.STATUS; dc++) {
+        var dv2 = allData[dIdx][startCol - 1 + dc];
+        dRest += String(dv2 == null ? "" : dv2).trim() + String(insFormulas[dIdx][startCol - 1 + dc] || "").trim();
+      }
+      if (dTitle || dRest || /HYPERLINK/i.test(dLinkF) ||
           dChk.indexOf("📌") !== -1 || dChk.indexOf("▼") !== -1) {
         return respond({ ok: false, error: target + " " + insertRow + "행에 이미 내용이 있어 멈췄습니다. " +
           "구역 경계가 잘못 잡힌 것 같아요 — 시트를 확인해 주세요." +
-          (dTitle ? " (그 행: " + dTitle.slice(0, 30) + ")" : "") });
+          (dTitle ? " (그 행: " + dTitle.slice(0, 30) + ")" : dRest ? " (그 행에 제목 없이 다른 칸만 적혀 있어요)" : "") });
       }
     }
 
@@ -1644,16 +1697,16 @@ function doPost(e) {
     // v63: 제목·요청글·기획안·마감(B~E / J~M)을 한 번에 쓴다. 예전엔 여러 번 나눠 써서 중간 실패 시
     //      반쯤 쓴 행이 남았고, 링크 전에 멈추면 재전송이 중복 검사를 지나 두 번째 행을 만들었다.
     //      setValues 는 '=' 로 시작하는 문자열을 수식으로 넣는다 — 링크만 수식, 나머지는 textSafe.
-    var planVal = !planLink ? "" : (planLink.indexOf("http") === 0 && linkFormula(planLink, "🔗기획안링크")) || textSafe(planLink);   // v62 규칙: 기획안은 http 일 때만 수식
+    var planVal = !planLink ? "" : (isPlainUrl(planLink) && linkFormula(planLink, "🔗기획안링크")) || textSafe(planLink);   // v62 규칙: 기획안은 http 일 때만 수식(v71: 공백 없는 주소 하나)
     sheet.getRange(insertRow, startCol + COL.TITLE, 1, 4).setValues([[
-      textSafe(title),
+      litSafe(title),
       linkFormula(sourceUrl, "🔗요청글링크") || "",
       planVal,
       (dateValue instanceof Date) ? dateValue : textSafe(dateValue)
     ]]);
     written = target + " " + insertRow + "행";   // v68: 여기부터 실패해도 행은 들어가 있다
     // 메모(F/N)는 있을 때만 — 비어 있으면 그 칸을 건드리지 않는다(v62 와 같음)
-    if (memo) sheet.getRange(insertRow, startCol + COL.MEMO).setValue(textSafe(memo));
+    if (memo) sheet.getRange(insertRow, startCol + COL.MEMO).setValue(litSafe(memo));
     sheet.getRange(insertRow, startCol + COL.CHECK).setValue(false);
     var dueCell = sheet.getRange(insertRow, startCol + COL.DATE);
     if (dateValue instanceof Date) dueCell.setNumberFormat("mm / dd"); // 캘린더 작동 + MM/DD 표시
