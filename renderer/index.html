@@ -218,6 +218,7 @@
   .sync-pill:hover { border-color: var(--ink-3); }
   .sync-pill.syncing { pointer-events: none; }
   .sync-pill.err .dot { background: var(--red); animation: none; }   /* v1.0.39: 마지막 동기화 실패 */
+  @media (prefers-reduced-motion: reduce) { .sync-pill:not(.syncing) .dot { animation: none; } }   /* v1.0.41: 동작 줄이기면 쉴 때 깜빡이지 않음 */
   .sync-pill .sync-text { overflow: hidden; max-width: 60px; opacity: 1; transition: max-width 0.3s ease, opacity 0.25s ease; white-space: nowrap; }
   .sync-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; flex-shrink: 0; }
   .sync-pill.syncing .dot { animation: spin-pulse 0.8s linear infinite; }
@@ -498,6 +499,9 @@
     .overlay, .modal, .task.card-new { animation: none; }
     .toast { transition: opacity 0.2s linear; }
   }
+  .set-links { padding: 6px 28px 0; font-size: 12.5px; color: var(--ink-3); display: flex; gap: 10px; flex-shrink: 0; }
+  .set-links a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+  .set-links a:hover { color: var(--ink); }
   .modal-head { padding: 26px 28px 0; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
   .modal-head h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.035em; display: flex; align-items: center; gap: 0; }
   .modal-body { padding: 22px 28px 28px; }
@@ -1389,6 +1393,7 @@
       <h2><span>설정</span><span class="app-ver" id="app-ver">v1.0.0</span><a class="update-badge" id="update-badge" href="#" style="display:none">업데이트 있음</a></h2>
       <button class="close-btn" aria-label="닫기" onclick="closeModal('modal-settings')"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>
     </div>
+    <div class="set-links"><a href="#" onclick="event.preventDefault(); openDocs()">설명서 보기</a><span aria-hidden="true">·</span><a href="#" onclick="event.preventDefault(); openKeysModal()">단축키 보기</a></div>
     <!-- ★modal-head 는 스크롤 영역 밖이어야 한다 — 안에 두면 설정을 조금만 내려도
          제목·버전·닫기 [X] 가 화면에서 사라진다(탈출구가 ESC 뿐인데 표시가 없다). -->
     <div class="modal-inner">
@@ -2025,9 +2030,30 @@
 
   // "[라벨](https://...)" 마크다운 링크 → 클릭 가능한 링크로. (시트에서 작성한 하이퍼링크 인식)
   // 전체를 먼저 esc()로 이스케이프한 뒤 변환하므로 XSS 안전. http/https만 허용.
+  // 「[이름](주소)」와 맨 주소(https://…)를 눌리는 링크로. 이름이 주소 그대로거나 맨 주소면 「도메인/…」로 짧게 보인다.
+  function shortUrl(u){
+    try { const x = new URL(u.replace(/&amp;/g, "&")); return x.hostname.replace(/^www\./, "") + (x.pathname.length > 1 || x.search ? "/…" : ""); } catch(e){ return u; }
+  }
   function mdLinks(s){
-    return esc(s).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-      (_, label, url) => `<a class="mdlink" href="#" data-url="${url}" onclick="openMdLink(event, this)">${label}</a>`);
+    return esc(s).replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<]+)/g, (_, label, url, bare) => {
+      const u = url || bare;
+      const text = bare || label === url ? shortUrl(u) : label;
+      return `<a class="mdlink" href="#" data-url="${u}" title="${u}" onclick="openMdLink(event, this)">${text}</a>`;
+    });
+  }
+  // 메모 저장 전: 맨 주소는 「[주소](주소)」로 — 시트에도 확실히 링크로 들어가게(이미 [이름](주소) 안에 있는 주소는 그대로)
+  function linkifyMemo(t){
+    return String(t).replace(/(\]\()?(https?:\/\/[^\s\])]+)/g, (m, inLink, u) => inLink ? m : `[${u}](${u})`);
+  }
+  // 메모 입력칸: 글자를 고른 채 주소를 붙여 넣으면 그 글자에 링크를 건다(고른 글자가 없으면 주소 그대로 붙음 → 저장 때 링크)
+  function memoPasteLink(e){
+    const el = e.target, t = (e.clipboardData && e.clipboardData.getData("text") || "").trim();
+    if (!/^https?:\/\/\S+$/.test(t) || el.selectionStart === el.selectionEnd) return;
+    e.preventDefault();
+    const a = el.selectionStart, b = el.selectionEnd, sel = el.value.slice(a, b);
+    el.value = el.value.slice(0, a) + `[${sel}](${t})` + el.value.slice(b);
+    el.selectionStart = el.selectionEnd = a + sel.length + t.length + 4;
+    el.dispatchEvent(new Event("input"));
   }
   function openMdLink(e, el){
     e.preventDefault(); e.stopPropagation(); // 행 클릭/편집 동작과 분리
@@ -2099,11 +2125,17 @@
     svg.innerHTML = need ? '<g transform="rotate(180 12 12)">' + inner + "</g>" : inner;
   }
   // 사용자가 고른 테마를 기억했다가 켤 때 되살린다(고른 적 없으면 지금처럼 라이트)
-  try { if (localStorage.getItem("theme") === "dark") { document.body.classList.add("dark"); setThemeIcon(); } } catch (e) {}
+  try {
+    const saved = localStorage.getItem("theme");
+    const dark0 = saved ? saved === "dark" : !!(window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);   // 고른 적 없으면 윈도 테마
+    if (dark0) { document.body.classList.add("dark"); setThemeIcon(); }
+    if (window.timerAPI && window.timerAPI.setThemeBg) window.timerAPI.setThemeBg(dark0);
+  } catch (e) {}
   function toggleTheme() {
     document.body.classList.toggle("dark");
     const dark = document.body.classList.contains("dark");
     try { localStorage.setItem("theme", dark ? "dark" : "light"); } catch (e) {}
+    if (window.timerAPI && window.timerAPI.setThemeBg) window.timerAPI.setThemeBg(dark);   // 다음 시작 때 창 바탕색(흰 화면 번쩍임 방지)
     // 메일 아이콘과 동일한 모션: 180° 회전 + 중간점(210ms)에서 글리프 교체
     const svg = $("theme-icon");
     themeIconState.rot += 180;
@@ -3724,6 +3756,7 @@
   const RESERVED_KEYS = new Set(["escape","backspace","enter","tab"," ","w","arrowleft","arrowright","arrowup","arrowdown","home","end","pageup","pagedown","delete","insert"]);
   let keyCaptureId = null;
 
+  function openDocs(){ if (window.timerAPI && window.timerAPI.openExternal) window.timerAPI.openExternal("https://minsk999.github.io/teamtimer-releases/"); }
   function openKeysModal(){
     keyCaptureId = null;
     renderKeysList();
@@ -4671,12 +4704,12 @@
     const cur = m[col] || "";
     const textEl = el.querySelector(".mgmt-text");
     const acts = el.querySelector(".mgmt-acts");
-    textEl.outerHTML = `<div class="mgmt-edit"><input type="text" id="medit-input"></div>`;
+    textEl.outerHTML = `<div class="mgmt-edit"><input type="text" id="medit-input" onpaste="memoPasteLink(event)"></div>`;
     acts.innerHTML =
       `<button class="mact save" title="저장"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6"/></svg></button>` +
       `<button class="mact" title="취소"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`;
     const input = el.querySelector("#medit-input");
-    input.value = cur; input.focus(); input.select();
+    input.value = cur.replace(/\[(https?:\/\/[^\]\s]+)\]\(\1\)/g, "$1"); input.focus(); input.select();   // 「[주소](주소)」는 주소만 보여 준다(저장 때 다시 링크)
     mgmtEditing = { view: viewName };
     const save = () => { mgmtEditing = false; commitMgmt(row, col, input.value, cur); };
     const cancel = () => { mgmtEditing = false; renderMgmt(true); };
@@ -4694,7 +4727,7 @@
     const m = mgmtFind(row);
     if(mgmtSeenGone(m, col, seen)) return;
     if(!m) return;
-    const val = String(text).trim();
+    const val = linkifyMemo(String(text).trim());
     const prev = m[col];               // 롤백용 원본
     if(val === String(prev || "")) { renderMgmt(); return; }  // 변경 없으면 그냥 닫기
     m[col] = val;                      // ① 즉시 반영
@@ -4718,7 +4751,7 @@
   }
   function cancelAddMgmt(){ mgmtAdding = false; mgmtAddDraft = ""; renderMgmt(); }
   async function submitAddMgmt(text){
-    const val = String(text).trim();
+    const val = linkifyMemo(String(text).trim());
     if(!val){ cancelAddMgmt(); return; }
     const myName = getMyName();
     if(!myName || typeof window.timerAPI === "undefined"){ toast("앱에서만 동작해요"); return; }
@@ -4758,7 +4791,7 @@
     });
     if(mgmtAdding){
       rows += `<div class="mgmt-item adding"><span class="pin"></span>`
-        + `<div class="mgmt-edit"><input type="text" id="madd-input" placeholder="새 관리 항목" value="${esc(mgmtAddDraft)}" oninput="mgmtAddDraft=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAddMgmt(this.value)}else if(event.key==='Escape'){event.preventDefault();cancelAddMgmt()}"></div>`
+        + `<div class="mgmt-edit"><input type="text" id="madd-input" placeholder="새 관리 항목 · 주소를 붙여 넣으면 링크" onpaste="memoPasteLink(event)" value="${esc(mgmtAddDraft)}" oninput="mgmtAddDraft=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAddMgmt(this.value)}else if(event.key==='Escape'){event.preventDefault();cancelAddMgmt()}"></div>`
         + `<div class="mgmt-acts">`
         +   `<button class="mact save" title="추가" onclick="submitAddMgmt(document.getElementById('madd-input').value)"><svg viewBox="0 0 20 20"><path d="M5 10l3.5 3.5L15 6"/></svg></button>`
         +   `<button class="mact" title="취소" onclick="cancelAddMgmt()"><svg viewBox="0 0 20 20"><path d="M5.5 5.5l9 9M14.5 5.5l-9 9"/></svg></button>`

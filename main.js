@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 //  작업 타이머 — Electron 메인 프로세스
 // ─────────────────────────────────────────────
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, session, dialog, screen } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, session, dialog, screen, nativeTheme } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -68,6 +68,12 @@ process.on('uncaughtException', (e) => {
 });
 process.on('unhandledRejection', (e) => logError('main-promise', e));
 ipcMain.on('log-error', (event, msg) => logError('renderer', String(msg).slice(0, 2000)));
+// 화면 테마를 기억해 다음 시작 때 창 바탕색을 맞춘다 — 어두운 테마인데 뜰 때 흰 바탕이 번쩍이지 않게
+function themePath() { return path.join(app.getPath('userData'), 'theme.txt'); }
+ipcMain.on('theme-bg', (event, dark) => { try { fs.writeFileSync(themePath(), dark ? 'dark' : 'light'); } catch (e) {} });
+function startDark() {
+  try { return fs.readFileSync(themePath(), 'utf8').trim() === 'dark'; } catch (e) { return nativeTheme.shouldUseDarkColors; }
+}
 
 let mainWindow = null;
 let tray = null;
@@ -354,7 +360,7 @@ function createWindow() {
     // (1) 항상 좌측 고정이라 윈도우와 레이아웃이 어긋나고 (2) 모달 블러가 적용되지 않는다.
     // → frame:false 로 신호등을 없애고, 렌더러의 커스텀 버튼(우측)을 양쪽 플랫폼 공통으로 사용.
     frame: false,
-    backgroundColor: '#ffffff',
+    backgroundColor: startDark() ? '#0a0a0a' : '#ffffff',   // 렌더러 --bg 와 같은 값
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

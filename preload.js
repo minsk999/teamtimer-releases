@@ -62,6 +62,8 @@ contextBridge.exposeInMainWorld('timerAPI', {
 
   // 오류 기록(userData/error.log)
   logError: (msg) => ipcRenderer.send('log-error', msg),
+  // 테마(다음 시작 때 창 바탕색)
+  setThemeBg: (dark) => ipcRenderer.send('theme-bg', !!dark),
 
   // 플랫폼 정보 (UI 분기용)
   platform: process.platform,
