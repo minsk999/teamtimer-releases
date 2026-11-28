@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 //  작업 타이머 — Electron 메인 프로세스
 // ─────────────────────────────────────────────
-const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, session, dialog, screen, nativeTheme } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, Notification, nativeImage, shell, safeStorage, session, dialog, screen, nativeTheme, systemPreferences } = require('electron');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -391,7 +391,7 @@ function createWindow() {
   // 준비되면 표시 (깜빡임 방지). 단, 부팅 자동 실행 + "최소화 시작" 설정이면 트레이에 머무름
   mainWindow.once('ready-to-show', () => {
     if (wasOpenedAtLogin() && readStartupCfg().minimized) return; // 창 안 띄우고 트레이 상주
-    mainWindow.show();
+    showMain();
   });
 
   if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
@@ -401,7 +401,7 @@ function createWindow() {
     saveWinState();
     if (isQuitting) return;
     e.preventDefault();
-    mainWindow.hide();
+    hideToTray();
   });
 
   // 윈도우 종료·로그오프 때는 바로 끝낸다. 버티면 OS 가 GPU 보조 프로세스를 먼저 죽이고, 본체가 그걸
@@ -456,9 +456,9 @@ function createTray() {
   tray.setToolTip('작업 타이머');
 
   const menu = Menu.buildFromTemplate([
-    { label: '작업 타이머 열기', click: () => { mainWindow.show(); } },
+    { label: '작업 타이머 열기', click: () => { showMain(); } },
     // 상주 앱이라 창을 몇 주씩 안 여는 사람이 있다 — 수동 진입점을 하나 둔다
-    { label: '업데이트 확인', click: () => { mainWindow.show(); pushUpdateCheck(true); } },
+    { label: '업데이트 확인', click: () => { showMain(); pushUpdateCheck(true); } },
     { type: 'separator' },
     { label: '종료', click: () => { isQuitting = true; app.quit(); } },
   ]);
@@ -466,9 +466,34 @@ function createTray() {
 
   // 트레이 클릭 시 창 토글
   tray.on('click', () => {
-    if (mainWindow.isVisible()) mainWindow.hide();
-    else mainWindow.show();
+    if (mainWindow.isVisible() && !hideFade) hideToTray();
+    else showMain();
   });
+}
+
+// 트레이로 숨기기. ★그냥 hide() 하면 윈도 11 이 숨김 애니메이션을 그리는 동안 창의 둥근 모서리가 직각으로 바뀐다
+//   (2026-11-28 60fps 녹화로 확인 — 최소화 애니메이션은 둥근 채라 괜찮다). 앱이 직접 투명도를 내려 사라지게 한 뒤 숨기면
+//   그동안 둥근 모서리·테두리가 그대로 남는다(같은 녹화로 확인). 숨긴 뒤 투명도는 바로 1 로 되돌린다 — 다시 띄운 창도 둥근 채(확인).
+//   윈도 「애니메이션 효과」를 끈 PC·맥은 그냥 숨긴다. 흐려지는 중에 다시 열기를 누르면 멈추고 그대로 보인다(showMain).
+let hideFade = null;
+function hideToTray() {
+  if (!mainWindow || mainWindow.isDestroyed() || hideFade) return;
+  let rich = true; try { rich = systemPreferences.getAnimationSettings().shouldRenderRichAnimation; } catch (e) {}
+  if (process.platform !== 'win32' || !rich || !mainWindow.isVisible() || mainWindow.isMinimized()) { mainWindow.hide(); return; }
+  const N = 8; let i = 0;   // 16ms × 8 ≈ 0.13초 — 윈도 숨김 애니메이션과 비슷한 길이
+  const step = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) { hideFade = null; return; }
+    i++; mainWindow.setOpacity(Math.max(0, 1 - i / N));
+    if (i < N) { hideFade = setTimeout(step, 16); return; }
+    hideFade = null; mainWindow.hide(); mainWindow.setOpacity(1);
+  };
+  hideFade = setTimeout(step, 0);
+}
+function showMain() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (hideFade) { clearTimeout(hideFade); hideFade = null; }
+  mainWindow.setOpacity(1);
+  mainWindow.show();
 }
 
 // ── 앱 생명주기 ──
@@ -491,7 +516,7 @@ if (!gotTheLock) {
     // 사용자가 앱을 또 실행했을 때 — 기존 창을 복원·표시하고 포커스
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
-      if (!mainWindow.isVisible()) mainWindow.show();
+      if (!mainWindow.isVisible() || hideFade) showMain();   // 흐려지며 숨는 중이어도 다시 보인다
       mainWindow.focus();
     }
   });
@@ -518,7 +543,7 @@ app.whenReady().then(() => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
-    else mainWindow.show();
+    else showMain();
   });
 });
 
@@ -573,7 +598,7 @@ ipcMain.handle('notify', (event, { title, body, mailId }) => {
   n.on('click', () => {
     if (!mainWindow) return;
     if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
+    showMain();
     mainWindow.focus();
     // 알림에 메일 id가 실려 있으면 렌더러가 설정(Gmail/요청글/둘 다)대로 열도록 전달
     if (mailId) mainWindow.webContents.send('notification-mail-click', mailId);
@@ -594,7 +619,7 @@ ipcMain.on('win:maximize', () => {
     mainWindow.maximize();
   }
 });
-ipcMain.on('win:close', () => mainWindow.hide()); // 닫기 = 트레이로
+ipcMain.on('win:close', () => hideToTray()); // 닫기 = 트레이로
 
 // 최대화/복원 상태를 렌더러에 알림 (아이콘 전환용)
 function sendMaxState() {
