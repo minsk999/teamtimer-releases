@@ -166,6 +166,10 @@ CI 에 `Verify mac artifact architectures` 단계가 있어 이름↔실제(`lip
 - 버전 올릴 땐 **`npm run bump 1.0.28`** — package.json 과 docs/index.html 을 같이 고친다.
   CI 에 태그↔package.json 버전 일치 가드가 있어 어긋나면 빌드가 실패한다.
 
+## 창 닫기 = 흐리게 한 뒤 숨김 (v1.0.47)
+그냥 `mainWindow.hide()` 하면 윈도 11 의 숨김 애니메이션 동안 둥근 모서리가 **직각**으로 그려진다(60fps 녹화로 확인, `_audit/realapp/close-anim.js`). 숨김은 `hideToTray()`, 보이기는 `showMain()` 만 쓸 것(흐려지는 중 다시 열기를 처리한다). 최소화 애니메이션은 둥근 채라 손대지 않았다.
+⚠️ 이 PC 의 주 모니터는 gdigrab 이 검게 찍힌다 — 녹화는 왼쪽 모니터(배율 1)에 창을 놓고 한다.
+
 ## UI 작업에서 실측으로 밟은 것 (2026-08-28)
 
 ⚠️ **오버레이는 전부 `z-index:100` 이라 DOM 순서로 겹침이 정해진다.**
